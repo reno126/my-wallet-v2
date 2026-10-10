@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  "@prisma/engines": true
+  prisma: true
+# Prisma 7.10 pins a vulnerable deepmerge-ts major; remove after Prisma updates its pin.
+# Prisma 7.10 pins mysql2 3.15.3; its CLI works with this patched 3.x override.
+overrides:
+  deepmerge-ts: 8.0.2
+  mysql2: 3.24.5

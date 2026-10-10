@@ -1,0 +1,18 @@
+node_modules
+
+# Build and test output
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Local environment files may contain credentials
+.env.local
+.env.ci.local
+.env.*.local
+
+# Editor and operating-system metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
