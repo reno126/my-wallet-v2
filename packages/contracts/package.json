@@ -2,6 +2,9 @@
   "name": "@my-wallets/contracts",
   "private": true,
   "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "zod": "^4.6.5"
   }

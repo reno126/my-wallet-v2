@@ -2,6 +2,12 @@
   "name": "@my-wallets/web",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@my-wallets/contracts": "workspace:*",

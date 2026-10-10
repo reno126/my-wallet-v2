@@ -4,15 +4,16 @@
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "engines": {
-    "node": "^22.13.0 || >=24.0.0",
+    "node": "^22.22.0 || >=24.0.0",
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "dev:web": "pnpm --filter @my-wallets/web dev",
     "lint": "eslint .",
     "test:eslint-rules": "node --test tooling/eslint-rules/*.test.js",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm --recursive --if-present typecheck"
   },
   "devDependencies": {
     "@eslint/compat": "2.1.0",
