@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.git/
+pnpm-lock.yaml
+.env*
+apps/api/generated/
+apps/web/src/generated/
+packages/contracts/src/generated/
+AGENTS.md
+DEPENDENCY_VERSIONS.md
+IMPLEMENTATION_PLAN.md

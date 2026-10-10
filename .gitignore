@@ -16,3 +16,8 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
+
+# Supplied project planning and agent guidance files
+AGENTS.md
+DEPENDENCY_VERSIONS.md
+IMPLEMENTATION_PLAN.md
