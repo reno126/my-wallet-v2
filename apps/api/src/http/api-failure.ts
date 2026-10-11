@@ -1,11 +1,12 @@
-import type { ApiErrorInput } from '@my-wallets/contracts';
+import { type ApiErrorInput, apiErrorMessages } from '@my-wallets/contracts';
 
 export type ApiFailure =
   | { code: 'UNAUTHENTICATED' }
   | { code: 'FORBIDDEN' }
   | { code: 'NOT_FOUND' }
   | { code: 'CONFLICT' }
-  | { code: 'VALIDATION_FAILED' };
+  | { code: 'VALIDATION_FAILED' }
+  | { code: 'RATE_LIMITED' };
 
 interface FailureResponse {
   statusCode: number;
@@ -13,11 +14,12 @@ interface FailureResponse {
 }
 
 const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; message: string }> = {
-  UNAUTHENTICATED: { statusCode: 401, message: 'Authentication is required.' },
-  FORBIDDEN: { statusCode: 403, message: 'You do not have permission to perform this action.' },
-  NOT_FOUND: { statusCode: 404, message: 'The requested resource was not found.' },
-  CONFLICT: { statusCode: 409, message: 'The request conflicts with the current resource state.' },
-  VALIDATION_FAILED: { statusCode: 400, message: 'The request is invalid.' },
+  UNAUTHENTICATED: { statusCode: 401, message: apiErrorMessages.UNAUTHENTICATED },
+  FORBIDDEN: { statusCode: 403, message: apiErrorMessages.FORBIDDEN },
+  NOT_FOUND: { statusCode: 404, message: apiErrorMessages.NOT_FOUND },
+  CONFLICT: { statusCode: 409, message: apiErrorMessages.CONFLICT },
+  VALIDATION_FAILED: { statusCode: 400, message: apiErrorMessages.VALIDATION_FAILED },
+  RATE_LIMITED: { statusCode: 429, message: apiErrorMessages.RATE_LIMITED },
 };
 
 export function mapFailureToResponse(failure: ApiFailure, requestId: string): FailureResponse {

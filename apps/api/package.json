@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "pnpm --filter @my-wallets/contracts build && tsc -p tsconfig.build.json",
     "start": "node dist/app.js",
     "dev": "pnpm build && pnpm start",
     "test": "pnpm --filter @my-wallets/contracts build && vitest run",

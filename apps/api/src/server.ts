@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import autoload from '@fastify/autoload';
 import Fastify, { type FastifyServerOptions } from 'fastify';
 
-import type { ApiErrorInput } from '@my-wallets/contracts';
+import { type ApiErrorInput, apiErrorMessages } from '@my-wallets/contracts';
 
 import { apiEnvironment, type ApiEnvironmentInput } from './config/environment.js';
+import { mapFailureToResponse } from './http/api-failure.js';
 
 export interface BuildServerOptions {
   environment?: ApiEnvironmentInput;
@@ -15,6 +19,8 @@ export function buildServer(options: BuildServerOptions = {}) {
   const environment = options.environment ?? apiEnvironment;
   const server = Fastify({
     genReqId: () => randomUUID(),
+    trustProxy:
+      environment.API_TRUSTED_PROXY_CIDRS.length > 0 ? environment.API_TRUSTED_PROXY_CIDRS : false,
     logger:
       options.logger ??
       (environment.NODE_ENV === 'test'
@@ -31,12 +37,18 @@ export function buildServer(options: BuildServerOptions = {}) {
   });
 
   server.setErrorHandler((error, request, reply) => {
+    if (isRateLimitError(error)) {
+      const rateLimitResponse = mapFailureToResponse({ code: 'RATE_LIMITED' }, request.id);
+
+      return reply.code(rateLimitResponse.statusCode).send(rateLimitResponse.body);
+    }
+
     request.log.error({ err: error }, 'Unhandled request error');
 
     const response: ApiErrorInput = {
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred.',
+        message: apiErrorMessages.INTERNAL_SERVER_ERROR,
         requestId: request.id,
       },
     };
@@ -44,19 +56,26 @@ export function buildServer(options: BuildServerOptions = {}) {
     return reply.code(500).send(response);
   });
 
-  server.setNotFoundHandler((request, reply) => {
-    const response: ApiErrorInput = {
-      error: {
-        code: 'NOT_FOUND',
-        message: 'The requested resource was not found.',
-        requestId: request.id,
-      },
-    };
+  const serverDirectory = dirname(fileURLToPath(import.meta.url));
 
-    return reply.code(404).send(response);
+  server.register(autoload, {
+    dir: join(serverDirectory, 'plugins'),
+    ignorePattern: /\.(test|spec)\.ts$/,
+    options: { environment },
+  });
+  server.register(autoload, {
+    dir: join(serverDirectory, 'routes'),
+    autoHooks: true,
+    matchFilter: /[\\/]index\.(ts|js)$/,
+    ignorePattern: /\.(test|spec)\.(ts|js)$/,
+    options: { prefix: '/api' },
   });
 
-  server.get('/api/health', () => ({ status: 'ok' }));
-
   return server;
+}
+
+function isRateLimitError(error: unknown): error is { statusCode: 429 } {
+  return (
+    typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 429
+  );
 }

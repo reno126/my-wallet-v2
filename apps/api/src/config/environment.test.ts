@@ -8,6 +8,11 @@ describe('API environment validation', () => {
       NODE_ENV: 'development',
       API_HOST: '127.0.0.1',
       PORT: 3000,
+      CORS_ALLOWED_ORIGINS: [],
+      API_TRUSTED_PROXY_CIDRS: [],
+      API_HTTPS_ENABLED: false,
+      API_RATE_LIMIT_MAX: 100,
+      API_RATE_LIMIT_TIME_WINDOW_MS: 60_000,
     });
   });
 
@@ -17,16 +22,45 @@ describe('API environment validation', () => {
         NODE_ENV: 'test',
         API_HOST: '127.0.0.2',
         PORT: '3100',
+        CORS_ALLOWED_ORIGINS: 'http://localhost:5173, https://wallet.example',
+        API_TRUSTED_PROXY_CIDRS: '127.0.0.1, 10.1.0.0/16',
+        API_HTTPS_ENABLED: 'true',
+        API_RATE_LIMIT_MAX: '120',
+        API_RATE_LIMIT_TIME_WINDOW_MS: '30000',
       }),
     ).toStrictEqual({
       NODE_ENV: 'test',
       API_HOST: '127.0.0.2',
       PORT: 3100,
+      CORS_ALLOWED_ORIGINS: ['http://localhost:5173', 'https://wallet.example'],
+      API_TRUSTED_PROXY_CIDRS: ['127.0.0.1', '10.1.0.0/16'],
+      API_HTTPS_ENABLED: true,
+      API_RATE_LIMIT_MAX: 120,
+      API_RATE_LIMIT_TIME_WINDOW_MS: 30_000,
     });
   });
 
   it('rejects unsupported runtime modes and invalid ports', () => {
     expect(apiEnvironmentSchema.safeParse({ NODE_ENV: 'preview' }).success).toBe(false);
     expect(apiEnvironmentSchema.safeParse({ PORT: '65536' }).success).toBe(false);
+    expect(
+      apiEnvironmentSchema.safeParse({ CORS_ALLOWED_ORIGINS: 'https://wallet.example/path' })
+        .success,
+    ).toBe(false);
+    expect(
+      apiEnvironmentSchema.safeParse({ CORS_ALLOWED_ORIGINS: 'ftp://wallet.example' }).success,
+    ).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ API_TRUSTED_PROXY_CIDRS: '*' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ API_TRUSTED_PROXY_CIDRS: 'uniquelocal' }).success).toBe(
+      false,
+    );
+    expect(apiEnvironmentSchema.safeParse({ API_TRUSTED_PROXY_CIDRS: '10.0.0.0/99' }).success).toBe(
+      false,
+    );
+    expect(apiEnvironmentSchema.safeParse({ API_TRUSTED_PROXY_CIDRS: '0.0.0.0/0' }).success).toBe(
+      false,
+    );
+    expect(apiEnvironmentSchema.safeParse({ API_HTTPS_ENABLED: 'yes' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ API_RATE_LIMIT_MAX: '0' }).success).toBe(false);
   });
 });
