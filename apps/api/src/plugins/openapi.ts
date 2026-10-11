@@ -1,4 +1,5 @@
 import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import type { FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { jsonSchemaTransform, jsonSchemaTransformObject } from 'fastify-type-provider-zod';
@@ -47,6 +48,15 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
       return { ...transformedRoute, url: normalizedUrl };
     },
     transformObject: jsonSchemaTransformObject,
+  });
+
+  await server.register(swaggerUi, {
+    routePrefix: '/documentation',
+    staticCSP: true,
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: true,
+    },
   });
 };
 

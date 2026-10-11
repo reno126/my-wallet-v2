@@ -16,6 +16,30 @@ describe('OpenAPI contract', () => {
     apiServer = undefined;
   });
 
+  it('serves Swagger UI with a static CSP and Helmet security headers', async () => {
+    const server = createTestServer();
+    apiServer = server;
+    await server.ready();
+
+    const documentationResponse = await server.inject({
+      method: 'GET',
+      url: '/documentation/',
+    });
+
+    expect(documentationResponse.statusCode).toBe(200);
+    expect(documentationResponse.headers['content-type']).toContain('text/html');
+    expect(documentationResponse.payload).toContain('id="swagger-ui"');
+    expect(documentationResponse.payload).toContain('swagger-ui-bundle.js');
+    expect(documentationResponse.headers['x-content-type-options']).toBe('nosniff');
+    expect(documentationResponse.headers['x-frame-options']).toBe('SAMEORIGIN');
+
+    const contentSecurityPolicy = documentationResponse.headers['content-security-policy'];
+    expect(contentSecurityPolicy).toContain("default-src 'self'");
+    expect(contentSecurityPolicy).toContain("script-src 'self'");
+    expect(contentSecurityPolicy).toContain("style-src 'self'");
+    expect(contentSecurityPolicy).not.toContain("'unsafe-inline'");
+  });
+
   it('documents each health operation with unique IDs and validates successful responses', async () => {
     const server = createTestServer();
     apiServer = server;
