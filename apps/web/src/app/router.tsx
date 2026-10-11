@@ -1,18 +1,41 @@
 import type { RouteObject } from 'react-router';
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, redirect } from 'react-router';
 
+import { getSession, redirectAuthenticatedUser, requireSession } from '../lib/requireSession';
+import { AuthenticatedLayout } from './layouts/AuthenticatedLayout';
 import { RootLayout } from './layouts/RootLayout';
+import { AuthPlaceholderRoute } from './routes/auth/AuthPlaceholderRoute';
 import { HomeRoute } from './routes/home/HomeRoute';
 import { NotFoundRoute } from './routes/not-found/NotFoundRoute';
 import { RootErrorBoundary } from './routes/RootErrorBoundary';
+import { RootLoadingFallback } from './routes/RootLoadingFallback';
+import { WalletsRoute } from './routes/wallets/WalletsRoute';
+
+async function homeLoader() {
+  if (await getSession()) {
+    // Redirect Responses are the standard React Router loader control flow.
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect('/wallets');
+  }
+
+  return null;
+}
 
 export const routeObjects = [
   {
     path: '/',
     Component: RootLayout,
     ErrorBoundary: RootErrorBoundary,
+    HydrateFallback: RootLoadingFallback,
     children: [
-      { index: true, Component: HomeRoute },
+      { index: true, Component: HomeRoute, loader: homeLoader },
+      { path: 'login', Component: AuthPlaceholderRoute, loader: redirectAuthenticatedUser },
+      { path: 'register', Component: AuthPlaceholderRoute, loader: redirectAuthenticatedUser },
+      {
+        Component: AuthenticatedLayout,
+        loader: requireSession,
+        children: [{ path: 'wallets', Component: WalletsRoute, loader: requireSession }],
+      },
       { path: '*', Component: NotFoundRoute },
     ],
   },
