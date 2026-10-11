@@ -30,6 +30,11 @@ const rateLimitedResponse = {
   },
 } as const;
 
+const setCookieResponseHeader = {
+  description: 'Session cookies set or cleared by Better Auth.',
+  schema: { type: 'array', items: { type: 'string' } },
+} as const;
+
 export function addRateLimitContract(apiDocument: SwaggerDocument): OpenApiDocument {
   if (!isOpenApiDocument(apiDocument)) {
     throw new Error('The API contract must use OpenAPI 3.');
@@ -58,7 +63,45 @@ export function addRateLimitContract(apiDocument: SwaggerDocument): OpenApiDocum
     }
   }
 
+  addBetterAuthCookieHeaders(apiDocument);
+
   return apiDocument;
+}
+
+function addBetterAuthCookieHeaders(apiDocument: OpenApiDocument): void {
+  for (const path of [
+    '/auth/get-session',
+    '/auth/sign-up/email',
+    '/auth/sign-in/email',
+    '/auth/sign-out',
+  ]) {
+    const pathItem = apiDocument.paths?.[path];
+
+    if (!pathItem) {
+      continue;
+    }
+
+    for (const operation of Object.values(pathItem)) {
+      if (!isObjectRecord(operation) || !isObjectRecord(operation.responses)) {
+        continue;
+      }
+
+      const successResponse = operation.responses['200'];
+
+      if (!isObjectRecord(successResponse)) {
+        continue;
+      }
+
+      successResponse.headers = {
+        ...(isObjectRecord(successResponse.headers) ? successResponse.headers : {}),
+        'set-cookie': setCookieResponseHeader,
+      };
+    }
+  }
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isOpenApiDocument(apiDocument: SwaggerDocument): apiDocument is OpenApiDocument {

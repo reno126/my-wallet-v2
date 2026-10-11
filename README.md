@@ -36,7 +36,9 @@ Vite listens on `http://127.0.0.1:5173`. The development server proxies `/api` r
 
 Build the static web output with `pnpm --filter @my-wallets/web build`. `vite preview` is for local review only; production web hosting will serve the built output separately from the API.
 
-The API configuration validates `NODE_ENV`, `API_HOST`, and `PORT` once when its environment module is imported. It defaults to development mode, loopback host `127.0.0.1`, and port `3000`. `DATABASE_URL` is reserved for the API and Prisma; the browser uses relative `/api` requests by default. Keep API secrets in API-only environment configuration and never expose them through `VITE_` variables.
+The API validates runtime, listener, origin/proxy, rate-limit, database, and authentication settings at startup. It defaults to development mode, loopback host `127.0.0.1`, and port `3000`. Set `BETTER_AUTH_SECRET` in the ignored `.env.local` file for local API development; generate it with `openssl rand -base64 32`. Tests may omit it and use a test-only dummy secret. Production also requires explicit `BETTER_AUTH_URL` and exact `WEB_ORIGIN` values. Google OAuth credentials are API-only and are used when OAuth is implemented. `DATABASE_URL` is reserved for the API and Prisma; the browser uses relative `/api` requests by default. Never expose API secrets through `VITE_` variables.
+
+Better Auth exposes its public authentication handler under `/api/auth/*`, stores users and sessions in PostgreSQL, and currently enables email/password registration and login. The API provides a typed session lookup and authentication hook for later protected route groups; browser sign-in screens and Google OAuth are implemented in later Phase 3 slices.
 
 ## API documentation
 

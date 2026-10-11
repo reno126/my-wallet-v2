@@ -4,6 +4,22 @@ import { z as zod } from 'zod';
 
 const localDevelopmentDatabaseUrl =
   'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public';
+const testOnlyAuthSecret = 'test-only-secret-that-is-never-valid-in-production';
+const localBetterAuthUrl = 'http://127.0.0.1:3000';
+const localWebOrigin = 'http://127.0.0.1:5173';
+
+const exactHttpOriginSchema = zod
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const parsedOrigin = new URL(value);
+
+      return ['http:', 'https:'].includes(parsedOrigin.protocol) && parsedOrigin.origin === value;
+    } catch {
+      return false;
+    }
+  }, 'Value must be an exact HTTP or HTTPS origin without a path.');
 
 export const apiEnvironmentSchema = zod
   .object({
@@ -59,6 +75,11 @@ export const apiEnvironmentSchema = zod
       .min(1_000)
       .max(3_600_000)
       .default(60_000),
+    BETTER_AUTH_SECRET: zod.string().min(32).optional(),
+    BETTER_AUTH_URL: exactHttpOriginSchema.optional(),
+    WEB_ORIGIN: exactHttpOriginSchema.optional(),
+    GOOGLE_CLIENT_ID: zod.string().default(''),
+    GOOGLE_CLIENT_SECRET: zod.string().default(''),
     DATABASE_URL: zod
       .string()
       .url()
@@ -81,7 +102,42 @@ export const apiEnvironmentSchema = zod
         message: 'DATABASE_URL must be explicitly configured in production.',
       });
     }
-  });
+
+    if (
+      environment.NODE_ENV !== 'test' &&
+      (!environment.BETTER_AUTH_SECRET || environment.BETTER_AUTH_SECRET === testOnlyAuthSecret)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['BETTER_AUTH_SECRET'],
+        message: 'BETTER_AUTH_SECRET must be set to a non-test value outside tests.',
+      });
+    }
+
+    if (environment.NODE_ENV === 'production') {
+      if (!environment.BETTER_AUTH_URL) {
+        context.addIssue({
+          code: 'custom',
+          path: ['BETTER_AUTH_URL'],
+          message: 'BETTER_AUTH_URL must be explicitly configured in production.',
+        });
+      }
+
+      if (!environment.WEB_ORIGIN) {
+        context.addIssue({
+          code: 'custom',
+          path: ['WEB_ORIGIN'],
+          message: 'WEB_ORIGIN must be explicitly configured in production.',
+        });
+      }
+    }
+  })
+  .transform((environment) => ({
+    ...environment,
+    BETTER_AUTH_SECRET: environment.BETTER_AUTH_SECRET ?? testOnlyAuthSecret,
+    BETTER_AUTH_URL: environment.BETTER_AUTH_URL ?? localBetterAuthUrl,
+    WEB_ORIGIN: environment.WEB_ORIGIN ?? localWebOrigin,
+  }));
 
 export type ApiEnvironmentInput = zod.infer<typeof apiEnvironmentSchema>;
 

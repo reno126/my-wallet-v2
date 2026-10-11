@@ -262,6 +262,9 @@ function createTestServer(environmentOverrides: Record<string, string> = {}) {
   return buildServer({
     environment: apiEnvironmentSchema.parse({
       NODE_ENV: 'test',
+      BETTER_AUTH_SECRET: 'production-mode-test-fixture-secret-with-enough-length',
+      BETTER_AUTH_URL: 'https://api.test.example',
+      WEB_ORIGIN: 'https://wallet.test.example',
       DATABASE_URL:
         'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
       ...environmentOverrides,

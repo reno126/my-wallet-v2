@@ -71,8 +71,9 @@ describe('OpenAPI contract', () => {
     server.register(failureRoute, { prefix: '/api' });
     await server.ready();
 
+    const apiDocument = addRateLimitContract(server.swagger());
     const contractApi = new OpenAPIBackend({
-      definition: addRateLimitContract(server.swagger()),
+      definition: apiDocument,
       strict: true,
       apiRoot: '/api',
     });
@@ -112,6 +113,40 @@ describe('OpenAPI contract', () => {
     expect(limitedResponse.headers['x-ratelimit-limit']).toBeDefined();
     expect(limitedResponse.headers['x-ratelimit-remaining']).toBeDefined();
     expect(limitedResponse.headers['x-ratelimit-reset']).toBeDefined();
+  });
+
+  it('documents a Better Auth handler response through its OpenAPI operation', async () => {
+    const server = createTestServer();
+    apiServer = server;
+    await server.ready();
+
+    const apiDocument = addRateLimitContract(server.swagger());
+    const contractApi = new OpenAPIBackend({
+      definition: apiDocument,
+      strict: true,
+      apiRoot: '/api',
+    });
+    await contractApi.init();
+
+    expect(apiDocument).toHaveProperty(
+      'paths./auth/sign-up/email.post.responses.200.headers.set-cookie',
+    );
+
+    expect(
+      contractApi.matchOperation({
+        method: 'post',
+        path: '/api/auth/sign-up/email',
+        headers: {},
+      })?.operationId,
+    ).toBe('registerWithEmail');
+
+    const sessionResponse = await server.inject({
+      method: 'GET',
+      url: '/api/auth/get-session',
+    });
+
+    validateResponseAgainstContract(contractApi, '/api/auth/get-session', sessionResponse);
+    expect(sessionResponse.statusCode).toBe(200);
   });
 });
 
@@ -158,7 +193,11 @@ const rateLimitRoute: FastifyPluginCallbackZod = (
 
 function createTestServer() {
   return buildServer({
-    environment: apiEnvironmentSchema.parse({ NODE_ENV: 'test' }),
+    environment: apiEnvironmentSchema.parse({
+      NODE_ENV: 'test',
+      DATABASE_URL:
+        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
+    }),
     logger: false,
   });
 }
