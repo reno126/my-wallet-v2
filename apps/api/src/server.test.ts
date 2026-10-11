@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type ApiErrorInput, apiErrorSchema } from '@my-wallets/contracts';
 
@@ -12,6 +12,27 @@ describe('API server security boundary', () => {
   afterEach(async () => {
     await server?.close();
     server = undefined;
+  });
+
+  it('reuses its connected Prisma client and releases the connection pool on close', async () => {
+    const testServer = createTestServer();
+    server = testServer;
+
+    await testServer.ready();
+    const queryResult = await testServer.prisma.$queryRaw<Array<{ database: string }>>`
+      SELECT current_database() AS database
+    `;
+    const firstClient = testServer.prisma;
+    const disconnect = vi.spyOn(firstClient, '$disconnect');
+
+    await testServer.inject({ method: 'GET', url: '/api/health' });
+
+    expect(queryResult).toStrictEqual([{ database: 'wallet_test' }]);
+    expect(testServer.prisma).toBe(firstClient);
+
+    await testServer.close();
+
+    expect(disconnect).toHaveBeenCalledOnce();
   });
 
   it('loads health routes under the shared API prefix and applies Helmet headers', async () => {
@@ -239,7 +260,12 @@ describe('API server security boundary', () => {
 
 function createTestServer(environmentOverrides: Record<string, string> = {}) {
   return buildServer({
-    environment: apiEnvironmentSchema.parse({ NODE_ENV: 'test', ...environmentOverrides }),
+    environment: apiEnvironmentSchema.parse({
+      NODE_ENV: 'test',
+      DATABASE_URL:
+        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
+      ...environmentOverrides,
+    }),
     logger: false,
   });
 }

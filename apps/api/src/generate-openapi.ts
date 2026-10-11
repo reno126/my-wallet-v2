@@ -13,7 +13,7 @@ try {
   const openApiDocument = addRateLimitContract(server.swagger());
   const outputPath = resolve(
     dirname(fileURLToPath(import.meta.url)),
-    '../../../packages/contracts/openapi.json',
+    '../../../../packages/contracts/openapi.json',
   );
 
   await mkdir(dirname(outputPath), { recursive: true });

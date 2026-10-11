@@ -3,12 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @my-wallets/contracts build && tsc -p tsconfig.build.json",
-    "start": "node dist/app.js",
+    "build": "pnpm prisma:generate && pnpm --filter @my-wallets/contracts build && tsc -p tsconfig.build.json",
+    "start": "node dist/src/app.js",
     "dev": "pnpm build && pnpm start",
-    "generate:openapi": "pnpm build && node dist/generate-openapi.js",
-    "test": "pnpm --filter @my-wallets/contracts build && vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "generate:openapi": "pnpm build && node dist/src/generate-openapi.js",
+    "prisma:generate": "prisma generate && pnpm prisma:compile-client",
+    "prisma:compile-client": "tsc --project tsconfig.prisma-client.json",
+    "prisma:validate": "prisma validate",
+    "prisma:format": "prisma format",
+    "prisma:migrate:dev": "prisma migrate dev && pnpm prisma:generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:status": "prisma migrate status",
+    "test": "pnpm prisma:generate && pnpm --filter @my-wallets/contracts build && vitest run",
+    "typecheck": "pnpm prisma:generate && tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.7",

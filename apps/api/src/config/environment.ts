@@ -2,60 +2,86 @@ import { isIP } from 'node:net';
 
 import { z as zod } from 'zod';
 
-export const apiEnvironmentSchema = zod.object({
-  NODE_ENV: zod.enum(['development', 'test', 'production']).default('development'),
-  API_HOST: zod.string().trim().min(1).default('127.0.0.1'),
-  PORT: zod.coerce.number().int().min(1).max(65_535).default(3000),
-  CORS_ALLOWED_ORIGINS: zod
-    .string()
-    .default('')
-    .transform((configuredOrigins) =>
-      configuredOrigins
-        .split(',')
-        .map((configuredOrigin) => configuredOrigin.trim())
-        .filter((configuredOrigin) => configuredOrigin.length > 0),
-    )
-    .refine(
-      (configuredOrigins) =>
-        configuredOrigins.every((configuredOrigin) => {
-          try {
-            const parsedOrigin = new URL(configuredOrigin);
+const localDevelopmentDatabaseUrl =
+  'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public';
 
-            return (
-              ['http:', 'https:'].includes(parsedOrigin.protocol) &&
-              parsedOrigin.origin === configuredOrigin
-            );
-          } catch {
-            return false;
-          }
-        }),
-      'CORS origins must be exact HTTP or HTTPS origins without paths.',
-    ),
-  API_TRUSTED_PROXY_CIDRS: zod
-    .string()
-    .default('')
-    .transform((configuredCidrs) =>
-      configuredCidrs
-        .split(',')
-        .map((configuredCidr) => configuredCidr.trim())
-        .filter((configuredCidr) => configuredCidr.length > 0),
-    )
-    .refine(
-      (configuredCidrs) => configuredCidrs.every(isIpAddressOrCidr),
-      'Trusted proxies must be explicit IP addresses or non-catch-all CIDRs.',
-    ),
-  API_HTTPS_ENABLED: zod
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((value) => value === 'true'),
-  API_RATE_LIMIT_MAX: zod.coerce.number().int().min(1).max(10_000).default(100),
-  API_RATE_LIMIT_TIME_WINDOW_MS: zod.coerce
-    .number()
-    .int()
-    .min(1_000)
-    .max(3_600_000)
-    .default(60_000),
-});
+export const apiEnvironmentSchema = zod
+  .object({
+    NODE_ENV: zod.enum(['development', 'test', 'production']).default('development'),
+    API_HOST: zod.string().trim().min(1).default('127.0.0.1'),
+    PORT: zod.coerce.number().int().min(1).max(65_535).default(3000),
+    CORS_ALLOWED_ORIGINS: zod
+      .string()
+      .default('')
+      .transform((configuredOrigins) =>
+        configuredOrigins
+          .split(',')
+          .map((configuredOrigin) => configuredOrigin.trim())
+          .filter((configuredOrigin) => configuredOrigin.length > 0),
+      )
+      .refine(
+        (configuredOrigins) =>
+          configuredOrigins.every((configuredOrigin) => {
+            try {
+              const parsedOrigin = new URL(configuredOrigin);
+
+              return (
+                ['http:', 'https:'].includes(parsedOrigin.protocol) &&
+                parsedOrigin.origin === configuredOrigin
+              );
+            } catch {
+              return false;
+            }
+          }),
+        'CORS origins must be exact HTTP or HTTPS origins without paths.',
+      ),
+    API_TRUSTED_PROXY_CIDRS: zod
+      .string()
+      .default('')
+      .transform((configuredCidrs) =>
+        configuredCidrs
+          .split(',')
+          .map((configuredCidr) => configuredCidr.trim())
+          .filter((configuredCidr) => configuredCidr.length > 0),
+      )
+      .refine(
+        (configuredCidrs) => configuredCidrs.every(isIpAddressOrCidr),
+        'Trusted proxies must be explicit IP addresses or non-catch-all CIDRs.',
+      ),
+    API_HTTPS_ENABLED: zod
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    API_RATE_LIMIT_MAX: zod.coerce.number().int().min(1).max(10_000).default(100),
+    API_RATE_LIMIT_TIME_WINDOW_MS: zod.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(3_600_000)
+      .default(60_000),
+    DATABASE_URL: zod
+      .string()
+      .url()
+      .refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol), {
+        message: 'DATABASE_URL must use the PostgreSQL protocol.',
+      })
+      .default(localDevelopmentDatabaseUrl),
+    DATABASE_POOL_MAX: zod.coerce.number().int().min(1).max(100).default(10),
+    DATABASE_CONNECT_TIMEOUT_MS: zod.coerce.number().int().min(1).max(60_000).default(5_000),
+    DATABASE_IDLE_TIMEOUT_MS: zod.coerce.number().int().min(1_000).max(600_000).default(30_000),
+  })
+  .superRefine((environment, context) => {
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.DATABASE_URL === localDevelopmentDatabaseUrl
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DATABASE_URL'],
+        message: 'DATABASE_URL must be explicitly configured in production.',
+      });
+    }
+  });
 
 export type ApiEnvironmentInput = zod.infer<typeof apiEnvironmentSchema>;
 

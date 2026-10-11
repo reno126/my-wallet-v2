@@ -13,6 +13,11 @@ describe('API environment validation', () => {
       API_HTTPS_ENABLED: false,
       API_RATE_LIMIT_MAX: 100,
       API_RATE_LIMIT_TIME_WINDOW_MS: 60_000,
+      DATABASE_URL:
+        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public',
+      DATABASE_POOL_MAX: 10,
+      DATABASE_CONNECT_TIMEOUT_MS: 5_000,
+      DATABASE_IDLE_TIMEOUT_MS: 30_000,
     });
   });
 
@@ -27,6 +32,10 @@ describe('API environment validation', () => {
         API_HTTPS_ENABLED: 'true',
         API_RATE_LIMIT_MAX: '120',
         API_RATE_LIMIT_TIME_WINDOW_MS: '30000',
+        DATABASE_URL: 'postgresql://wallet:local@127.0.0.1:5432/wallet_dev?schema=public',
+        DATABASE_POOL_MAX: '12',
+        DATABASE_CONNECT_TIMEOUT_MS: '7000',
+        DATABASE_IDLE_TIMEOUT_MS: '45000',
       }),
     ).toStrictEqual({
       NODE_ENV: 'test',
@@ -37,6 +46,10 @@ describe('API environment validation', () => {
       API_HTTPS_ENABLED: true,
       API_RATE_LIMIT_MAX: 120,
       API_RATE_LIMIT_TIME_WINDOW_MS: 30_000,
+      DATABASE_URL: 'postgresql://wallet:local@127.0.0.1:5432/wallet_dev?schema=public',
+      DATABASE_POOL_MAX: 12,
+      DATABASE_CONNECT_TIMEOUT_MS: 7_000,
+      DATABASE_IDLE_TIMEOUT_MS: 45_000,
     });
   });
 
@@ -62,5 +75,10 @@ describe('API environment validation', () => {
     );
     expect(apiEnvironmentSchema.safeParse({ API_HTTPS_ENABLED: 'yes' }).success).toBe(false);
     expect(apiEnvironmentSchema.safeParse({ API_RATE_LIMIT_MAX: '0' }).success).toBe(false);
+    expect(
+      apiEnvironmentSchema.safeParse({ DATABASE_URL: 'mysql://localhost/wallet' }).success,
+    ).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ DATABASE_POOL_MAX: '0' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ NODE_ENV: 'production' }).success).toBe(false);
   });
 });
