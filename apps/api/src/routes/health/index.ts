@@ -1,13 +1,55 @@
-import type { FastifyPluginCallback } from 'fastify';
+import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
-const healthRoutes: FastifyPluginCallback = (
+import { apiErrorSchema, healthStatusSchema } from '@my-wallets/contracts';
+
+const healthResponse = healthStatusSchema.parse({ status: 'ok' });
+
+const healthResponseSchemas = {
+  200: healthStatusSchema,
+  500: apiErrorSchema,
+};
+
+const healthRoutes: FastifyPluginCallbackZod = (
   server,
   _pluginOptions,
   completePluginRegistration,
 ) => {
-  server.get('/', () => ({ status: 'ok' }));
-  server.get('/live', () => ({ status: 'ok' }));
-  server.get('/ready', () => ({ status: 'ok' }));
+  server.get(
+    '/',
+    {
+      schema: {
+        operationId: 'getHealthStatus',
+        summary: 'Check API health',
+        tags: ['Health'],
+        response: healthResponseSchemas,
+      },
+    },
+    () => healthResponse,
+  );
+  server.get(
+    '/live',
+    {
+      schema: {
+        operationId: 'getLivenessStatus',
+        summary: 'Check API liveness',
+        tags: ['Health'],
+        response: healthResponseSchemas,
+      },
+    },
+    () => healthResponse,
+  );
+  server.get(
+    '/ready',
+    {
+      schema: {
+        operationId: 'getReadinessStatus',
+        summary: 'Check API readiness',
+        tags: ['Health'],
+        response: healthResponseSchemas,
+      },
+    },
+    () => healthResponse,
+  );
   completePluginRegistration();
 };
 

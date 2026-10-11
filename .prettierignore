@@ -11,3 +11,5 @@ packages/contracts/src/generated/
 AGENTS.md
 DEPENDENCY_VERSIONS.md
 IMPLEMENTATION_PLAN.md
+apps/web/src/api/generated/openapi.d.ts
+packages/contracts/openapi.json

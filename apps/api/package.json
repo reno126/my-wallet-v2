@@ -6,6 +6,7 @@
     "build": "pnpm --filter @my-wallets/contracts build && tsc -p tsconfig.build.json",
     "start": "node dist/app.js",
     "dev": "pnpm build && pnpm start",
+    "generate:openapi": "pnpm build && node dist/generate-openapi.js",
     "test": "pnpm --filter @my-wallets/contracts build && vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

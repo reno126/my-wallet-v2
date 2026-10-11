@@ -1,5 +1,7 @@
 import { z as zod } from 'zod';
 
+import { resourceIdSchema } from './common.js';
+
 export const apiErrorSchema = zod.object({
   error: zod.object({
     code: zod.enum([
@@ -12,7 +14,7 @@ export const apiErrorSchema = zod.object({
       'INTERNAL_SERVER_ERROR',
     ]),
     message: zod.string().min(1),
-    requestId: zod.string().min(1),
+    requestId: resourceIdSchema,
   }),
 });
 

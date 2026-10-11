@@ -1,0 +1,888 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "My Wallet API",
+    "description": "HTTP API for managing private investment wallets. Rate-limited responses include Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset headers.",
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {
+      "ApiErrorInput": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "UNAUTHENTICATED",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "CONFLICT",
+                  "VALIDATION_FAILED",
+                  "RATE_LIMITED",
+                  "INTERNAL_SERVER_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requestId": {
+                "$ref": "#/components/schemas/ResourceIdInput"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "AuthSessionInput": {
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserInput"
+          }
+        },
+        "required": [
+          "expiresAt",
+          "user"
+        ]
+      },
+      "AuthUserInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name"
+        ]
+      },
+      "CreateTransactionInput": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "side": {
+            "$ref": "#/components/schemas/TransactionSideInput"
+          },
+          "transactionDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency"
+        ]
+      },
+      "CreateWalletInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          }
+        },
+        "required": [
+          "name",
+          "reportingCurrency"
+        ]
+      },
+      "CurrencyCodeInput": {
+        "type": "string",
+        "enum": [
+          "USD"
+        ]
+      },
+      "DateOnlyInput": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "InstrumentInput": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quoteCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "exchange",
+          "quoteCurrency"
+        ]
+      },
+      "InstrumentSearchQueryInput": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "q"
+        ]
+      },
+      "InstrumentSearchResponseInput": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstrumentInput"
+            }
+          }
+        },
+        "required": [
+          "results"
+        ]
+      },
+      "ResourceIdInput": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "TimestampInput": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "TransactionListInput": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransactionInput"
+            }
+          }
+        },
+        "required": [
+          "transactions"
+        ]
+      },
+      "TransactionInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "side": {
+            "$ref": "#/components/schemas/TransactionSideInput"
+          },
+          "transactionDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          }
+        },
+        "required": [
+          "id",
+          "walletId",
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency",
+          "createdAt"
+        ]
+      },
+      "TransactionSideInput": {
+        "type": "string",
+        "enum": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "UpdateWalletInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletListInput": {
+        "type": "object",
+        "properties": {
+          "wallets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletSummaryInput"
+            }
+          }
+        },
+        "required": [
+          "wallets"
+        ]
+      },
+      "WalletSummaryInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "updatedAt",
+          "reportingCurrency"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "UNAUTHENTICATED",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "CONFLICT",
+                  "VALIDATION_FAILED",
+                  "RATE_LIMITED",
+                  "INTERNAL_SERVER_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requestId": {
+                "$ref": "#/components/schemas/ResourceId"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "requestId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "AuthSession": {
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        },
+        "required": [
+          "expiresAt",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "AuthUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "CreateTransaction": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "side": {
+            "$ref": "#/components/schemas/TransactionSide"
+          },
+          "transactionDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "CreateWallet": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          }
+        },
+        "required": [
+          "name",
+          "reportingCurrency"
+        ],
+        "additionalProperties": false
+      },
+      "CurrencyCode": {
+        "type": "string",
+        "enum": [
+          "USD"
+        ]
+      },
+      "DateOnly": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "Instrument": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quoteCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "exchange",
+          "quoteCurrency"
+        ],
+        "additionalProperties": false
+      },
+      "InstrumentSearchQuery": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "additionalProperties": false
+      },
+      "InstrumentSearchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Instrument"
+            }
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "additionalProperties": false
+      },
+      "ResourceId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "Timestamp": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "TransactionList": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          }
+        },
+        "required": [
+          "transactions"
+        ],
+        "additionalProperties": false
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "side": {
+            "$ref": "#/components/schemas/TransactionSide"
+          },
+          "transactionDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "walletId",
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionSide": {
+        "type": "string",
+        "enum": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "UpdateWallet": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WalletList": {
+        "type": "object",
+        "properties": {
+          "wallets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletSummary"
+            }
+          }
+        },
+        "required": [
+          "wallets"
+        ],
+        "additionalProperties": false
+      },
+      "WalletSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "updatedAt",
+          "reportingCurrency"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "RateLimited": {
+        "description": "The client has exceeded its request limit.",
+        "headers": {
+          "retry-after": {
+            "description": "Seconds to wait before retrying.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "x-ratelimit-limit": {
+            "description": "Maximum requests allowed in the current window.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "x-ratelimit-remaining": {
+            "description": "Requests remaining in the current window.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "x-ratelimit-reset": {
+            "description": "Seconds until the current window resets.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealthStatus",
+        "summary": "Check API health",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "getLivenessStatus",
+        "summary": "Check API liveness",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getReadinessStatus",
+        "summary": "Check API readiness",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "API liveness and readiness probes."
+    }
+  ]
+}
