@@ -2,6 +2,9 @@
   "name": "@my-wallets/api",
   "private": true,
   "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.7",
     "@fastify/autoload": "^6.5.0",
@@ -22,6 +25,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/node": "26.6.4",
     "@types/pg": "^8.23.1",
     "openapi-backend": "5.21.2",
     "prisma": "^7.10.0"

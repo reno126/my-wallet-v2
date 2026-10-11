@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wallet_local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wallet_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-wallet_dev}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./tooling/postgres/create-test-database.sql:/docker-entrypoint-initdb.d/10-create-test-database.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready --username "$${POSTGRES_USER}" --dbname "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  postgres_data:

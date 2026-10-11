@@ -10,17 +10,35 @@ Use a supported Node.js and pnpm version from the root `package.json` (Node.js 2
 pnpm install
 ```
 
+Install and start Docker Desktop or Docker Engine with Compose. Create the ignored local environment files from the checked-in example:
+
+```powershell
+Copy-Item .env.example .env.local
+Copy-Item .env.example .env.ci.local
+```
+
+Keep `.env.local` on the `wallet_dev` database and edit `.env.ci.local` to set `NODE_ENV=test` and point `DATABASE_URL` at `wallet_test`. The example credentials are for loopback development only. Do not put production credentials in these files or commit them.
+
+Start PostgreSQL and wait for its health check with:
+
+```sh
+pnpm db:up:local
+pnpm db:wait:local
+```
+
 Start the web development server with:
 
 ```sh
-pnpm dev:web
+pnpm dev:local
 ```
 
-Vite listens on `http://127.0.0.1:5173`. The development server proxies `/api` requests to `http://127.0.0.1:3000`. The API runtime is introduced in the API foundation slice, so API requests are unavailable until that slice is implemented.
+Vite listens on `http://127.0.0.1:5173`. The development server proxies `/api` requests to `http://127.0.0.1:3000`. The API runtime is introduced in the API foundation slice, so API requests are unavailable until that slice is implemented. `pnpm ci:local` loads `.env.ci.local` for local CI checks; package scripts themselves never load environment files implicitly.
 
 Build the static web output with `pnpm --filter @my-wallets/web build`. `vite preview` is for local review only; production web hosting will serve the built output separately from the API.
 
-The current web scaffold does not need a database or environment variables. The API's initial local settings will be `NODE_ENV=development`, `API_HOST=127.0.0.1`, and `PORT=3000`; the API runtime is not available yet. The PostgreSQL development/test services and ignored local environment files are introduced in the environment workflow slice. Later API persistence work will require a local PostgreSQL development database and a separate disposable test database; never use production data for local development or tests. Keep API secrets in API-only environment configuration and do not expose them through `VITE_` variables. The browser uses relative `/api` requests by default.
+The API configuration validates `NODE_ENV`, `API_HOST`, and `PORT` once when its environment module is imported. It defaults to development mode, loopback host `127.0.0.1`, and port `3000`. `DATABASE_URL` is reserved for the API and Prisma; the browser uses relative `/api` requests by default. Keep API secrets in API-only environment configuration and never expose them through `VITE_` variables.
+
+The Compose service binds PostgreSQL to loopback and creates `wallet_dev` plus `wallet_test` on first initialization of its named volume. Initialization scripts run only when that volume is empty. `pnpm db:stop` stops PostgreSQL without removing data. `pnpm db:down` removes the container and network but preserves the named volume. `pnpm db:destroy-local-data` removes the volume and permanently deletes both local databases; use it only when you intend to discard all local database data. To clear only test objects, use `pnpm db:reset:test:local`; it refuses to run unless `.env.ci.local` explicitly sets `NODE_ENV=test` and points to the loopback `wallet_test` database. Never use production data for local development or tests.
 
 ## Route configuration
 
