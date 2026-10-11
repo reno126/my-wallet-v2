@@ -13,6 +13,13 @@ describe('API environment validation', () => {
       API_HTTPS_ENABLED: false,
       API_RATE_LIMIT_MAX: 100,
       API_RATE_LIMIT_TIME_WINDOW_MS: 60_000,
+      API_AUTH_RATE_LIMIT_MAX: 60,
+      API_AUTHENTICATED_RATE_LIMIT_MAX: 300,
+      BETTER_AUTH_RATE_LIMIT_ENABLED: false,
+      BETTER_AUTH_RATE_LIMIT_MAX: 100,
+      BETTER_AUTH_RATE_LIMIT_WINDOW_SECONDS: 60,
+      BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX: 5,
+      BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS: 60,
       BETTER_AUTH_SECRET: 'test-only-secret-that-is-never-valid-in-production',
       BETTER_AUTH_URL: 'http://127.0.0.1:3000',
       WEB_ORIGIN: 'http://127.0.0.1:5173',
@@ -37,6 +44,13 @@ describe('API environment validation', () => {
         API_HTTPS_ENABLED: 'true',
         API_RATE_LIMIT_MAX: '120',
         API_RATE_LIMIT_TIME_WINDOW_MS: '30000',
+        API_AUTH_RATE_LIMIT_MAX: '50',
+        API_AUTHENTICATED_RATE_LIMIT_MAX: '600',
+        BETTER_AUTH_RATE_LIMIT_ENABLED: 'true',
+        BETTER_AUTH_RATE_LIMIT_MAX: '80',
+        BETTER_AUTH_RATE_LIMIT_WINDOW_SECONDS: '120',
+        BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX: '3',
+        BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS: '90',
         DATABASE_URL: 'postgresql://wallet:local@127.0.0.1:5432/wallet_dev?schema=public',
         DATABASE_POOL_MAX: '12',
         DATABASE_CONNECT_TIMEOUT_MS: '7000',
@@ -51,6 +65,13 @@ describe('API environment validation', () => {
       API_HTTPS_ENABLED: true,
       API_RATE_LIMIT_MAX: 120,
       API_RATE_LIMIT_TIME_WINDOW_MS: 30_000,
+      API_AUTH_RATE_LIMIT_MAX: 50,
+      API_AUTHENTICATED_RATE_LIMIT_MAX: 600,
+      BETTER_AUTH_RATE_LIMIT_ENABLED: true,
+      BETTER_AUTH_RATE_LIMIT_MAX: 80,
+      BETTER_AUTH_RATE_LIMIT_WINDOW_SECONDS: 120,
+      BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX: 3,
+      BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS: 90,
       BETTER_AUTH_SECRET: 'test-only-secret-that-is-never-valid-in-production',
       BETTER_AUTH_URL: 'http://127.0.0.1:3000',
       WEB_ORIGIN: 'http://127.0.0.1:5173',
@@ -85,6 +106,16 @@ describe('API environment validation', () => {
     );
     expect(apiEnvironmentSchema.safeParse({ API_HTTPS_ENABLED: 'yes' }).success).toBe(false);
     expect(apiEnvironmentSchema.safeParse({ API_RATE_LIMIT_MAX: '0' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ API_AUTH_RATE_LIMIT_MAX: '0' }).success).toBe(false);
+    expect(
+      apiEnvironmentSchema.safeParse({ API_AUTHENTICATED_RATE_LIMIT_MAX: '100001' }).success,
+    ).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ BETTER_AUTH_RATE_LIMIT_ENABLED: 'yes' }).success).toBe(
+      false,
+    );
+    expect(
+      apiEnvironmentSchema.safeParse({ BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX: '0' }).success,
+    ).toBe(false);
     expect(
       apiEnvironmentSchema.safeParse({ DATABASE_URL: 'mysql://localhost/wallet' }).success,
     ).toBe(false);

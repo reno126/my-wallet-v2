@@ -24,6 +24,41 @@ export function createBetterAuth(prisma: PrismaClient, environment: ApiEnvironme
     trustedOrigins: [environment.WEB_ORIGIN],
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     emailAndPassword: { enabled: true },
+    rateLimit: {
+      enabled: environment.NODE_ENV === 'production' || environment.BETTER_AUTH_RATE_LIMIT_ENABLED,
+      storage: 'database',
+      max: environment.BETTER_AUTH_RATE_LIMIT_MAX,
+      window: environment.BETTER_AUTH_RATE_LIMIT_WINDOW_SECONDS,
+      customRules: {
+        '/sign-in/email': {
+          max: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX,
+          window: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS,
+        },
+        '/sign-up/email': {
+          max: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX,
+          window: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS,
+        },
+        '/forget-password': {
+          max: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX,
+          window: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS,
+        },
+        '/reset-password': {
+          max: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX,
+          window: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS,
+        },
+        '/send-verification-email': {
+          max: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX,
+          window: environment.BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS,
+        },
+      },
+    },
+    advanced: {
+      ipAddress: {
+        // The auth bridge replaces this header with Fastify's trusted request.ip.
+        ipAddressHeaders: ['x-real-ip'],
+        ipv6Subnet: 64,
+      },
+    },
   });
 }
 

@@ -75,6 +75,21 @@ export const apiEnvironmentSchema = zod
       .min(1_000)
       .max(3_600_000)
       .default(60_000),
+    API_AUTH_RATE_LIMIT_MAX: zod.coerce.number().int().min(1).max(10_000).default(60),
+    API_AUTHENTICATED_RATE_LIMIT_MAX: zod.coerce.number().int().min(1).max(100_000).default(300),
+    BETTER_AUTH_RATE_LIMIT_ENABLED: zod
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    BETTER_AUTH_RATE_LIMIT_MAX: zod.coerce.number().int().min(1).max(10_000).default(100),
+    BETTER_AUTH_RATE_LIMIT_WINDOW_SECONDS: zod.coerce.number().int().min(1).max(3_600).default(60),
+    BETTER_AUTH_CREDENTIAL_RATE_LIMIT_MAX: zod.coerce.number().int().min(1).max(1_000).default(5),
+    BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS: zod.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(3_600)
+      .default(60),
     BETTER_AUTH_SECRET: zod.string().min(32).optional(),
     BETTER_AUTH_URL: exactHttpOriginSchema.optional(),
     WEB_ORIGIN: exactHttpOriginSchema.optional(),

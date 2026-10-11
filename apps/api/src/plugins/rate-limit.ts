@@ -13,6 +13,7 @@ const rateLimitPlugin: FastifyPluginAsync<ApiPluginOptions> = async (server, { e
     global: true,
     max: environment.API_RATE_LIMIT_MAX,
     timeWindow: environment.API_RATE_LIMIT_TIME_WINDOW_MS,
+    ipv6Subnet: 64,
     allowList: (request) => healthProbePaths.has(new URL(request.url, 'http://localhost').pathname),
     errorResponseBuilder: (request, context) => ({
       statusCode: context.statusCode,

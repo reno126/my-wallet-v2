@@ -2,6 +2,8 @@ import { fromNodeHeaders } from 'better-auth/node';
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify';
 import { z as zod } from 'zod';
 
+import type { ApiPluginOptions } from '../../plugin-options.js';
+
 const authResponseSchema = {
   200: zod.unknown(),
   400: zod.unknown(),
@@ -28,11 +30,26 @@ const signInEmailBodySchema = zod
   })
   .passthrough();
 
-const authRoutes: FastifyPluginCallback = (server, _pluginOptions, completePluginRegistration) => {
+const authRoutes: FastifyPluginCallback<ApiPluginOptions> = (
+  server,
+  { environment },
+  completePluginRegistration,
+) => {
+  const authCatchAllRateLimit = {
+    max: environment.API_AUTH_RATE_LIMIT_MAX,
+    timeWindow: environment.API_RATE_LIMIT_TIME_WINDOW_MS,
+    ipv6Subnet: 64,
+  };
+
   const forwardAuthRequest = async (request: FastifyRequest, reply: FastifyReply) => {
+    const authHeaders = fromNodeHeaders(request.headers);
+
+    // Align Better Auth's limiter and session IP tracking with Fastify's trusted proxy result.
+    authHeaders.set('x-real-ip', request.ip);
+
     const authRequest = new Request(new URL(request.url, server.auth.options.baseURL), {
       method: request.method,
-      headers: fromNodeHeaders(request.headers),
+      headers: authHeaders,
       ...(request.method === 'POST' && request.body !== undefined
         ? { body: JSON.stringify(request.body) }
         : {}),
@@ -60,6 +77,7 @@ const authRoutes: FastifyPluginCallback = (server, _pluginOptions, completePlugi
   server.get(
     '/get-session',
     {
+      config: { rateLimit: authCatchAllRateLimit },
       schema: {
         operationId: 'getAuthSession',
         summary: 'Get the current Better Auth session',
@@ -72,6 +90,7 @@ const authRoutes: FastifyPluginCallback = (server, _pluginOptions, completePlugi
   server.post(
     '/sign-up/email',
     {
+      config: { rateLimit: authCatchAllRateLimit },
       schema: {
         operationId: 'registerWithEmail',
         summary: 'Register an account with email and password',
@@ -85,6 +104,7 @@ const authRoutes: FastifyPluginCallback = (server, _pluginOptions, completePlugi
   server.post(
     '/sign-in/email',
     {
+      config: { rateLimit: authCatchAllRateLimit },
       schema: {
         operationId: 'signInWithEmail',
         summary: 'Sign in with email and password',
@@ -98,6 +118,7 @@ const authRoutes: FastifyPluginCallback = (server, _pluginOptions, completePlugi
   server.post(
     '/sign-out',
     {
+      config: { rateLimit: authCatchAllRateLimit },
       schema: {
         operationId: 'signOut',
         summary: 'End the current Better Auth session',
@@ -116,12 +137,14 @@ const authRoutes: FastifyPluginCallback = (server, _pluginOptions, completePlugi
   server.route({
     method: 'GET',
     url: '/*',
+    config: { rateLimit: authCatchAllRateLimit },
     schema: { hide: true },
     handler: forwardAuthRequest,
   });
   server.route({
     method: 'POST',
     url: '/*',
+    config: { rateLimit: authCatchAllRateLimit },
     schema: { hide: true },
     handler: forwardAuthRequest,
   });

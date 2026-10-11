@@ -17,6 +17,16 @@ jobs:
     name: Install, test, build, and audit
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public
+      POSTGRES_USER: wallet_local
+      POSTGRES_PASSWORD: wallet_local_only
+      POSTGRES_DB: wallet_dev
+      POSTGRES_PORT: '5432'
+      BETTER_AUTH_SECRET: test-only-secret-that-is-never-valid-in-production
+      BETTER_AUTH_URL: http://127.0.0.1:3000
+      WEB_ORIGIN: http://127.0.0.1:5173
     steps:
       - name: Check out the repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -34,6 +44,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL and prepare the test database
+        run: |
+          pnpm db:wait
+          pnpm db:reset:test
+          pnpm db:migrate:deploy
 
       - name: Run workspace CI checks
         run: pnpm ci:workspace

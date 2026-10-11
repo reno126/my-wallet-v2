@@ -36,6 +36,8 @@ export function buildServer(options: BuildServerOptions = {}) {
           }),
   });
 
+  server.decorate('apiEnvironment', environment);
+
   server.setErrorHandler((error, request, reply) => {
     if (isRateLimitError(error)) {
       const rateLimitResponse = mapFailureToResponse({ code: 'RATE_LIMITED' }, request.id);
@@ -67,8 +69,16 @@ export function buildServer(options: BuildServerOptions = {}) {
     dir: join(serverDirectory, 'routes'),
     autoHooks: true,
     matchFilter: /[\\/]index\.(ts|js)$/,
+    ignorePattern: /^(?:private(?:\/|$)|.*\.(?:test|spec)\.(?:ts|js)$)/,
+    options: { prefix: '/api', environment },
+  });
+  server.register(autoload, {
+    dir: join(serverDirectory, 'routes', 'private'),
+    autoHooks: true,
+    cascadeHooks: true,
+    matchFilter: /[\\/]index\.(ts|js)$/,
     ignorePattern: /\.(test|spec)\.(ts|js)$/,
-    options: { prefix: '/api' },
+    options: { prefix: '/api', environment },
   });
 
   return server;
