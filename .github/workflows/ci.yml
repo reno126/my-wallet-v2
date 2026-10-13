@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Chromium
+        run: pnpm --filter @my-wallets/e2e exec playwright install --with-deps chromium
+
       - name: Start PostgreSQL and prepare the test database
         run: |
           pnpm db:wait

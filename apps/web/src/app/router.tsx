@@ -4,7 +4,7 @@ import { createBrowserRouter, redirect } from 'react-router';
 import { getSession, redirectAuthenticatedUser, requireSession } from '../lib/requireSession';
 import { AuthenticatedLayout } from './layouts/AuthenticatedLayout';
 import { RootLayout } from './layouts/RootLayout';
-import { AuthPlaceholderRoute } from './routes/auth/AuthPlaceholderRoute';
+import { registerAction, RegisterRoute, signInAction, SignInRoute } from './routes/auth/AuthRoute';
 import { HomeRoute } from './routes/home/HomeRoute';
 import { NotFoundRoute } from './routes/not-found/NotFoundRoute';
 import { RootErrorBoundary } from './routes/RootErrorBoundary';
@@ -29,8 +29,18 @@ export const routeObjects = [
     HydrateFallback: RootLoadingFallback,
     children: [
       { index: true, Component: HomeRoute, loader: homeLoader },
-      { path: 'login', Component: AuthPlaceholderRoute, loader: redirectAuthenticatedUser },
-      { path: 'register', Component: AuthPlaceholderRoute, loader: redirectAuthenticatedUser },
+      {
+        path: 'login',
+        Component: SignInRoute,
+        loader: redirectAuthenticatedUser,
+        action: signInAction,
+      },
+      {
+        path: 'register',
+        Component: RegisterRoute,
+        loader: redirectAuthenticatedUser,
+        action: registerAction,
+      },
       {
         Component: AuthenticatedLayout,
         loader: requireSession,

@@ -14,9 +14,9 @@ const authResponseSchema = {
 
 const signUpEmailBodySchema = zod
   .object({
-    name: zod.string().min(1),
+    name: zod.string().min(1).max(100),
     email: zod.email(),
-    password: zod.string().min(8),
+    password: zod.string().min(8).max(128),
     callbackURL: zod.string().optional(),
   })
   .passthrough();
@@ -24,7 +24,7 @@ const signUpEmailBodySchema = zod
 const signInEmailBodySchema = zod
   .object({
     email: zod.email(),
-    password: zod.string().min(1),
+    password: zod.string().min(1).max(128),
     callbackURL: zod.string().optional(),
     rememberMe: zod.boolean().optional(),
   })

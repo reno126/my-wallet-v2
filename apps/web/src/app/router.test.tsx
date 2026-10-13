@@ -55,7 +55,9 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /my wallet/i })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: /a clearer view of your investments/i }),
+    ).toBeTruthy();
   });
 
   it('sends an authenticated visitor from the home route to wallets', async () => {
@@ -89,7 +91,7 @@ describe('application routing', () => {
       render(<RouterProvider router={memoryRouter} />);
 
       expect(
-        await screen.findByRole('heading', { name: /sign in|create an account/i }),
+        await screen.findByRole('heading', { name: /welcome back|create your account/i }),
       ).toBeTruthy();
       expect(memoryRouter.state.location.pathname).toBe(path);
     },
@@ -100,7 +102,7 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /sign in/i })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeTruthy();
     expect(memoryRouter.state.location.pathname).toBe('/login');
   });
 
@@ -162,7 +164,9 @@ describe('application routing', () => {
 
     await user.click(screen.getByRole('link', { name: /return to the home page/i }));
 
-    expect(await screen.findByRole('heading', { name: /my wallet/i })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: /a clearer view of your investments/i }),
+    ).toBeTruthy();
   });
 
   it('submits a route action and renders its result', async () => {

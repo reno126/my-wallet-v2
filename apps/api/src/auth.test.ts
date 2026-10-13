@@ -47,6 +47,15 @@ describe('Better Auth API integration', () => {
 
     expect(registrationResponse.statusCode).toBe(200);
     expect(registrationCookies).not.toBe('');
+    expect(cookieHeaders(registrationResponse.headers['set-cookie']).join(';')).toContain(
+      'HttpOnly',
+    );
+    expect(cookieHeaders(registrationResponse.headers['set-cookie']).join(';')).toContain(
+      'SameSite=Lax',
+    );
+    expect(cookieHeaders(registrationResponse.headers['set-cookie']).join(';')).not.toContain(
+      'Domain=',
+    );
 
     const sessionResponse = await testServer.inject({
       method: 'GET',
@@ -107,6 +116,70 @@ describe('Better Auth API integration', () => {
 
     expect(loggedInSessionResponse.statusCode).toBe(200);
     expect(loggedInSessionResponse.json()).toMatchObject({ user: { email } });
+  }, 60_000);
+
+  it('marks authentication cookies Secure when HTTPS is enabled at ingress', async () => {
+    const testServer = createTestServer(true);
+    server = testServer;
+    email = `${randomUUID()}@example.test`;
+
+    const response = await testServer.inject({
+      method: 'POST',
+      url: '/api/auth/sign-up/email',
+      headers: { origin: 'http://127.0.0.1:5173' },
+      payload: { name: 'Test User', email, password: 'a-strong-test-password' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(cookieHeaders(response.headers['set-cookie']).join(';')).toContain('Secure');
+  });
+
+  it('enforces the configured password length for credential registration', async () => {
+    const testServer = createTestServer();
+    server = testServer;
+    email = `${randomUUID()}@example.test`;
+
+    const invalidRegistrationInputs = [
+      { name: 'Test User', password: 'short' },
+      { name: 'Test User', password: 'a'.repeat(129) },
+      { name: 'a'.repeat(101), password: 'a-strong-test-password' },
+    ];
+
+    for (const input of invalidRegistrationInputs) {
+      const response = await testServer.inject({
+        method: 'POST',
+        url: '/api/auth/sign-up/email',
+        headers: { origin: 'http://127.0.0.1:5173' },
+        payload: { ...input, email },
+      });
+
+      const body = apiErrorSchema.parse(response.json());
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error.code).toBe('VALIDATION_FAILED');
+    }
+
+    expect(await testServer.prisma.user.findUnique({ where: { email } })).toBeNull();
+  });
+
+  it('uses the browser-visible callback URL for Google OAuth initiation', async () => {
+    const testServer = createTestServer(false, true);
+    server = testServer;
+
+    const response = await testServer.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/social',
+      headers: { origin: 'http://127.0.0.1:5173' },
+      payload: { provider: 'google', callbackURL: '/wallets' },
+    });
+    const socialSignIn = zod.object({ url: zod.url() }).parse(response.json());
+    const googleAuthorizationURL = new URL(socialSignIn.url);
+
+    expect(response.statusCode).toBe(200);
+    expect(googleAuthorizationURL.hostname).toBe('accounts.google.com');
+    expect(googleAuthorizationURL.searchParams.get('redirect_uri')).toBe(
+      'http://127.0.0.1:5173/api/auth/callback/google',
+    );
   });
 
   it('returns the common 401 response when the typed auth hook finds no session', async () => {
@@ -130,23 +203,30 @@ describe('Better Auth API integration', () => {
   });
 });
 
-function createTestServer() {
+function createTestServer(httpsEnabled = false, googleEnabled = false) {
   return buildServer({
     environment: apiEnvironmentSchema.parse({
       NODE_ENV: 'test',
       DATABASE_URL:
         'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
+      API_HTTPS_ENABLED: httpsEnabled ? 'true' : 'false',
+      GOOGLE_CLIENT_ID: googleEnabled ? 'test-google-client-id' : '',
+      GOOGLE_CLIENT_SECRET: googleEnabled ? 'test-google-client-secret' : '',
     }),
     logger: false,
   });
 }
 
 function readCookieHeader(setCookieHeader: string | string[] | undefined): string {
-  const cookies = Array.isArray(setCookieHeader)
+  const cookies = cookieHeaders(setCookieHeader);
+
+  return cookies.map((cookie) => cookie.split(';', 1)[0]).join('; ');
+}
+
+function cookieHeaders(setCookieHeader: string | string[] | undefined): string[] {
+  return Array.isArray(setCookieHeader)
     ? setCookieHeader
     : setCookieHeader === undefined
       ? []
       : [setCookieHeader];
-
-  return cookies.map((cookie) => cookie.split(';', 1)[0]).join('; ');
 }

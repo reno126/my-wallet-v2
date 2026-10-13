@@ -23,7 +23,22 @@ export function createBetterAuth(prisma: PrismaClient, environment: ApiEnvironme
     secret: environment.BETTER_AUTH_SECRET,
     trustedOrigins: [environment.WEB_ORIGIN],
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
-    emailAndPassword: { enabled: true },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+    },
+    ...(environment.GOOGLE_CLIENT_ID && environment.GOOGLE_CLIENT_SECRET
+      ? {
+          socialProviders: {
+            google: {
+              clientId: environment.GOOGLE_CLIENT_ID,
+              clientSecret: environment.GOOGLE_CLIENT_SECRET,
+              redirectURI: new URL('/api/auth/callback/google', environment.WEB_ORIGIN).toString(),
+            },
+          },
+        }
+      : {}),
     rateLimit: {
       enabled: environment.NODE_ENV === 'production' || environment.BETTER_AUTH_RATE_LIMIT_ENABLED,
       storage: 'database',
@@ -53,6 +68,12 @@ export function createBetterAuth(prisma: PrismaClient, environment: ApiEnvironme
       },
     },
     advanced: {
+      useSecureCookies: environment.NODE_ENV === 'production' || environment.API_HTTPS_ENABLED,
+      defaultCookieAttributes: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: environment.NODE_ENV === 'production' || environment.API_HTTPS_ENABLED,
+      },
       ipAddress: {
         // The auth bridge replaces this header with Fastify's trusted request.ip.
         ipAddressHeaders: ['x-real-ip'],

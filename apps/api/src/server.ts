@@ -45,6 +45,12 @@ export function buildServer(options: BuildServerOptions = {}) {
       return reply.code(rateLimitResponse.statusCode).send(rateLimitResponse.body);
     }
 
+    if (isValidationError(error)) {
+      const validationResponse = mapFailureToResponse({ code: 'VALIDATION_FAILED' }, request.id);
+
+      return reply.code(validationResponse.statusCode).send(validationResponse.body);
+    }
+
     request.log.error({ err: error }, 'Unhandled request error');
 
     const response: ApiErrorInput = {
@@ -87,5 +93,14 @@ export function buildServer(options: BuildServerOptions = {}) {
 function isRateLimitError(error: unknown): error is { statusCode: 429 } {
   return (
     typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 429
+  );
+}
+
+function isValidationError(error: unknown): error is { validation: unknown[] } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'validation' in error &&
+    Array.isArray(error.validation)
   );
 }
