@@ -6,7 +6,7 @@ const localDevelopmentDatabaseUrl =
   'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public';
 const testOnlyAuthSecret = 'test-only-secret-that-is-never-valid-in-production';
 const localBetterAuthUrl = 'http://127.0.0.1:3000';
-const localWebOrigin = 'http://127.0.0.1:5173';
+const localWebOrigin = 'http://localhost:5173';
 
 const exactHttpOriginSchema = zod
   .string()

@@ -41,7 +41,7 @@ describe('Better Auth API integration', () => {
     const registrationResponse = await testServer.inject({
       method: 'POST',
       url: '/api/auth/sign-up/email',
-      headers: { origin: 'http://127.0.0.1:5173' },
+      headers: { origin: 'http://localhost:5173' },
       payload: { name: 'Test User', email, password: 'a-strong-test-password' },
     });
     const registrationCookies = readCookieHeader(registrationResponse.headers['set-cookie']);
@@ -75,7 +75,7 @@ describe('Better Auth API integration', () => {
     const signOutResponse = await testServer.inject({
       method: 'POST',
       url: '/api/auth/sign-out',
-      headers: { cookie: registrationCookies, origin: 'http://127.0.0.1:5173' },
+      headers: { cookie: registrationCookies, origin: 'http://localhost:5173' },
       payload: {},
     });
 
@@ -93,7 +93,7 @@ describe('Better Auth API integration', () => {
     const loginResponse = await testServer.inject({
       method: 'POST',
       url: '/api/auth/sign-in/email',
-      headers: { origin: 'http://127.0.0.1:5173' },
+      headers: { origin: 'http://localhost:5173' },
       payload: { email, password: 'a-strong-test-password' },
     });
     const loginCookies = readCookieHeader(loginResponse.headers['set-cookie']);
@@ -119,7 +119,7 @@ describe('Better Auth API integration', () => {
     const response = await testServer.inject({
       method: 'POST',
       url: '/api/auth/sign-up/email',
-      headers: { origin: 'http://127.0.0.1:5173' },
+      headers: { origin: 'http://localhost:5173' },
       payload: { name: 'Test User', email, password: 'a-strong-test-password' },
     });
 
@@ -142,7 +142,7 @@ describe('Better Auth API integration', () => {
       const response = await testServer.inject({
         method: 'POST',
         url: '/api/auth/sign-up/email',
-        headers: { origin: 'http://127.0.0.1:5173' },
+        headers: { origin: 'http://localhost:5173' },
         payload: { ...input, email },
       });
 
@@ -162,7 +162,7 @@ describe('Better Auth API integration', () => {
     const response = await testServer.inject({
       method: 'POST',
       url: '/api/auth/sign-in/social',
-      headers: { origin: 'http://127.0.0.1:5173' },
+      headers: { origin: 'http://localhost:5173' },
       payload: { provider: 'google', callbackURL: '/wallets' },
     });
     const socialSignIn = zod.object({ url: zod.url() }).parse(response.json());
@@ -171,7 +171,7 @@ describe('Better Auth API integration', () => {
     expect(response.statusCode).toBe(200);
     expect(googleAuthorizationURL.hostname).toBe('accounts.google.com');
     expect(googleAuthorizationURL.searchParams.get('redirect_uri')).toBe(
-      'http://127.0.0.1:5173/api/auth/callback/google',
+      'http://localhost:5173/api/auth/callback/google',
     );
   });
 });
@@ -187,7 +187,7 @@ function createAuthTestServer({
 }: AuthTestServerOptions = {}) {
   return createTestServer({
     BETTER_AUTH_URL: 'http://127.0.0.1:3000',
-    WEB_ORIGIN: 'http://127.0.0.1:5173',
+    WEB_ORIGIN: 'http://localhost:5173',
     API_HTTPS_ENABLED: httpsEnabled ? 'true' : 'false',
     GOOGLE_CLIENT_ID: googleEnabled ? 'test-google-client-id' : '',
     GOOGLE_CLIENT_SECRET: googleEnabled ? 'test-google-client-secret' : '',

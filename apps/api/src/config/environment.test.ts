@@ -46,7 +46,7 @@ describe('API environment validation', () => {
       BETTER_AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS: 60,
       BETTER_AUTH_SECRET: 'test-only-secret-that-is-never-valid-in-production',
       BETTER_AUTH_URL: 'http://127.0.0.1:3000',
-      WEB_ORIGIN: 'http://127.0.0.1:5173',
+      WEB_ORIGIN: 'http://localhost:5173',
       GOOGLE_CLIENT_ID: '',
       GOOGLE_CLIENT_SECRET: '',
       DATABASE_URL:
