@@ -4,6 +4,7 @@ export type SignInResponse = 'success' | 'api-rate-limit' | 'better-auth-rate-li
 
 interface AuthApiMockOptions {
   signInResponse?: SignInResponse;
+  initiallySignedIn?: boolean;
 }
 
 interface AuthApiMock {
@@ -20,9 +21,9 @@ const testUser = {
 
 export async function mockAuthApi(
   page: Page,
-  { signInResponse = 'success' }: AuthApiMockOptions = {},
+  { signInResponse = 'success', initiallySignedIn = false }: AuthApiMockOptions = {},
 ): Promise<AuthApiMock> {
-  let signedIn = false;
+  let signedIn = initiallySignedIn;
   const googleSignInRequests: unknown[] = [];
   const unexpectedRequests: string[] = [];
 

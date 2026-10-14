@@ -5,14 +5,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { routeObjects } from './router';
 
-const { mockGetSession, mockSignUpEmail, mockSignInEmail, mockSignInSocial, mockSignOut } =
-  vi.hoisted(() => ({
-    mockGetSession: vi.fn(),
-    mockSignUpEmail: vi.fn(),
-    mockSignInEmail: vi.fn(),
-    mockSignInSocial: vi.fn(),
-    mockSignOut: vi.fn(),
-  }));
+const {
+  mockGetSession,
+  mockListWallets,
+  mockSignUpEmail,
+  mockSignInEmail,
+  mockSignInSocial,
+  mockSignOut,
+} = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockListWallets: vi.fn(),
+  mockSignUpEmail: vi.fn(),
+  mockSignInEmail: vi.fn(),
+  mockSignInSocial: vi.fn(),
+  mockSignOut: vi.fn(),
+}));
 
 vi.mock('../lib/auth-client', () => ({
   authClient: {
@@ -24,6 +31,10 @@ vi.mock('../lib/auth-client', () => ({
   },
 }));
 
+vi.mock('@/lib/api/wallets', () => ({
+  walletsApi: { list: mockListWallets, create: vi.fn() },
+}));
+
 async function fillSignInForm(user: UserEvent) {
   await user.type(await screen.findByRole('textbox', { name: /email/i }), 'taylor@example.test');
   await user.type(await screen.findByLabelText(/password/i), 'a-strong-password');
@@ -32,6 +43,13 @@ async function fillSignInForm(user: UserEvent) {
 describe('sign-in journeys', () => {
   beforeEach(() => {
     mockGetSession.mockReset().mockResolvedValue({ data: null, error: null });
+    mockListWallets.mockReset().mockResolvedValue({
+      ok: true,
+      value: {
+        wallets: [],
+        pagination: { page: 1, pageSize: 25, totalCount: 0, totalPages: 0 },
+      },
+    });
     mockSignUpEmail.mockReset();
     mockSignInEmail.mockReset();
     mockSignInSocial.mockReset();
@@ -58,7 +76,7 @@ describe('sign-in journeys', () => {
       password: 'a-strong-password',
       callbackURL: '/wallets',
     });
-    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Wallets$/ })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/wallets');
   });
 
@@ -101,7 +119,7 @@ describe('sign-in journeys', () => {
       password: 'a-strong-password',
       callbackURL: '/wallets',
     });
-    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Wallets$/ })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/wallets');
   });
 

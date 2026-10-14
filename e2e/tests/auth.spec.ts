@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 import { mockAuthApi } from './support/auth-api';
+import { mockWalletsApi } from './support/wallets-api';
 
 test.describe('authentication journeys', () => {
   test('registration, logout, and login work through the browser', async ({ page }) => {
     const auth = await mockAuthApi(page);
+    await mockWalletsApi(page);
 
     await page.goto('/');
     await page.getByRole('link', { name: /create your account/i }).click();
@@ -14,7 +16,7 @@ test.describe('authentication journeys', () => {
     await page.getByRole('button', { name: /create account/i }).click();
 
     await expect(page).toHaveURL(/\/wallets$/);
-    await expect(page.getByRole('heading', { name: /wallets/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Wallets', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: /sign out/i }).click();
     await expect(page).toHaveURL('/');
@@ -24,7 +26,7 @@ test.describe('authentication journeys', () => {
     await page.getByRole('button', { name: /^sign in$/i }).click();
 
     await expect(page).toHaveURL(/\/wallets$/);
-    await expect(page.getByRole('heading', { name: /wallets/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Wallets', exact: true })).toBeVisible();
     expect(auth.unexpectedRequests).toEqual([]);
   });
 

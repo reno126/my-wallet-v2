@@ -10,11 +10,12 @@ import { HomeRoute } from './routes/home/HomeRoute';
 import { NotFoundRoute } from './routes/not-found/NotFoundRoute';
 import { RootErrorBoundary } from './routes/RootErrorBoundary';
 
-const { mockGetSession } = vi.hoisted(() => ({
+const { mockGetSession, mockListWallets } = vi.hoisted(() => ({
   mockGetSession:
     vi.fn<
       () => Promise<{ data: { user: { id: string } } | null; error: { message: string } | null }>
     >(),
+  mockListWallets: vi.fn(),
 }));
 
 vi.mock('../lib/auth-client', () => ({
@@ -22,6 +23,10 @@ vi.mock('../lib/auth-client', () => ({
     getSession: mockGetSession,
     useSession: () => ({ isPending: false }),
   },
+}));
+
+vi.mock('@/lib/api/wallets', () => ({
+  walletsApi: { list: mockListWallets, create: vi.fn() },
 }));
 
 function LoadingRouteFallback() {
@@ -32,6 +37,13 @@ describe('application routing', () => {
   beforeEach(() => {
     mockGetSession.mockReset();
     mockGetSession.mockResolvedValue({ data: null, error: null });
+    mockListWallets.mockReset().mockResolvedValue({
+      ok: true,
+      value: {
+        wallets: [],
+        pagination: { page: 1, pageSize: 25, totalCount: 0, totalPages: 0 },
+      },
+    });
   });
 
   it('renders the home route from the shared route configuration', async () => {
@@ -50,7 +62,7 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Wallets$/ })).toBeInTheDocument();
     expect(memoryRouter.state.location.pathname).toBe('/wallets');
   });
 
@@ -62,7 +74,7 @@ describe('application routing', () => {
 
       render(<RouterProvider router={memoryRouter} />);
 
-      expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: /^Wallets$/ })).toBeInTheDocument();
       expect(memoryRouter.state.location.pathname).toBe('/wallets');
     },
   );

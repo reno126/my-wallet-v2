@@ -9,7 +9,7 @@ import { HomeRoute } from './routes/home/HomeRoute';
 import { NotFoundRoute } from './routes/not-found/NotFoundRoute';
 import { RootErrorBoundary } from './routes/RootErrorBoundary';
 import { RootLoadingFallback } from './routes/RootLoadingFallback';
-import { WalletsRoute } from './routes/wallets/WalletsRoute';
+import { WalletsLoadingState } from './routes/wallets/_components/WalletsLoadingState';
 
 async function homeLoader() {
   if (await getSession()) {
@@ -44,7 +44,24 @@ export const routeObjects = [
       {
         Component: AuthenticatedLayout,
         loader: requireSession,
-        children: [{ path: 'wallets', Component: WalletsRoute, loader: requireSession }],
+        children: [
+          {
+            path: 'wallets',
+            HydrateFallback: WalletsLoadingState,
+            lazy: async () => {
+              const [routeModule, dataModule] = await Promise.all([
+                import('./routes/wallets/WalletsRoute'),
+                import('./routes/wallets/_utils/walletRouteData'),
+              ]);
+
+              return {
+                Component: routeModule.WalletsRoute,
+                loader: dataModule.walletsLoader,
+                action: dataModule.walletsAction,
+              };
+            },
+          },
+        ],
       },
       { path: '*', Component: NotFoundRoute },
     ],
