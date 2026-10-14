@@ -40,9 +40,7 @@ export function WalletCreateDialog() {
   const isSubmitting = fetcher.state !== 'idle';
   const isOpen = isOpenRequested && fetcher.data?.status !== 'created';
   const rootError =
-    !isSubmitting && fetcher.data?.status === 'failed'
-      ? walletDictionary.create.failed
-      : undefined;
+    !isSubmitting && fetcher.data?.status === 'failed' ? walletDictionary.create.failed : undefined;
 
   useEffect(() => {
     const actionResult = fetcher.data;
