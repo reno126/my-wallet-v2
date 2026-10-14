@@ -3,30 +3,31 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z as zod } from 'zod';
 
-import { apiErrorMessages, apiErrorSchema } from '@my-wallets/contracts';
+import { apiErrorSchema } from '@my-wallets/contracts';
 
-import { apiEnvironmentSchema } from './config/environment.js';
-import { buildServer } from './server.js';
+import { createTestServer, type TestServer } from '../../test-support/create-test-server.js';
 
 describe('Better Auth API integration', () => {
-  let server: ReturnType<typeof buildServer> | undefined;
+  let server: TestServer | undefined;
   let email: string | undefined;
 
   afterEach(async () => {
-    if (server?.hasDecorator('prisma')) {
-      if (email) {
-        await server.prisma.user.deleteMany({ where: { email } });
-      }
-
-      await server.close();
-    }
-
+    const testServer = server;
+    const testEmail = email;
     server = undefined;
     email = undefined;
+
+    try {
+      if (testServer?.hasDecorator('prisma') && testEmail) {
+        await testServer.prisma.user.deleteMany({ where: { email: testEmail } });
+      }
+    } finally {
+      await testServer?.close();
+    }
   });
 
   it('registers, resolves a session, protects a route, signs out, and allows a new login', async () => {
-    const testServer = createTestServer();
+    const testServer = createAuthTestServer();
     server = testServer;
     email = `${randomUUID()}@example.test`;
 
@@ -47,15 +48,7 @@ describe('Better Auth API integration', () => {
 
     expect(registrationResponse.statusCode).toBe(200);
     expect(registrationCookies).not.toBe('');
-    expect(cookieHeaders(registrationResponse.headers['set-cookie']).join(';')).toContain(
-      'HttpOnly',
-    );
-    expect(cookieHeaders(registrationResponse.headers['set-cookie']).join(';')).toContain(
-      'SameSite=Lax',
-    );
-    expect(cookieHeaders(registrationResponse.headers['set-cookie']).join(';')).not.toContain(
-      'Domain=',
-    );
+    expectAuthCookieAttributes(registrationResponse.headers['set-cookie']);
 
     const sessionResponse = await testServer.inject({
       method: 'GET',
@@ -119,7 +112,7 @@ describe('Better Auth API integration', () => {
   }, 60_000);
 
   it('marks authentication cookies Secure when HTTPS is enabled at ingress', async () => {
-    const testServer = createTestServer(true);
+    const testServer = createAuthTestServer({ httpsEnabled: true });
     server = testServer;
     email = `${randomUUID()}@example.test`;
 
@@ -131,11 +124,11 @@ describe('Better Auth API integration', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(cookieHeaders(response.headers['set-cookie']).join(';')).toContain('Secure');
+    expectAuthCookieAttributes(response.headers['set-cookie'], { secure: true });
   });
 
   it('enforces the configured password length for credential registration', async () => {
-    const testServer = createTestServer();
+    const testServer = createAuthTestServer();
     server = testServer;
     email = `${randomUUID()}@example.test`;
 
@@ -163,7 +156,7 @@ describe('Better Auth API integration', () => {
   });
 
   it('uses the browser-visible callback URL for Google OAuth initiation', async () => {
-    const testServer = createTestServer(false, true);
+    const testServer = createAuthTestServer({ googleEnabled: true });
     server = testServer;
 
     const response = await testServer.inject({
@@ -181,39 +174,23 @@ describe('Better Auth API integration', () => {
       'http://127.0.0.1:5173/api/auth/callback/google',
     );
   });
-
-  it('returns the common 401 response when the typed auth hook finds no session', async () => {
-    const testServer = createTestServer();
-    server = testServer;
-
-    testServer.register((routeServer, _pluginOptions, completePluginRegistration) => {
-      routeServer.get('/api/test-session', { preHandler: routeServer.authenticate }, (request) => ({
-        userId: request.authSession?.user.id,
-      }));
-      completePluginRegistration();
-    });
-
-    const response = await testServer.inject({ method: 'GET', url: '/api/test-session' });
-    const body = apiErrorSchema.parse(response.json());
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error.code).toBe('UNAUTHENTICATED');
-    expect(body.error.message).toBe(apiErrorMessages.UNAUTHENTICATED);
-    expect(body.error.requestId).toEqual(expect.any(String));
-  });
 });
 
-function createTestServer(httpsEnabled = false, googleEnabled = false) {
-  return buildServer({
-    environment: apiEnvironmentSchema.parse({
-      NODE_ENV: 'test',
-      DATABASE_URL:
-        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
-      API_HTTPS_ENABLED: httpsEnabled ? 'true' : 'false',
-      GOOGLE_CLIENT_ID: googleEnabled ? 'test-google-client-id' : '',
-      GOOGLE_CLIENT_SECRET: googleEnabled ? 'test-google-client-secret' : '',
-    }),
-    logger: false,
+interface AuthTestServerOptions {
+  httpsEnabled?: boolean;
+  googleEnabled?: boolean;
+}
+
+function createAuthTestServer({
+  httpsEnabled = false,
+  googleEnabled = false,
+}: AuthTestServerOptions = {}) {
+  return createTestServer({
+    BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+    WEB_ORIGIN: 'http://127.0.0.1:5173',
+    API_HTTPS_ENABLED: httpsEnabled ? 'true' : 'false',
+    GOOGLE_CLIENT_ID: googleEnabled ? 'test-google-client-id' : '',
+    GOOGLE_CLIENT_SECRET: googleEnabled ? 'test-google-client-secret' : '',
   });
 }
 
@@ -229,4 +206,21 @@ function cookieHeaders(setCookieHeader: string | string[] | undefined): string[]
     : setCookieHeader === undefined
       ? []
       : [setCookieHeader];
+}
+
+function expectAuthCookieAttributes(
+  setCookieHeader: string | string[] | undefined,
+  { secure = false }: { secure?: boolean } = {},
+): void {
+  const headers = cookieHeaders(setCookieHeader);
+
+  expect(headers.length).toBeGreaterThan(0);
+  for (const header of headers) {
+    expect(header).toMatch(/;\s*httponly(?:;|$)/i);
+    expect(header).toMatch(/;\s*samesite=lax(?:;|$)/i);
+    expect(header).not.toMatch(/;\s*domain=/i);
+    if (secure) {
+      expect(header).toMatch(/;\s*secure(?:;|$)/i);
+    }
+  }
 }

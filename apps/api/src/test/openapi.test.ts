@@ -4,12 +4,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { apiErrorSchema, healthStatusSchema } from '@my-wallets/contracts';
 
-import { apiEnvironmentSchema } from './config/environment.js';
-import { addRateLimitContract } from './openapi-document.js';
-import { buildServer } from './server.js';
+import { createTestServer, type TestServer } from '../../test-support/create-test-server.js';
+import { addRateLimitContract } from '../openapi-document.js';
 
 describe('OpenAPI contract', () => {
-  let apiServer: ReturnType<typeof buildServer> | undefined;
+  let apiServer: TestServer | undefined;
 
   afterEach(async () => {
     await apiServer?.close();
@@ -191,21 +190,10 @@ const rateLimitRoute: FastifyPluginCallbackZod = (
   completePluginRegistration();
 };
 
-function createTestServer() {
-  return buildServer({
-    environment: apiEnvironmentSchema.parse({
-      NODE_ENV: 'test',
-      DATABASE_URL:
-        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
-    }),
-    logger: false,
-  });
-}
-
 function validateResponseAgainstContract(
   contractApi: OpenAPIBackend,
   requestPath: string,
-  response: Awaited<ReturnType<ReturnType<typeof buildServer>['inject']>>,
+  response: Awaited<ReturnType<TestServer['inject']>>,
 ) {
   const matchedOperation = contractApi.matchOperation({
     method: 'get',

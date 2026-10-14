@@ -3,29 +3,32 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z as zod } from 'zod';
 
-import { apiErrorSchema } from '@my-wallets/contracts';
+import { apiErrorMessages, apiErrorSchema } from '@my-wallets/contracts';
 
-import { apiEnvironmentSchema } from './config/environment.js';
-import { registerPrivateRouteHooks } from './routes/private/autohooks.js';
-import { buildServer } from './server.js';
+import { createTestServer, type TestServer } from '../../test-support/create-test-server.js';
+import { registerPrivateRouteHooks } from '../routes/private/autohooks.js';
 
 describe('private API authorization and abuse controls', () => {
-  let server: ReturnType<typeof buildServer> | undefined;
+  let server: TestServer | undefined;
   const registeredEmails: string[] = [];
 
   afterEach(async () => {
-    if (server?.hasDecorator('prisma')) {
-      await server.prisma.rateLimit.deleteMany();
-
-      if (registeredEmails.length > 0) {
-        await server.prisma.user.deleteMany({ where: { email: { in: registeredEmails } } });
-      }
-
-      await server.close();
-    }
-
-    registeredEmails.length = 0;
+    const testServer = server;
+    const testEmails = [...registeredEmails];
     server = undefined;
+    registeredEmails.length = 0;
+
+    try {
+      if (testServer?.hasDecorator('prisma')) {
+        await testServer.prisma.rateLimit.deleteMany();
+
+        if (testEmails.length > 0) {
+          await testServer.prisma.user.deleteMany({ where: { email: { in: testEmails } } });
+        }
+      }
+    } finally {
+      await testServer?.close();
+    }
   });
 
   it('requires a session for private routes and derives identity from that session', async () => {
@@ -38,8 +41,12 @@ describe('private API authorization and abuse controls', () => {
       url: '/api/test-private/wallets',
     });
 
+    const unauthenticatedError = apiErrorSchema.parse(unauthenticatedResponse.json()).error;
+
     expect(unauthenticatedResponse.statusCode).toBe(401);
-    expect(apiErrorSchema.parse(unauthenticatedResponse.json()).error.code).toBe('UNAUTHENTICATED');
+    expect(unauthenticatedError.code).toBe('UNAUTHENTICATED');
+    expect(unauthenticatedError.message).toBe(apiErrorMessages.UNAUTHENTICATED);
+    expect(unauthenticatedError.requestId).toEqual(expect.any(String));
 
     const email = await registerUser(testServer, registeredEmails);
     const cookies = await getSessionCookie(testServer, email);
@@ -54,7 +61,7 @@ describe('private API authorization and abuse controls', () => {
     expect(authenticatedResponse.statusCode).toBe(200);
     expect(authenticatedResult.userId.length).toBeGreaterThan(0);
     expect(authenticatedResult.userId).not.toBe('attacker-selected-id');
-  });
+  }, 60_000);
 
   it('accepts only the exact Origin or a Referer fallback when Origin is absent', async () => {
     const testServer = createTestServer();
@@ -277,23 +284,8 @@ describe('private API authorization and abuse controls', () => {
   });
 });
 
-function createTestServer(environmentOverrides: Record<string, string> = {}) {
-  return buildServer({
-    environment: apiEnvironmentSchema.parse({
-      NODE_ENV: 'test',
-      BETTER_AUTH_SECRET: 'authorization-test-fixture-secret-with-enough-length',
-      BETTER_AUTH_URL: 'https://api.test.example',
-      WEB_ORIGIN: 'https://wallet.test.example',
-      DATABASE_URL:
-        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
-      ...environmentOverrides,
-    }),
-    logger: false,
-  });
-}
-
 function registerProtectedTestRoutes(
-  testServer: ReturnType<typeof buildServer>,
+  testServer: TestServer,
   onMutation: () => void = () => undefined,
 ): void {
   testServer.register(
@@ -313,10 +305,7 @@ function registerProtectedTestRoutes(
   );
 }
 
-async function registerUser(
-  testServer: ReturnType<typeof buildServer>,
-  registeredEmails: string[],
-): Promise<string> {
+async function registerUser(testServer: TestServer, registeredEmails: string[]): Promise<string> {
   const email = `${randomUUID()}@example.test`;
   registeredEmails.push(email);
 
@@ -332,10 +321,7 @@ async function registerUser(
   return email;
 }
 
-async function getSessionCookie(
-  testServer: ReturnType<typeof buildServer>,
-  email: string,
-): Promise<string> {
+async function getSessionCookie(testServer: TestServer, email: string): Promise<string> {
   const sessionResponse = await testServer.inject({
     method: 'POST',
     url: '/api/auth/sign-in/email',

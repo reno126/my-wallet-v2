@@ -4,7 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "types": ["node"]
+    "types": ["node"],
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src/**/*.ts", "better-auth.config.ts", "vitest.config.ts", "prisma.config.ts"]
 }

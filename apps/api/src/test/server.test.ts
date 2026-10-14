@@ -2,12 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type ApiErrorInput, apiErrorSchema } from '@my-wallets/contracts';
 
-import { apiEnvironmentSchema } from './config/environment.js';
-import { sendResult } from './http/send-result.js';
-import { buildServer } from './server.js';
+import { createTestServer, type TestServer } from '../../test-support/create-test-server.js';
+import { sendResult } from '../http/send-result.js';
 
 describe('API server security boundary', () => {
-  let server: ReturnType<typeof buildServer> | undefined;
+  let server: TestServer | undefined;
 
   afterEach(async () => {
     await server?.close();
@@ -257,21 +256,6 @@ describe('API server security boundary', () => {
     expect(secondClientRetryResponse.statusCode).toBe(429);
   });
 });
-
-function createTestServer(environmentOverrides: Record<string, string> = {}) {
-  return buildServer({
-    environment: apiEnvironmentSchema.parse({
-      NODE_ENV: 'test',
-      BETTER_AUTH_SECRET: 'production-mode-test-fixture-secret-with-enough-length',
-      BETTER_AUTH_URL: 'https://api.test.example',
-      WEB_ORIGIN: 'https://wallet.test.example',
-      DATABASE_URL:
-        'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
-      ...environmentOverrides,
-    }),
-    logger: false,
-  });
-}
 
 function parseApiErrorResponse(payload: string): ApiErrorInput {
   return apiErrorSchema.parse(JSON.parse(payload) as unknown);

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +23,11 @@ vi.mock('../lib/auth-client', () => ({
     signOut: mockSignOut,
   },
 }));
+
+async function fillSignInForm(user: UserEvent) {
+  await user.type(await screen.findByRole('textbox', { name: /email/i }), 'taylor@example.test');
+  await user.type(await screen.findByLabelText(/password/i), 'a-strong-password');
+}
 
 describe('sign-in journeys', () => {
   beforeEach(() => {
@@ -53,7 +58,7 @@ describe('sign-in journeys', () => {
       password: 'a-strong-password',
       callbackURL: '/wallets',
     });
-    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/wallets');
   });
 
@@ -88,8 +93,7 @@ describe('sign-in journeys', () => {
     const router = createMemoryRouter(routeObjects, { initialEntries: ['/login'] });
 
     render(<RouterProvider router={router} />);
-    await user.type(await screen.findByRole('textbox', { name: /email/i }), 'taylor@example.test');
-    await user.type(await screen.findByLabelText(/password/i), 'a-strong-password');
+    await fillSignInForm(user);
     await user.click(await screen.findByRole('button', { name: /^sign in$/i }));
 
     expect(mockSignInEmail).toHaveBeenCalledWith({
@@ -97,7 +101,7 @@ describe('sign-in journeys', () => {
       password: 'a-strong-password',
       callbackURL: '/wallets',
     });
-    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/wallets');
   });
 
@@ -120,12 +124,12 @@ describe('sign-in journeys', () => {
       <RouterProvider router={createMemoryRouter(routeObjects, { initialEntries: ['/login'] })} />,
     );
 
-    await user.type(await screen.findByRole('textbox', { name: /email/i }), 'taylor@example.test');
-    await user.type(await screen.findByLabelText(/password/i), 'a-strong-password');
+    await fillSignInForm(user);
     await user.click(await screen.findByRole('button', { name: /^sign in$/i }));
 
-    expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.queryByText(/private auth detail/i)).toBeNull();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toBeInTheDocument();
+    expect(alert).not.toHaveTextContent(/private auth detail/i);
   });
 
   it.each(['API request limit', 'Better Auth credential limit'])(
@@ -142,16 +146,12 @@ describe('sign-in journeys', () => {
         />,
       );
 
-      await user.type(
-        await screen.findByRole('textbox', { name: /email/i }),
-        'taylor@example.test',
-      );
-      await user.type(await screen.findByLabelText(/password/i), 'a-strong-password');
+      await fillSignInForm(user);
       await user.click(await screen.findByRole('button', { name: /^sign in$/i }));
 
-      expect(await screen.findByRole('alert')).toBeTruthy();
-      expect(screen.getByText(/too many attempts/i)).toBeTruthy();
-      expect(screen.queryByText(/private rate limit detail/i)).toBeNull();
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(/wait|try again/i);
+      expect(alert).not.toHaveTextContent(/private rate limit detail/i);
     },
   );
 
@@ -170,7 +170,7 @@ describe('sign-in journeys', () => {
     expect(mockSignOut).toHaveBeenCalledOnce();
     expect(
       await screen.findByRole('heading', { name: /a clearer view of your investments/i }),
-    ).toBeTruthy();
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/');
   });
 
@@ -180,9 +180,11 @@ describe('sign-in journeys', () => {
     render(<RouterProvider router={router} />);
 
     await user.click(await screen.findByRole('link', { name: /create your account/i }));
-    expect(await screen.findByRole('heading', { name: /create your account/i })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: /create your account/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: /sign in/i }));
-    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
   });
 });

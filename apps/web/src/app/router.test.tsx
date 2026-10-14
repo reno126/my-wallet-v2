@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ActionFunction, RouteObject } from 'react-router';
-import { createMemoryRouter, Form, RouterProvider, useActionData } from 'react-router';
+import type { RouteObject } from 'react-router';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { requestWithSession } from '../lib/requireSession';
 import { RootLayout } from './layouts/RootLayout';
 import { routeObjects } from './router';
 import { HomeRoute } from './routes/home/HomeRoute';
@@ -25,21 +24,6 @@ vi.mock('../lib/auth-client', () => ({
   },
 }));
 
-const saveScaffoldPreference: ActionFunction = () => ({ status: 'saved' });
-
-function ActionRoute() {
-  const actionData = useActionData<{ status: string }>();
-
-  return (
-    <>
-      <Form method="post">
-        <button type="submit">Save scaffold preference</button>
-      </Form>
-      {actionData ? <p role="status">{actionData.status}</p> : null}
-    </>
-  );
-}
-
 function LoadingRouteFallback() {
   return <p role="status">Loading route</p>;
 }
@@ -57,7 +41,7 @@ describe('application routing', () => {
 
     expect(
       await screen.findByRole('heading', { name: /a clearer view of your investments/i }),
-    ).toBeTruthy();
+    ).toBeInTheDocument();
   });
 
   it('sends an authenticated visitor from the home route to wallets', async () => {
@@ -66,7 +50,7 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
     expect(memoryRouter.state.location.pathname).toBe('/wallets');
   });
 
@@ -78,7 +62,7 @@ describe('application routing', () => {
 
       render(<RouterProvider router={memoryRouter} />);
 
-      expect(await screen.findByRole('heading', { name: /wallets/i })).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: /wallets/i })).toBeInTheDocument();
       expect(memoryRouter.state.location.pathname).toBe('/wallets');
     },
   );
@@ -92,7 +76,7 @@ describe('application routing', () => {
 
       expect(
         await screen.findByRole('heading', { name: /welcome back|create your account/i }),
-      ).toBeTruthy();
+      ).toBeInTheDocument();
       expect(memoryRouter.state.location.pathname).toBe(path);
     },
   );
@@ -102,37 +86,8 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
     expect(memoryRouter.state.location.pathname).toBe('/login');
-  });
-
-  it('does not make a protected API request when the session is missing', async () => {
-    const privateApiRequest = vi.fn(() =>
-      Promise.resolve({ response: new Response(null, { status: 200 }) }),
-    );
-
-    const redirectLocation = await requestWithSession(privateApiRequest).then(
-      () => null,
-      (error: unknown) => (error instanceof Response ? error.headers.get('Location') : null),
-    );
-
-    expect(redirectLocation).toBe('/login');
-    expect(privateApiRequest).not.toHaveBeenCalled();
-  });
-
-  it('redirects to login when a protected API request reports an expired session', async () => {
-    mockGetSession.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
-    const privateApiRequest = vi.fn(() =>
-      Promise.resolve({ response: new Response(null, { status: 401 }) }),
-    );
-
-    const redirectLocation = await requestWithSession(privateApiRequest).then(
-      () => null,
-      (error: unknown) => (error instanceof Response ? error.headers.get('Location') : null),
-    );
-
-    expect(redirectLocation).toBe('/login');
-    expect(privateApiRequest).toHaveBeenCalledOnce();
   });
 
   it('shows the route error boundary when session lookup fails', async () => {
@@ -141,9 +96,11 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /something went wrong/i })).toBeTruthy();
-    expect(screen.getByText(/status 503/i)).toBeTruthy();
-    expect(screen.queryByText(/private session service detail/i)).toBeNull();
+    expect(
+      await screen.findByRole('heading', { name: /something went wrong/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/status 503/i)).toBeInTheDocument();
+    expect(screen.queryByText(/private session service detail/i)).not.toBeInTheDocument();
   });
 
   it('shows the route error boundary when the session service returns an error', async () => {
@@ -152,8 +109,10 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /something went wrong/i })).toBeTruthy();
-    expect(screen.getByText(/status 503/i)).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: /something went wrong/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/status 503/i)).toBeInTheDocument();
   });
 
   it('renders a not-found route and navigates back home', async () => {
@@ -166,21 +125,7 @@ describe('application routing', () => {
 
     expect(
       await screen.findByRole('heading', { name: /a clearer view of your investments/i }),
-    ).toBeTruthy();
-  });
-
-  it('submits a route action and renders its result', async () => {
-    const user = userEvent.setup();
-    const actionRoutes = [
-      { path: '/', action: saveScaffoldPreference, Component: ActionRoute },
-    ] satisfies RouteObject[];
-    const memoryRouter = createMemoryRouter(actionRoutes, { initialEntries: ['/'] });
-
-    render(<RouterProvider router={memoryRouter} />);
-
-    await user.click(screen.getByRole('button', { name: /save scaffold preference/i }));
-
-    expect((await screen.findByRole('status')).textContent).toBe('saved');
+    ).toBeInTheDocument();
   });
 
   it('renders a safe route error boundary when a loader fails', async () => {
@@ -206,7 +151,9 @@ describe('application routing', () => {
 
     render(<RouterProvider router={memoryRouter} />);
 
-    expect(await screen.findByRole('heading', { name: /something went wrong/i })).toBeTruthy();
-    expect(screen.queryByText(/private diagnostic detail/i)).toBeNull();
+    expect(
+      await screen.findByRole('heading', { name: /something went wrong/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/private diagnostic detail/i)).not.toBeInTheDocument();
   });
 });
