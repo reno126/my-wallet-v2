@@ -1,8 +1,8 @@
 import type { FastifyReply } from 'fastify';
 
 import type { Result } from '../result.js';
-import type { ApiFailure } from './api-failure.js';
-import { mapFailureToResponse } from './api-failure.js';
+import type { ApiFailure } from './api-failure.ts';
+import { mapFailureToResponse } from './api-failure.ts';
 
 export function sendResult<Value>(
   reply: FastifyReply,

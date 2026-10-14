@@ -26,6 +26,14 @@ pnpm db:up:local
 pnpm db:wait:local
 ```
 
+Open Prisma Studio against the local development database with:
+
+```sh
+pnpm db:studio:local
+```
+
+Studio can edit and delete records, so keep it on the local development database and do not expose it publicly.
+
 Start the web development server with:
 
 ```sh

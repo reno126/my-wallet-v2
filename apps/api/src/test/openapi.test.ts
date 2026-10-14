@@ -1,11 +1,10 @@
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
-import { OpenAPIBackend } from 'openapi-backend';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { apiErrorSchema, healthStatusSchema } from '@my-wallets/contracts';
 
 import { createTestServer, type TestServer } from '../../test-support/create-test-server.js';
-import { addRateLimitContract } from '../openapi-document.js';
+import { createOpenApiValidator } from '../../test-support/openapi-contract.js';
 
 describe('OpenAPI contract', () => {
   let apiServer: TestServer | undefined;
@@ -44,23 +43,18 @@ describe('OpenAPI contract', () => {
     apiServer = server;
     await server.ready();
 
-    const apiDocument = addRateLimitContract(server.swagger());
-    const contractApi = new OpenAPIBackend({
-      definition: apiDocument,
-      strict: true,
-      apiRoot: '/api',
-    });
-    await contractApi.init();
-    const operationIds = contractApi.router
-      .getOperations()
-      .flatMap((operation) => (operation.operationId ? [operation.operationId] : []));
+    const {
+      document: apiDocument,
+      operationIds,
+      assertResponse,
+    } = await createOpenApiValidator(server);
 
     expect(new Set(operationIds).size).toBe(operationIds.length);
     expect(apiDocument.components?.schemas).toHaveProperty('WalletSummary');
     expect(apiDocument.components?.schemas).toHaveProperty('InstrumentSearchResponse');
 
     const healthResponse = await server.inject({ method: 'GET', url: '/api/health' });
-    validateResponseAgainstContract(contractApi, '/api/health', healthResponse);
+    assertResponse('get', '/api/health', healthResponse);
     expect(healthResponse.statusCode).toBe(200);
   });
 
@@ -70,17 +64,11 @@ describe('OpenAPI contract', () => {
     server.register(failureRoute, { prefix: '/api' });
     await server.ready();
 
-    const apiDocument = addRateLimitContract(server.swagger());
-    const contractApi = new OpenAPIBackend({
-      definition: apiDocument,
-      strict: true,
-      apiRoot: '/api',
-    });
-    await contractApi.init();
+    const { assertResponse } = await createOpenApiValidator(server);
 
     const failureResponse = await server.inject({ method: 'GET', url: '/api/contract-failure' });
 
-    validateResponseAgainstContract(contractApi, '/api/contract-failure', failureResponse);
+    assertResponse('get', '/api/contract-failure', failureResponse);
     expect(failureResponse.statusCode).toBe(500);
     expect(apiErrorSchema.parse(failureResponse.json()).error.code).toBe('INTERNAL_SERVER_ERROR');
   });
@@ -91,18 +79,12 @@ describe('OpenAPI contract', () => {
     server.register(rateLimitRoute, { prefix: '/api' });
     await server.ready();
 
-    const apiDocument = addRateLimitContract(server.swagger());
-    const contractApi = new OpenAPIBackend({
-      definition: apiDocument,
-      strict: true,
-      apiRoot: '/api',
-    });
-    await contractApi.init();
+    const { document: apiDocument, assertResponse } = await createOpenApiValidator(server);
 
     const firstResponse = await server.inject({ method: 'GET', url: '/api/contract-rate-limit' });
     const limitedResponse = await server.inject({ method: 'GET', url: '/api/contract-rate-limit' });
 
-    validateResponseAgainstContract(contractApi, '/api/contract-rate-limit', limitedResponse);
+    assertResponse('get', '/api/contract-rate-limit', limitedResponse);
     expect(firstResponse.statusCode).toBe(200);
     expect(limitedResponse.statusCode).toBe(429);
     expect(apiDocument.components?.responses?.['RateLimited']).toHaveProperty(
@@ -119,32 +101,20 @@ describe('OpenAPI contract', () => {
     apiServer = server;
     await server.ready();
 
-    const apiDocument = addRateLimitContract(server.swagger());
-    const contractApi = new OpenAPIBackend({
-      definition: apiDocument,
-      strict: true,
-      apiRoot: '/api',
-    });
-    await contractApi.init();
+    const { document: apiDocument, assertResponse } = await createOpenApiValidator(server);
 
     expect(apiDocument).toHaveProperty(
       'paths./auth/sign-up/email.post.responses.200.headers.set-cookie',
     );
 
-    expect(
-      contractApi.matchOperation({
-        method: 'post',
-        path: '/api/auth/sign-up/email',
-        headers: {},
-      })?.operationId,
-    ).toBe('registerWithEmail');
+    expect(apiDocument.paths?.['/auth/sign-up/email']?.post?.operationId).toBe('registerWithEmail');
 
     const sessionResponse = await server.inject({
       method: 'GET',
       url: '/api/auth/get-session',
     });
 
-    validateResponseAgainstContract(contractApi, '/api/auth/get-session', sessionResponse);
+    assertResponse('get', '/api/auth/get-session', sessionResponse);
     expect(sessionResponse.statusCode).toBe(200);
   });
 });
@@ -189,43 +159,3 @@ const rateLimitRoute: FastifyPluginCallbackZod = (
   );
   completePluginRegistration();
 };
-
-function validateResponseAgainstContract(
-  contractApi: OpenAPIBackend,
-  requestPath: string,
-  response: Awaited<ReturnType<TestServer['inject']>>,
-) {
-  const matchedOperation = contractApi.matchOperation({
-    method: 'get',
-    path: requestPath,
-    headers: {},
-  });
-
-  expect(matchedOperation?.operationId).toBeDefined();
-  const operationId = matchedOperation?.operationId;
-  expect(operationId).toBeDefined();
-
-  const documentedResponse = matchedOperation?.responses?.[String(response.statusCode)];
-  expect(documentedResponse).toBeDefined();
-
-  const responseBody: unknown = response.json();
-  const validationResult = contractApi.validateResponse(
-    responseBody,
-    operationId ?? '',
-    response.statusCode,
-  );
-  expect(validationResult.valid).toBe(true);
-
-  const responseContent =
-    documentedResponse && 'content' in documentedResponse ? documentedResponse.content : undefined;
-  const documentedMediaTypes = Object.keys(responseContent ?? {});
-  const responseMediaType = response.headers['content-type']?.split(';')[0];
-  expect(documentedMediaTypes).toContain(responseMediaType);
-
-  const responseHeaderValidation = contractApi.validateResponseHeaders(
-    response.headers,
-    operationId ?? '',
-    { statusCode: response.statusCode },
-  );
-  expect(responseHeaderValidation.valid).toBe(true);
-}

@@ -22,6 +22,8 @@ export {
 export {
   createWalletSchema,
   updateWalletSchema,
+  walletIdParamsSchema,
+  walletListQuerySchema,
   walletListSchema,
   walletSummarySchema,
 } from './schemas/wallet.js';

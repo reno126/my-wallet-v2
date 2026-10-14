@@ -39,7 +39,10 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
         version: '1.0.0',
       },
       servers: [{ url: '/api' }],
-      tags: [{ name: 'Health', description: 'API liveness and readiness probes.' }],
+      tags: [
+        { name: 'Health', description: 'API liveness and readiness probes.' },
+        { name: 'Wallets', description: 'Authenticated wallet lifecycle operations.' },
+      ],
     },
     transform: (transformOptions) => {
       const transformedRoute = jsonSchemaTransform(transformOptions);

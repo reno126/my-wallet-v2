@@ -31,6 +31,7 @@
     "db:format:local": "dotenv -e .env.local -- pnpm --filter @my-wallets/api prisma:format",
     "db:migrate:dev:local": "dotenv -e .env.local -- pnpm --filter @my-wallets/api prisma:migrate:dev",
     "db:migrate:status:local": "dotenv -e .env.local -- pnpm --filter @my-wallets/api prisma:migrate:status",
+    "db:studio:local": "dotenv -e .env.local -- pnpm --filter @my-wallets/api prisma:studio",
     "db:migrate:deploy": "pnpm --filter @my-wallets/api prisma:migrate:deploy",
     "test:database-safety": "node --test tooling/database/reset-test-database.test.mjs",
     "contracts:generate": "pnpm --filter @my-wallets/api generate:openapi && openapi-typescript packages/contracts/openapi.json -o apps/web/src/api/generated/openapi.d.ts",

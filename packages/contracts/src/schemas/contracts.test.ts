@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { createTransactionSchema, createWalletSchema, walletSummarySchema } from '../index.js';
+import {
+  createTransactionSchema,
+  createWalletSchema,
+  updateWalletSchema,
+  walletListQuerySchema,
+  walletSummarySchema,
+} from '../index.js';
 
 describe('public contracts', () => {
   it('accepts USD and rejects unsupported wallet reporting currencies', () => {
@@ -14,12 +20,21 @@ describe('public contracts', () => {
     });
     const emptyWalletName = createWalletSchema.safeParse({
       name: '  ',
+    });
+    const normalizedWallet = createWalletSchema.parse({
+      name: '  Long-term  ',
       reportingCurrency: 'USD',
     });
+    const emptyUpdate = updateWalletSchema.safeParse({});
+    const oversizedPage = walletListQuerySchema.safeParse({ page: '1', pageSize: '101' });
 
     expect(validWallet.success).toBe(true);
     expect(unsupportedWallet.success).toBe(false);
     expect(emptyWalletName.success).toBe(false);
+    expect(normalizedWallet.name).toBe('Long-term');
+    expect(normalizedWallet.reportingCurrency).toBe('USD');
+    expect(emptyUpdate.success).toBe(false);
+    expect(oversizedPage.success).toBe(false);
   });
 
   it('accepts exact decimal strings up to eight fractional digits', () => {

@@ -7,6 +7,10 @@ datasource db {
   provider = "postgresql"
 }
 
+enum CurrencyCode {
+  USD
+}
+
 model User {
   id            String    @id
   name          String
@@ -17,9 +21,24 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  wallets       Wallet[]
 
   @@unique([email])
   @@map("user")
+}
+
+model Wallet {
+  id                String       @id @default(uuid()) @db.Uuid
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String       @db.VarChar(100)
+  description       String?      @db.VarChar(500)
+  reportingCurrency CurrencyCode @default(USD)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([userId, createdAt, id])
+  @@map("wallet")
 }
 
 model Session {
