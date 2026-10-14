@@ -12,6 +12,7 @@ export function WalletsRoute() {
   const [signOutFailed, setSignOutFailed] = useState(false);
 
   function signOut() {
+    setSignOutFailed(false);
     startSignOutTransition(async () => {
       try {
         const result = await authClient.signOut();
