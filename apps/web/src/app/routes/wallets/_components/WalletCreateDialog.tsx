@@ -29,7 +29,7 @@ type WalletFormInput = zod.input<typeof createWalletSchema>;
 type WalletFormOutput = zod.output<typeof createWalletSchema>;
 
 export function WalletCreateDialog() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpenRequested, setIsOpenRequested] = useState(false);
   const fetcher = useFetcher<typeof walletsAction>();
   const form = useForm<WalletFormInput, undefined, WalletFormOutput>({
     resolver: zodResolver(createWalletSchema),
@@ -37,8 +37,12 @@ export function WalletCreateDialog() {
   });
   const nameError = form.formState.errors.name?.message;
   const descriptionError = form.formState.errors.description?.message;
-  const rootError = form.formState.errors.root?.message;
   const isSubmitting = fetcher.state !== 'idle';
+  const isOpen = isOpenRequested && fetcher.data?.status !== 'created';
+  const rootError =
+    !isSubmitting && fetcher.data?.status === 'failed'
+      ? walletDictionary.create.failed
+      : undefined;
 
   useEffect(() => {
     const actionResult = fetcher.data;
@@ -49,28 +53,25 @@ export function WalletCreateDialog() {
 
     if (actionResult.status === 'created') {
       toast.success(walletDictionary.create.created(actionResult.walletName));
-      form.reset();
-      // The controlled dialog closes in response to the completed route action.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsOpen(false);
       return;
     }
 
-    const errorMessage = walletDictionary.create.failed;
-    form.setError('root', { type: 'server', message: errorMessage });
-    toast.error(errorMessage);
-  }, [fetcher.data, form]);
+    toast.error(walletDictionary.create.failed);
+  }, [fetcher.data]);
 
   function handleOpenChange(open: boolean) {
-    setIsOpen(open);
+    setIsOpenRequested(open);
 
-    if (!open && !isSubmitting) {
+    if (!isSubmitting) {
       form.reset();
+
+      if (open) {
+        fetcher.reset();
+      }
     }
   }
 
   function submitWallet(values: WalletFormOutput) {
-    form.clearErrors('root');
     void fetcher.submit(
       {
         name: values.name,
