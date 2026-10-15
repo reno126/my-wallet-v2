@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://my-wallet-v2-api.up.railway.app/:path*"
+      "destination": "https://my-wallet-v2-api.up.railway.app/api/:path*"
     },
     {
       "source": "/(.*)",
