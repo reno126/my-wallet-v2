@@ -20,14 +20,10 @@ export async function getSession() {
       await authClient.getSession({ query: { disableCookieCache: true } }),
     );
   } catch {
-    // React Router route boundaries handle this safe service failure.
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('The authentication service is unavailable.', { status: 503 });
   }
 
   if (!sessionResult.success || sessionResult.data.error) {
-    // React Router route boundaries handle this safe service failure.
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Response('The authentication service is unavailable.', { status: 503 });
   }
 
@@ -38,36 +34,16 @@ export async function requireSession() {
   const session = await getSession();
 
   if (!session) {
-    // Redirect Responses are the standard React Router loader/action control flow.
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw redirect('/login');
   }
 
   return session;
 }
 
-export async function requestWithSession<T extends { response: Response }>(
-  request: () => Promise<T>,
-) {
-  await requireSession();
-
-  const result = await request();
-
-  if (result.response.status === 401) {
-    // Redirect Responses are the standard React Router loader/action control flow.
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw redirect('/login');
-  }
-
-  return result;
-}
-
 export async function redirectAuthenticatedUser() {
   const session = await getSession();
 
   if (session) {
-    // Redirect Responses are the standard React Router loader control flow.
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw redirect('/wallets');
   }
 

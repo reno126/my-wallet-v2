@@ -8,6 +8,7 @@ interface AuthApiMockOptions {
 }
 
 interface AuthApiMock {
+  expireSession: () => void;
   readonly googleSignInRequests: readonly unknown[];
   readonly unexpectedRequests: readonly string[];
 }
@@ -88,6 +89,9 @@ export async function mockAuthApi(
   });
 
   return {
+    expireSession() {
+      signedIn = false;
+    },
     get googleSignInRequests() {
       return [...googleSignInRequests];
     },

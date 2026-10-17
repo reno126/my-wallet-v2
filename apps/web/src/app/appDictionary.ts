@@ -1,6 +1,7 @@
 export const appDictionary = {
   brand: 'My Wallet',
   navigation: {
+    loading: 'Loading page…',
     main: 'Main navigation',
     wallets: 'Wallets',
     signOut: 'Sign out',

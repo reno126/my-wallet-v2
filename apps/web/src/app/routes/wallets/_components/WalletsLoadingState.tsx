@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { walletDictionary } from '../_utils/walletDictionary';
+import { walletDictionary } from '../walletDictionary';
 
 const walletCardPlaceholders = ['first', 'second', 'third'] as const;
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { requestWithSession } from './requireSession';
+import { getSession, requireSession } from './requireSession';
 
 const { mockGetSession } = vi.hoisted(() => ({
   mockGetSession:
@@ -26,34 +26,34 @@ async function getRedirectLocation(request: Promise<unknown>) {
     throw error;
   }
 
-  throw new Error('Expected requestWithSession to redirect.');
+  throw new Error('Expected requireSession to redirect.');
 }
 
-describe('requestWithSession', () => {
+describe('protected route session lookup', () => {
   beforeEach(() => {
     mockGetSession.mockReset().mockResolvedValue({ data: null, error: null });
   });
 
-  it('does not make a protected API request when the session is missing', async () => {
-    const privateApiRequest = vi.fn(() =>
-      Promise.resolve({ response: new Response(null, { status: 200 }) }),
-    );
-
-    await expect(getRedirectLocation(requestWithSession(privateApiRequest))).resolves.toBe(
-      '/login',
-    );
-    expect(privateApiRequest).not.toHaveBeenCalled();
+  it('should redirect a visitor without a session to login', async () => {
+    // Act
+    const destination = await getRedirectLocation(requireSession());
+    // Assert
+    expect(destination).toBe('/login');
   });
 
-  it('redirects to login when a protected API request reports an expired session', async () => {
+  it('should return the authenticated user for the route guard', async () => {
+    // Arrange
     mockGetSession.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
-    const privateApiRequest = vi.fn(() =>
-      Promise.resolve({ response: new Response(null, { status: 401 }) }),
-    );
+    // Act
+    const session = await requireSession();
+    // Assert
+    expect(session).toStrictEqual({ user: { id: 'user-1' } });
+  });
 
-    await expect(getRedirectLocation(requestWithSession(privateApiRequest))).resolves.toBe(
-      '/login',
-    );
-    expect(privateApiRequest).toHaveBeenCalledOnce();
+  it('should report an unavailable auth service without treating it as logout', async () => {
+    // Arrange
+    mockGetSession.mockRejectedValue(new Error('Private diagnostic detail'));
+    // Assert
+    await expect(getSession()).rejects.toMatchObject({ status: 503 });
   });
 });

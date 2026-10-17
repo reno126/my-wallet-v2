@@ -23,6 +23,12 @@ export async function mockWalletsApi(page: Page): Promise<WalletsApiMock> {
     const request = route.request();
     const requestPath = new URL(request.url()).pathname;
 
+    if (requestPath.startsWith('/api/wallets/') && request.method() === 'GET') {
+      const wallet = wallets.find((candidate) => `/api/wallets/${candidate.id}` === requestPath);
+      await route.fulfill(wallet ? { json: wallet } : { status: 404, json: {} });
+      return;
+    }
+
     if (requestPath !== '/api/wallets') {
       await route.continue();
       return;

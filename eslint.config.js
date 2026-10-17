@@ -113,6 +113,16 @@ export default tseslint.config(
     },
   },
   {
+    files: ['apps/web/src/app/routes/**/*.{ts,tsx}', 'apps/web/src/lib/requireSession.ts'],
+    rules: {
+      // React Router handles thrown Responses as redirects or route errors.
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        { allow: [{ from: 'lib', name: 'Response' }] },
+      ],
+    },
+  },
+  {
     ...testingLibrary.configs['flat/react'],
     files: ['apps/web/**/*.{test,spec}.{ts,tsx}'],
     rules: {

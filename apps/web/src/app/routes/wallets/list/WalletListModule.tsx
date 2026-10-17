@@ -1,7 +1,9 @@
 import { WalletCards } from 'lucide-react';
-import { useLoaderData, useNavigate, useNavigation, useRevalidator } from 'react-router';
+import type { LoaderFunctionArgs } from 'react-router';
+import { Link, redirect, useLoaderData, useNavigate, useNavigation } from 'react-router';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { walletListQuerySchema } from '@my-wallets/contracts';
+import { LoadError } from '@/components/shared/LoadError';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -12,18 +14,36 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { type WalletList, walletsApi } from '@/lib/api/wallets';
 
+import { walletFailureMessage } from '../_utils/walletFailureMessage';
+import { walletDictionary } from '../walletDictionary';
 import { WalletCard } from './_components/WalletCard';
-import { WalletCreateDialog } from './_components/WalletCreateDialog';
-import { WalletsLoadingState } from './_components/WalletsLoadingState';
-import { walletDictionary } from './_utils/walletDictionary';
-import { walletsLoader } from './_utils/walletRouteData';
 
-export function WalletsRoute() {
+type WalletListData =
+  { status: 'ready'; walletList: WalletList } | { status: 'error'; message: string };
+
+export async function walletListLoader({
+  request,
+}: LoaderFunctionArgs): Promise<WalletListData | Response> {
+  const pageValues = new URL(request.url).searchParams.getAll('page');
+  const query = walletListQuerySchema.safeParse(
+    pageValues.length === 0 ? {} : { page: pageValues[0] },
+  );
+  if (pageValues.length > 1 || !query.success) return redirect('/wallets');
+  const result = await walletsApi.list(query.data, request.signal);
+  return result.ok
+    ? { status: 'ready', walletList: result.value }
+    : {
+        status: 'error',
+        message: walletFailureMessage(result.error, { failed: walletDictionary.page.loadFailed }),
+      };
+}
+
+export function WalletListComponent() {
   const navigate = useNavigate();
   const navigation = useNavigation();
-  const revalidator = useRevalidator();
-  const data = useLoaderData<typeof walletsLoader>();
+  const data = useLoaderData<typeof walletListLoader>();
 
   if (data.status === 'error') {
     return (
@@ -37,19 +57,7 @@ export function WalletsRoute() {
           </h1>
           <p className="text-muted-foreground">{walletDictionary.page.description}</p>
         </div>
-        <Alert variant="destructive">
-          <AlertTitle>{walletDictionary.page.loadFailed}</AlertTitle>
-          <AlertDescription>
-            <Button
-              className="mt-4"
-              disabled={revalidator.state !== 'idle'}
-              onClick={() => void revalidator.revalidate()}
-              variant="outline"
-            >
-              {walletDictionary.page.retry}
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <LoadError message={data.message} retryLabel={walletDictionary.page.retry} />
       </section>
     );
   }
@@ -73,7 +81,9 @@ export function WalletsRoute() {
           </h1>
           <p className="max-w-prose text-muted-foreground">{walletDictionary.page.description}</p>
         </div>
-        <WalletCreateDialog />
+        <Button asChild>
+          <Link to="/wallets/new">{walletDictionary.page.createButton}</Link>
+        </Button>
       </header>
 
       <Card className="border-border/70 bg-card/60">
@@ -90,10 +100,8 @@ export function WalletsRoute() {
             {walletDictionary.wallet.reportingCurrency}: USD
           </span>
         </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <WalletsLoadingState />
-          ) : walletList.wallets.length === 0 ? (
+        <CardContent aria-busy={isLoading}>
+          {walletList.wallets.length === 0 ? (
             <Empty className="border border-dashed border-border bg-background/50 py-12 sm:py-16">
               <EmptyHeader>
                 <EmptyMedia variant="icon">

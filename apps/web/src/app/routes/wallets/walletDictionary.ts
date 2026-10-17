@@ -1,10 +1,4 @@
 export const walletDictionary = {
-  navigation: {
-    wallets: 'Wallets',
-    signOut: 'Sign out',
-    signingOut: 'Signing out…',
-    signOutFailed: 'We could not sign you out. Please try again.',
-  },
   page: {
     eyebrow: 'Private workspace',
     title: 'Wallets',
@@ -19,6 +13,17 @@ export const walletDictionary = {
     retry: 'Try again',
     loading: 'Loading your wallets',
     paginationLabel: 'Wallet pages',
+  },
+  errors: {
+    rateLimited: 'Too many requests. Please wait before trying again.',
+    retryAfter: (seconds: number) => `Too many requests. Try again in ${seconds} seconds.`,
+  },
+  detail: {
+    title: 'Wallet details',
+    back: 'Back to wallets',
+    unavailable: 'Wallet unavailable',
+    unavailableDescription: 'This wallet does not exist or is not available to your account.',
+    loadFailed: 'We could not load this wallet. Check your connection and try again.',
   },
   wallet: {
     reportingCurrency: 'Reporting currency',
@@ -42,6 +47,9 @@ export const walletDictionary = {
     submit: 'Create wallet',
     submitting: 'Creating wallet…',
     failed: 'We could not create this wallet. Please try again.',
-    created: (name: string) => `${name} was created.`,
+    invalid: 'Check the wallet details and try again.',
+    unconfirmed:
+      'We could not confirm whether the wallet was created. Check your wallets before trying again.',
+    confirmed: 'Your wallet was created.',
   },
 } as const;

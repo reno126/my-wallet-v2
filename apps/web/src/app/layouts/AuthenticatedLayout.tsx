@@ -1,5 +1,5 @@
 import { useTransition } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useNavigate, useNavigation } from 'react-router';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { appDictionary } from '../appDictionary';
 
 export function AuthenticatedLayout() {
   const navigate = useNavigate();
+  const navigation = useNavigation();
   const [isSigningOut, startSignOutTransition] = useTransition();
 
   function signOut() {
@@ -60,6 +61,11 @@ export function AuthenticatedLayout() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 md:py-10 lg:px-8">
+        {navigation.state === 'loading' ? (
+          <p role="status" className="mb-4 text-sm text-muted-foreground">
+            {appDictionary.navigation.loading}
+          </p>
+        ) : null}
         <Outlet />
       </main>
     </div>

@@ -13,9 +13,7 @@ import { WalletsLoadingState } from './routes/wallets/_components/WalletsLoading
 
 async function homeLoader() {
   if (await getSession()) {
-    // Redirect Responses are the standard React Router loader control flow.
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw redirect('/wallets');
+    return redirect('/wallets');
   }
 
   return null;
@@ -49,15 +47,30 @@ export const routeObjects = [
             path: 'wallets',
             HydrateFallback: WalletsLoadingState,
             lazy: async () => {
-              const [routeModule, dataModule] = await Promise.all([
-                import('./routes/wallets/WalletsRoute'),
-                import('./routes/wallets/_utils/walletRouteData'),
-              ]);
-
+              const routeModule = await import('./routes/wallets/list/WalletListModule');
               return {
-                Component: routeModule.WalletsRoute,
-                loader: dataModule.walletsLoader,
-                action: dataModule.walletsAction,
+                Component: routeModule.WalletListComponent,
+                loader: routeModule.walletListLoader,
+              };
+            },
+          },
+          {
+            path: 'wallets/new',
+            lazy: async () => {
+              const routeModule = await import('./routes/wallets/create/CreateWalletModule');
+              return {
+                Component: routeModule.CreateWalletComponent,
+                action: routeModule.createWalletAction,
+              };
+            },
+          },
+          {
+            path: 'wallets/:walletId',
+            lazy: async () => {
+              const routeModule = await import('./routes/wallets/detail/WalletDetailModule');
+              return {
+                Component: routeModule.WalletDetailComponent,
+                loader: routeModule.walletDetailLoader,
               };
             },
           },
