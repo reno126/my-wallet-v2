@@ -4,7 +4,6 @@ import { createBrowserRouter, redirect } from 'react-router';
 import { getSession, redirectAuthenticatedUser, requireSession } from '../lib/requireSession';
 import { AuthenticatedLayout } from './layouts/AuthenticatedLayout';
 import { RootLayout } from './layouts/RootLayout';
-import { registerAction, RegisterRoute, signInAction, SignInRoute } from './routes/auth/AuthRoute';
 import { HomeRoute } from './routes/home/HomeRoute';
 import { NotFoundRoute } from './routes/not-found/NotFoundRoute';
 import { RootErrorBoundary } from './routes/RootErrorBoundary';
@@ -29,15 +28,25 @@ export const routeObjects = [
       { index: true, Component: HomeRoute, loader: homeLoader },
       {
         path: 'login',
-        Component: SignInRoute,
         loader: redirectAuthenticatedUser,
-        action: signInAction,
+        lazy: async () => {
+          const routeModule = await import('./routes/auth/AuthRoute');
+          return {
+            Component: routeModule.SignInRoute,
+            action: routeModule.signInAction,
+          };
+        },
       },
       {
         path: 'register',
-        Component: RegisterRoute,
         loader: redirectAuthenticatedUser,
-        action: registerAction,
+        lazy: async () => {
+          const routeModule = await import('./routes/auth/AuthRoute');
+          return {
+            Component: routeModule.RegisterRoute,
+            action: routeModule.registerAction,
+          };
+        },
       },
       {
         Component: AuthenticatedLayout,
