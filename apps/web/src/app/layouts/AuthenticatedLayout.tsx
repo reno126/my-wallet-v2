@@ -61,6 +61,7 @@ export function AuthenticatedLayout() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 md:py-10 lg:px-8">
+        {/* ToDo: replace by nav indicator */}
         {navigation.state === 'loading' ? (
           <p role="status" className="mb-4 text-sm text-muted-foreground">
             {appDictionary.navigation.loading}
