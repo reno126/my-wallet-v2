@@ -61,6 +61,9 @@ describe('API server security boundary', () => {
       routeServer.get('/unexpected', () => {
         throw new Error('database connection string must remain private');
       });
+      routeServer.get('/unexpected-client-status', () => {
+        throw Object.assign(new Error('private application failure'), { statusCode: 400 });
+      });
       completePluginRegistration();
     });
 
@@ -68,6 +71,10 @@ describe('API server security boundary', () => {
     const unexpectedFailureResponse = await testServer.inject({
       method: 'GET',
       url: '/unexpected',
+    });
+    const unexpectedClientStatusResponse = await testServer.inject({
+      method: 'GET',
+      url: '/unexpected-client-status',
     });
 
     expect(expectedFailureResponse.statusCode).toBe(404);
@@ -78,6 +85,8 @@ describe('API server security boundary', () => {
       'INTERNAL_SERVER_ERROR',
     );
     expect(unexpectedFailureResponse.headers['x-content-type-options']).toBe('nosniff');
+    expect(unexpectedClientStatusResponse.statusCode).toBe(500);
+    expect(unexpectedClientStatusResponse.payload).not.toContain('private application failure');
   });
 
   it('applies Helmet headers to the not-found response', async () => {

@@ -48,7 +48,12 @@ const walletRoutes: FastifyPluginCallbackZod = (server, _options, completePlugin
         summary: 'Create a wallet for the authenticated user',
         tags: ['Wallets'],
         body: createWalletSchema,
-        response: { 201: walletSummarySchema, ...commonErrorResponses },
+        response: {
+          201: walletSummarySchema,
+          ...commonErrorResponses,
+          413: apiErrorSchema,
+          415: apiErrorSchema,
+        },
       },
     },
     async (request, reply) => {
@@ -85,7 +90,12 @@ const walletRoutes: FastifyPluginCallbackZod = (server, _options, completePlugin
         tags: ['Wallets'],
         params: walletIdParamsSchema,
         body: updateWalletSchema,
-        response: { 200: walletSummarySchema, ...commonErrorResponses },
+        response: {
+          200: walletSummarySchema,
+          ...commonErrorResponses,
+          413: apiErrorSchema,
+          415: apiErrorSchema,
+        },
       },
     },
     async (request, reply) => {

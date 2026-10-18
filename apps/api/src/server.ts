@@ -9,6 +9,7 @@ import { type ApiErrorInput, apiErrorMessages } from '@my-wallets/contracts';
 
 import { apiEnvironment, type ApiEnvironmentInput } from './config/environment.js';
 import { mapFailureToResponse } from './http/api-failure.js';
+import { getRequestFailure } from './http/request-failure.js';
 
 export interface BuildServerOptions {
   environment?: ApiEnvironmentInput;
@@ -39,16 +40,12 @@ export function buildServer(options: BuildServerOptions = {}) {
   server.decorate('apiEnvironment', environment);
 
   server.setErrorHandler((error, request, reply) => {
-    if (isRateLimitError(error)) {
-      const rateLimitResponse = mapFailureToResponse({ code: 'RATE_LIMITED' }, request.id);
+    const failure = getRequestFailure(error);
 
-      return reply.code(rateLimitResponse.statusCode).send(rateLimitResponse.body);
-    }
+    if (failure !== undefined) {
+      const response = mapFailureToResponse(failure, request.id);
 
-    if (isValidationError(error)) {
-      const validationResponse = mapFailureToResponse({ code: 'VALIDATION_FAILED' }, request.id);
-
-      return reply.code(validationResponse.statusCode).send(validationResponse.body);
+      return reply.code(response.statusCode).send(response.body);
     }
 
     request.log.error({ err: error }, 'Unhandled request error');
@@ -88,19 +85,4 @@ export function buildServer(options: BuildServerOptions = {}) {
   });
 
   return server;
-}
-
-function isRateLimitError(error: unknown): error is { statusCode: 429 } {
-  return (
-    typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 429
-  );
-}
-
-function isValidationError(error: unknown): error is { validation: unknown[] } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'validation' in error &&
-    Array.isArray(error.validation)
-  );
 }

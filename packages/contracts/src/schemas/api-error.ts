@@ -10,6 +10,8 @@ export const apiErrorSchema = zod.object({
       'NOT_FOUND',
       'CONFLICT',
       'VALIDATION_FAILED',
+      'PAYLOAD_TOO_LARGE',
+      'UNSUPPORTED_MEDIA_TYPE',
       'RATE_LIMITED',
       'INTERNAL_SERVER_ERROR',
     ]),

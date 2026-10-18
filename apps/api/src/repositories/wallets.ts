@@ -56,7 +56,7 @@ export function createWalletRepository(prisma: PrismaClient) {
     },
 
     async updateForUser(userId: string, walletId: string, changes: UpdateWalletInput) {
-      const updateResult = await prisma.wallet.updateMany({
+      const [wallet] = await prisma.wallet.updateManyAndReturn({
         where: { id: walletId, userId },
         data: {
           ...(changes.name === undefined ? {} : { name: changes.name }),
@@ -64,16 +64,10 @@ export function createWalletRepository(prisma: PrismaClient) {
             ? {}
             : { description: changes.description || null }),
         },
-      });
-
-      if (updateResult.count === 0) {
-        return null;
-      }
-
-      return prisma.wallet.findFirst({
-        where: { id: walletId, userId },
         select: walletSummarySelect,
       });
+
+      return wallet ?? null;
     },
   };
 }

@@ -6,6 +6,8 @@ export type ApiFailure =
   | { code: 'NOT_FOUND' }
   | { code: 'CONFLICT' }
   | { code: 'VALIDATION_FAILED' }
+  | { code: 'PAYLOAD_TOO_LARGE' }
+  | { code: 'UNSUPPORTED_MEDIA_TYPE' }
   | { code: 'RATE_LIMITED' };
 
 interface FailureResponse {
@@ -19,6 +21,8 @@ const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; mes
   NOT_FOUND: { statusCode: 404, message: apiErrorMessages.NOT_FOUND },
   CONFLICT: { statusCode: 409, message: apiErrorMessages.CONFLICT },
   VALIDATION_FAILED: { statusCode: 400, message: apiErrorMessages.VALIDATION_FAILED },
+  PAYLOAD_TOO_LARGE: { statusCode: 413, message: apiErrorMessages.PAYLOAD_TOO_LARGE },
+  UNSUPPORTED_MEDIA_TYPE: { statusCode: 415, message: apiErrorMessages.UNSUPPORTED_MEDIA_TYPE },
   RATE_LIMITED: { statusCode: 429, message: apiErrorMessages.RATE_LIMITED },
 };
 

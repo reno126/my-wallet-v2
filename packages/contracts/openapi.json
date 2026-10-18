@@ -21,6 +21,8 @@
                   "NOT_FOUND",
                   "CONFLICT",
                   "VALIDATION_FAILED",
+                  "PAYLOAD_TOO_LARGE",
+                  "UNSUPPORTED_MEDIA_TYPE",
                   "RATE_LIMITED",
                   "INTERNAL_SERVER_ERROR"
                 ]
@@ -403,6 +405,8 @@
                   "NOT_FOUND",
                   "CONFLICT",
                   "VALIDATION_FAILED",
+                  "PAYLOAD_TOO_LARGE",
+                  "UNSUPPORTED_MEDIA_TYPE",
                   "RATE_LIMITED",
                   "INTERNAL_SERVER_ERROR"
                 ]
@@ -1388,6 +1392,26 @@
               }
             }
           },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -1568,6 +1592,26 @@
               }
             }
           },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -1597,7 +1641,7 @@
     },
     {
       "name": "Wallets",
-      "description": "Authenticated wallet lifecycle operations."
+      "description": "Authenticated wallet lifecycle operations. All wallet responses use Cache-Control: no-store."
     }
   ]
 }

@@ -6,6 +6,12 @@ export function registerPrivateRouteHooks(
   server: FastifyInstance,
   environment = server.apiEnvironment,
 ): void {
+  server.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('cache-control', 'no-store');
+
+    return payload;
+  });
+
   // Keep this separate from the global onRequest limiter so it can run after session resolution.
   const authenticatedUserRateLimit = server.createRateLimit({
     max: environment.API_AUTHENTICATED_RATE_LIMIT_MAX,

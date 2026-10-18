@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { apiErrorSchema, walletListSchema, walletSummarySchema } from '@my-wallets/contracts';
 
@@ -48,6 +48,7 @@ describe('wallet API', () => {
     });
     contract.assertResponse('post', '/api/wallets', createFirstResponse);
     expect(createFirstResponse.statusCode).toBe(201);
+    expect(createFirstResponse.headers['cache-control']).toBe('no-store');
     const firstWallet = walletSummarySchema.parse(createFirstResponse.json());
     expect(firstWallet).toMatchObject({
       name: 'Long-term',
@@ -81,6 +82,7 @@ describe('wallet API', () => {
     });
     contract.assertResponse('get', '/api/wallets', firstPageResponse);
     expect(firstPageResponse.statusCode).toBe(200);
+    expect(firstPageResponse.headers['cache-control']).toBe('no-store');
     expect(walletListSchema.parse(firstPageResponse.json())).toMatchObject({
       wallets: [{ name: 'Short-term', reportingCurrency: 'USD' }],
       pagination: { page: 1, pageSize: 1, totalCount: 2, totalPages: 2 },
@@ -102,6 +104,7 @@ describe('wallet API', () => {
       headers: owner.headers,
     });
     contract.assertResponse('get', `/api/wallets/${firstWallet.id}`, readResponse);
+    expect(readResponse.headers['cache-control']).toBe('no-store');
     expect(walletSummarySchema.parse(readResponse.json())).toMatchObject({
       id: firstWallet.id,
       name: 'Long-term',
@@ -114,12 +117,26 @@ describe('wallet API', () => {
       payload: { name: 'Core portfolio', description: '' },
     });
     contract.assertResponse('patch', `/api/wallets/${firstWallet.id}`, updateResponse);
+    expect(updateResponse.headers['cache-control']).toBe('no-store');
     expect(walletSummarySchema.parse(updateResponse.json())).toMatchObject({
       id: firstWallet.id,
       name: 'Core portfolio',
       reportingCurrency: 'USD',
     });
     expect(walletSummarySchema.parse(updateResponse.json()).description).toBeUndefined();
+
+    const descriptionOnlyResponse = await testServer.inject({
+      method: 'PATCH',
+      url: `/api/wallets/${firstWallet.id}`,
+      headers: owner.headers,
+      payload: { description: 'Updated description' },
+    });
+    expect(descriptionOnlyResponse.statusCode).toBe(200);
+    contract.assertResponse('patch', `/api/wallets/${firstWallet.id}`, descriptionOnlyResponse);
+    expect(walletSummarySchema.parse(descriptionOnlyResponse.json())).toMatchObject({
+      name: 'Core portfolio',
+      description: 'Updated description',
+    });
 
     const otherUsersList = await testServer.inject({
       method: 'GET',
@@ -157,6 +174,7 @@ describe('wallet API', () => {
     });
     contract.assertResponse('post', '/api/wallets', blankNameResponse);
     expect(blankNameResponse.statusCode).toBe(400);
+    expect(blankNameResponse.headers['cache-control']).toBe('no-store');
     expect(apiErrorSchema.parse(blankNameResponse.json()).error.code).toBe('VALIDATION_FAILED');
 
     const unsupportedCurrencyResponse = await testServer.inject({
@@ -192,6 +210,7 @@ describe('wallet API', () => {
     });
     contract.assertResponse('get', `/api/wallets/${wallet.id}`, otherUserRead);
     expect(otherUserRead.statusCode).toBe(404);
+    expect(otherUserRead.headers['cache-control']).toBe('no-store');
     expect(apiErrorSchema.parse(otherUserRead.json()).error.code).toBe('NOT_FOUND');
 
     const otherUserUpdate = await testServer.inject({
@@ -202,6 +221,17 @@ describe('wallet API', () => {
     });
     contract.assertResponse('patch', `/api/wallets/${wallet.id}`, otherUserUpdate);
     expect(otherUserUpdate.statusCode).toBe(404);
+    expect(otherUserUpdate.headers['cache-control']).toBe('no-store');
+
+    const missingPath = `/api/wallets/${randomUUID()}`;
+    const missingResponse = await testServer.inject({
+      method: 'PATCH',
+      url: missingPath,
+      headers: owner.headers,
+      payload: { name: 'Missing' },
+    });
+    expect(missingResponse.statusCode).toBe(404);
+    contract.assertResponse('patch', missingPath, missingResponse);
 
     const ownerRead = await testServer.inject({
       method: 'GET',
@@ -210,6 +240,93 @@ describe('wallet API', () => {
     });
     expect(walletSummarySchema.parse(ownerRead.json()).name).toBe('Private wallet');
   }, 60_000);
+
+  it('should return each concurrent update’s own values and preserve omitted fields', async () => {
+    // Arrange
+    const testServer = createTestServer();
+    server = testServer;
+    await testServer.ready();
+    const contract = await createOpenApiValidator(testServer);
+    const owner = await createAuthenticatedUser(testServer, registeredEmails);
+    const createResponse = await testServer.inject({
+      method: 'POST',
+      url: '/api/wallets',
+      headers: owner.headers,
+      payload: { name: 'Original', description: 'Keep this description', reportingCurrency: 'USD' },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const wallet = walletSummarySchema.parse(createResponse.json());
+    const path = `/api/wallets/${wallet.id}`;
+    const names = Array.from({ length: 8 }, (_unusedValue, index) => `Concurrent name ${index}`);
+
+    // Act
+    const results = await Promise.all(
+      names.map(async (name) => ({
+        name,
+        response: await testServer.inject({
+          method: 'PATCH',
+          url: path,
+          headers: owner.headers,
+          payload: { name },
+        }),
+      })),
+    );
+
+    // Assert
+    for (const { name, response } of results) {
+      expect(response.statusCode).toBe(200);
+      contract.assertResponse('patch', path, response);
+      expect(walletSummarySchema.parse(response.json())).toMatchObject({
+        id: wallet.id,
+        name,
+        description: wallet.description,
+      });
+    }
+
+    const readResponse = await testServer.inject({
+      method: 'GET',
+      url: path,
+      headers: owner.headers,
+    });
+    const persistedWallet = walletSummarySchema.parse(readResponse.json());
+    expect(names).toContain(persistedWallet.name);
+  }, 60_000);
+
+  it('should prevent caching forbidden mutations and unexpected failures', async () => {
+    // Arrange
+    const testServer = createTestServer();
+    server = testServer;
+    await testServer.ready();
+    const contract = await createOpenApiValidator(testServer);
+    const owner = await createAuthenticatedUser(testServer, registeredEmails);
+
+    // Act
+    const forbiddenResponse = await testServer.inject({
+      method: 'POST',
+      url: '/api/wallets',
+      headers: { cookie: owner.headers.cookie },
+      payload: { name: 'Forbidden', reportingCurrency: 'USD' },
+    });
+    vi.spyOn(testServer.prisma.wallet, 'findMany').mockRejectedValueOnce(
+      new Error('private database details'),
+    );
+    const failedResponse = await testServer.inject({
+      method: 'GET',
+      url: '/api/wallets',
+      headers: owner.headers,
+    });
+
+    // Assert
+    expect(forbiddenResponse.statusCode).toBe(403);
+    expect(failedResponse.statusCode).toBe(500);
+    contract.assertResponse('post', '/api/wallets', forbiddenResponse);
+    contract.assertResponse('get', '/api/wallets', failedResponse);
+    expect(apiErrorSchema.parse(failedResponse.json()).error.code).toBe('INTERNAL_SERVER_ERROR');
+    expect(failedResponse.payload).not.toContain('private database details');
+    for (const response of [forbiddenResponse, failedResponse]) {
+      expect(response.headers['cache-control']).toBe('no-store');
+    }
+  });
 });
 
 async function createAuthenticatedUser(testServer: TestServer, registeredEmails: string[]) {

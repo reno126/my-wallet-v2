@@ -41,7 +41,11 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
       servers: [{ url: '/api' }],
       tags: [
         { name: 'Health', description: 'API liveness and readiness probes.' },
-        { name: 'Wallets', description: 'Authenticated wallet lifecycle operations.' },
+        {
+          name: 'Wallets',
+          description:
+            'Authenticated wallet lifecycle operations. All wallet responses use Cache-Control: no-store.',
+        },
       ],
     },
     transform: (transformOptions) => {

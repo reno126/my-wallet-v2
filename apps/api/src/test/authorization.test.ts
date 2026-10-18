@@ -148,6 +148,11 @@ describe('private API authorization and abuse controls', () => {
     }
 
     expect(requests.map((response) => response.statusCode)).toStrictEqual([200, 200, 429]);
+    expect(requests.map((response) => response.headers['cache-control'])).toStrictEqual([
+      'no-store',
+      'no-store',
+      'no-store',
+    ]);
     const limitedBody: unknown = requests[2]?.json();
     expect(apiErrorSchema.parse(limitedBody).error.code).toBe('RATE_LIMITED');
     expect(requests[2]?.headers['retry-after']).toBeDefined();
