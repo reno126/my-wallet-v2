@@ -1,11 +1,11 @@
-import type { FmpHistoricalPrice } from '../providers/fmp/historical-prices.js';
+import type { HistoricalClose } from './historical-price-provider.js';
 
 export function selectHistoricalPrice(
-  prices: FmpHistoricalPrice[],
+  prices: HistoricalClose[],
   from: string,
   to: string,
-): FmpHistoricalPrice | undefined {
-  let selected: FmpHistoricalPrice | undefined;
+): HistoricalClose | undefined {
+  let selected: HistoricalClose | undefined;
   for (const price of prices) {
     if (price.date >= from && price.date <= to && (!selected || price.date > selected.date)) {
       selected = price;

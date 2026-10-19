@@ -7,15 +7,8 @@ import {
 } from '@my-wallets/contracts';
 
 import type { ApiFailure } from '../http/api-failure.js';
-import { mapProviderFailure } from '../http/provider-failure.ts';
-import type { createFmpClient } from '../providers/fmp/client.js';
-import {
-  type FmpHistoricalPrice,
-  fmpHistoricalPricesSchema,
-  fmpHistoricalProfileSchema,
-  parseHistoricalPriceJson,
-} from '../providers/fmp/historical-prices.ts';
 import type { Result } from '../result.js';
+import type { HistoricalClose, HistoricalPriceProvider } from './historical-price-provider.js';
 import {
   currentMarketDate,
   historicalWindowStart,
@@ -24,13 +17,12 @@ import {
 } from './historical-price-selection.ts';
 
 type HistoricalPrice = zod.infer<typeof historicalPriceSchema>;
-type FmpClient = ReturnType<typeof createFmpClient>;
-const maximumHistoryRequests = 5;
+const maximumHistoryWindows = 5;
 const historicalCacheTtlMs = 60_000;
 const historicalCacheMaximumEntries = 100;
 
 export function createHistoricalPriceService(
-  client: FmpClient,
+  provider: HistoricalPriceProvider,
   now: () => Date = () => new Date(),
 ) {
   const cache = new Map<string, { value: HistoricalPrice; expiresAt: number }>();
@@ -42,100 +34,94 @@ export function createHistoricalPriceService(
   ): Promise<Result<HistoricalPrice, ApiFailure>> {
     const params = instrumentPriceParamsSchema.safeParse({ symbol });
     const query = instrumentPriceQuerySchema.safeParse({ date: requestedDate });
-    if (!params.success || !query.success || requestedDate > currentMarketDate(now())) {
+    if (!params.success || !query.success || query.data.date > currentMarketDate(now())) {
       return { ok: false, error: { code: 'VALIDATION_FAILED' } };
     }
 
-    const normalizedSymbol = symbol.toUpperCase();
-    const cacheKey = JSON.stringify([normalizedSymbol, requestedDate]);
-    const cached = cache.get(cacheKey);
-    if (cached && cached.expiresAt > now().getTime())
-      return { ok: true, value: { ...cached.value } };
-    cache.delete(cacheKey);
+    const normalizedSymbol = params.data.symbol.toUpperCase();
+    const date = query.data.date;
+    const cacheKey = JSON.stringify([normalizedSymbol, date]);
+    const cached = getCachedQuote(cacheKey);
+    if (cached) return { ok: true, value: cached };
 
-    const result = await fetchHistoricalPrice(client, normalizedSymbol, requestedDate, now);
-    if (result.ok) {
-      if (cache.size >= historicalCacheMaximumEntries) {
-        const oldestKey = cache.keys().next().value;
-        if (oldestKey !== undefined) cache.delete(oldestKey);
-      }
-      cache.set(cacheKey, {
-        value: { ...result.value },
-        expiresAt: now().getTime() + historicalCacheTtlMs,
-      });
+    const profileResult = await provider.getProfile(normalizedSymbol);
+    if (!profileResult.ok) return profileResult;
+    const profile = profileResult.value;
+    if (!profile.currency) return { ok: false, error: { code: 'CURRENCY_UNAVAILABLE' } };
+    if (profile.currency.toUpperCase() !== 'USD')
+      return { ok: false, error: { code: 'UNSUPPORTED_CURRENCY' } };
+
+    const selected = await findHistoricalClose(provider, {
+      symbol: normalizedSymbol,
+      requestedDate: date,
+      earliestDate: profile.ipoDate || '0000-01-01',
+    });
+    if (!selected.ok) return selected;
+
+    const value = toHistoricalPrice(normalizedSymbol, date, selected.value, now());
+    cacheQuote(cacheKey, value);
+    return { ok: true, value };
+  }
+
+  function getCachedQuote(key: string): HistoricalPrice | undefined {
+    const cached = cache.get(key);
+    if (cached && cached.expiresAt > now().getTime()) return { ...cached.value };
+    cache.delete(key);
+    return undefined;
+  }
+
+  function cacheQuote(key: string, value: HistoricalPrice): void {
+    if (cache.size >= historicalCacheMaximumEntries) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey !== undefined) cache.delete(oldestKey);
     }
-    return result;
+    cache.set(key, {
+      value: { ...value },
+      expiresAt: now().getTime() + historicalCacheTtlMs,
+    });
   }
 }
 
-async function fetchHistoricalPrice(
-  client: FmpClient,
-  symbol: string,
-  requestedDate: string,
-  now: () => Date,
-): Promise<Result<HistoricalPrice, ApiFailure>> {
-  const profileResult = await client.request({
-    endpoint: 'profile',
-    parameters: { symbol },
-    responseSchema: fmpHistoricalProfileSchema,
-  });
-  if (!profileResult.ok) return { ok: false, error: mapProviderFailure(profileResult.error) };
-  const profile = profileResult.value[0];
-  if (!profile) return { ok: false, error: { code: 'NOT_FOUND' } };
-  if (profile.symbol !== symbol) return { ok: false, error: { code: 'PROVIDER_ERROR' } };
-  if (!profile.currency) return { ok: false, error: { code: 'CURRENCY_UNAVAILABLE' } };
-  if (profile.currency.toUpperCase() !== 'USD')
-    return { ok: false, error: { code: 'UNSUPPORTED_CURRENCY' } };
+async function findHistoricalClose(
+  provider: HistoricalPriceProvider,
+  input: { symbol: string; requestedDate: string; earliestDate: string },
+): Promise<Result<HistoricalClose, ApiFailure>> {
+  const { symbol, requestedDate, earliestDate } = input;
+  let windowEndDate = requestedDate;
+  if (windowEndDate < earliestDate) return { ok: false, error: { code: 'PRICE_NOT_AVAILABLE' } };
 
-  const earliestDate = profile.ipoDate || '0000-01-01';
-  let to = requestedDate;
-  if (to < earliestDate) return { ok: false, error: { code: 'PRICE_NOT_AVAILABLE' } };
-
-  for (let attempt = 0; attempt < maximumHistoryRequests; attempt += 1) {
-    const from = historicalWindowStart(to, earliestDate);
-    const historyResult = await client.request({
-      endpoint: 'historical-price-eod/full',
-      parameters: { symbol, from, to },
-      responseSchema: fmpHistoricalPricesSchema,
-      parseResponse: parseHistoricalPriceJson,
+  for (let windowIndex = 0; windowIndex < maximumHistoryWindows; windowIndex += 1) {
+    const windowStartDate = historicalWindowStart(windowEndDate, earliestDate);
+    const historyResult = await provider.getHistory({
+      symbol,
+      from: windowStartDate,
+      to: windowEndDate,
+      expectedCurrency: 'USD',
     });
-    if (!historyResult.ok) return { ok: false, error: mapProviderFailure(historyResult.error) };
-    const rows = historyResult.value;
-    const failure = validateHistoricalRows(rows, symbol);
-    if (failure) return { ok: false, error: failure };
-    const selected = selectHistoricalPrice(rows, from, to);
-    if (selected)
-      return {
-        ok: true,
-        value: {
-          symbol,
-          requestedDate,
-          effectiveDate: selected.date,
-          unitPrice: selected.close,
-          currency: 'USD',
-          source: 'FMP',
-          retrievedAt: now().toISOString(),
-          usedPreviousTradingDay: selected.date !== requestedDate,
-        },
-      };
-    if (from === earliestDate) return { ok: false, error: { code: 'PRICE_NOT_AVAILABLE' } };
-    to = previousDate(from);
+    if (!historyResult.ok) return historyResult;
+    const selected = selectHistoricalPrice(historyResult.value, windowStartDate, windowEndDate);
+    if (selected) return { ok: true, value: selected };
+    if (windowStartDate === earliestDate)
+      return { ok: false, error: { code: 'PRICE_NOT_AVAILABLE' } };
+    windowEndDate = previousDate(windowStartDate);
   }
   return { ok: false, error: { code: 'PRICE_LOOKUP_INCOMPLETE' } };
 }
 
-function validateHistoricalRows(
-  rows: FmpHistoricalPrice[],
+function toHistoricalPrice(
   symbol: string,
-): ApiFailure | undefined {
-  const quotesByDate = new Map<string, string>();
-  for (const row of rows) {
-    if (row.symbol !== symbol) return { code: 'PROVIDER_ERROR' };
-    if (row.currency && row.currency.toUpperCase() !== 'USD') return { code: 'CURRENCY_MISMATCH' };
-    if (quotesByDate.has(row.date) && quotesByDate.get(row.date) !== row.close) {
-      return { code: 'PROVIDER_ERROR' };
-    }
-    quotesByDate.set(row.date, row.close);
-  }
-  return undefined;
+  requestedDate: string,
+  selected: HistoricalClose,
+  retrievedAt: Date,
+): HistoricalPrice {
+  return {
+    symbol,
+    requestedDate,
+    effectiveDate: selected.date,
+    unitPrice: selected.close,
+    currency: 'USD',
+    source: 'FMP',
+    retrievedAt: retrievedAt.toISOString(),
+    usedPreviousTradingDay: selected.date !== requestedDate,
+  };
 }

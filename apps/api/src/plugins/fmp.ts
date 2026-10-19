@@ -3,6 +3,7 @@ import fastifyPlugin from 'fastify-plugin';
 
 import type { ApiPluginOptions } from '../plugin-options.js';
 import { createFmpClient } from '../providers/fmp/client.ts';
+import { createFmpHistoricalPriceProvider } from '../providers/fmp/historical-price-provider.ts';
 import { createHistoricalPriceService } from '../services/historical-price.ts';
 import { createInstrumentSearchService } from '../services/instrument-search.ts';
 
@@ -28,7 +29,10 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
   });
 
   server.decorate('instrumentSearch', createInstrumentSearchService(client));
-  server.decorate('historicalPrices', createHistoricalPriceService(client));
+  server.decorate(
+    'historicalPrices',
+    createHistoricalPriceService(createFmpHistoricalPriceProvider(client)),
+  );
   completePluginRegistration();
 };
 

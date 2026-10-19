@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { createFmpClient } from '../providers/fmp/client.js';
+import { createFmpHistoricalPriceProvider } from '../providers/fmp/historical-price-provider.js';
 import { createHistoricalPriceService } from './historical-price.js';
+import type {
+  HistoricalPriceProvider,
+  HistoricalPriceWindow,
+} from './historical-price-provider.js';
 
 const profile = { symbol: 'AAPL', currency: 'USD', ipoDate: '1980-12-12' };
 const price = { symbol: 'AAPL', date: '2026-10-16', close: '190.12345678' };
@@ -27,7 +32,7 @@ function createHarness(bodies: unknown[], quotaLimit = 100) {
     },
   });
   return {
-    service: createHistoricalPriceService(client, () => clock),
+    service: createHistoricalPriceService(createFmpHistoricalPriceProvider(client), () => clock),
     requests,
     used: () => used,
     advance: (milliseconds: number) => {
@@ -304,5 +309,72 @@ describe('when looking up historical prices', () => {
     // Assert
     expect(result).toStrictEqual({ ok: false, error: { code: 'VALIDATION_FAILED' } });
     expect(harness.used()).toBe(0);
+  });
+});
+
+describe('when using the historical-price provider interface', () => {
+  it('should search older windows with a normalized symbol and verified currency', async () => {
+    // Arrange
+    const symbols: string[] = [];
+    const windows: HistoricalPriceWindow[] = [];
+    const provider: HistoricalPriceProvider = {
+      getProfile: (symbol) => {
+        symbols.push(symbol);
+        return Promise.resolve({ ok: true, value: { currency: 'usd', ipoDate: null } });
+      },
+      getHistory: (window) => {
+        windows.push(window);
+        return Promise.resolve({
+          ok: true,
+          value: windows.length === 1 ? [] : [{ date: '2020-07-01', close: '123.45' }],
+        });
+      },
+    };
+    const service = createHistoricalPriceService(provider, () => new Date('2026-10-19T16:00:00Z'));
+
+    // Act
+    const result = await service.quote('aapl', '2026-10-18');
+
+    // Assert
+    expect(result).toMatchObject({
+      ok: true,
+      value: { symbol: 'AAPL', effectiveDate: '2020-07-01', unitPrice: '123.45' },
+    });
+    expect(symbols).toStrictEqual(['AAPL']);
+    expect(windows).toStrictEqual([
+      { symbol: 'AAPL', from: '2021-10-18', to: '2026-10-18', expectedCurrency: 'USD' },
+      { symbol: 'AAPL', from: '2016-10-17', to: '2021-10-17', expectedCurrency: 'USD' },
+    ]);
+  });
+
+  it('should timestamp retrieval and start cache expiration after a slow provider completes', async () => {
+    // Arrange
+    let clock = new Date('2026-10-19T16:00:00Z');
+    let historyRequests = 0;
+    const provider: HistoricalPriceProvider = {
+      getProfile: () => Promise.resolve({ ok: true, value: profile }),
+      getHistory: () => {
+        historyRequests += 1;
+        clock = new Date(clock.getTime() + 90_000);
+        return Promise.resolve({ ok: true, value: [price] });
+      },
+    };
+    const service = createHistoricalPriceService(provider, () => clock);
+
+    // Act
+    const result = await service.quote('AAPL', '2026-10-18');
+    clock = new Date(clock.getTime() + 59_999);
+    const cached = await service.quote('AAPL', '2026-10-18');
+    clock = new Date(clock.getTime() + 1);
+    const refreshed = await service.quote('AAPL', '2026-10-18');
+
+    // Assert
+    expect(result).toMatchObject({ ok: true, value: { retrievedAt: '2026-10-19T16:01:30.000Z' } });
+    expect(cached).toStrictEqual(result);
+    expect(refreshed).toMatchObject({
+      ok: true,
+      value: { retrievedAt: '2026-10-19T16:04:00.000Z' },
+    });
+    expect(historyRequests).toBe(2);
   });
 });
