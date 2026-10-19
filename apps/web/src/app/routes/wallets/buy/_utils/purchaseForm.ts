@@ -1,4 +1,4 @@
-import type { z as zod } from 'zod';
+import { z as zod } from 'zod';
 
 import { createBuyTransactionSchema } from '@my-wallets/contracts';
 
@@ -20,10 +20,13 @@ export const purchaseFormSchema = createBuyTransactionSchema
     description: true,
   })
   .extend({
-    transactionDate: createBuyTransactionSchema.shape.transactionDate.refine(
-      (date) => date <= marketToday(),
-      text.futureDate,
-    ),
+    transactionDate: zod
+      .string({ error: text.invalidDate })
+      .refine(
+        (date) => createBuyTransactionSchema.shape.transactionDate.safeParse(date).success,
+        text.invalidDate,
+      )
+      .refine((date) => date <= marketToday(), text.futureDate),
     quantity: createBuyTransactionSchema.shape.quantity,
     description: createBuyTransactionSchema.shape.description.unwrap(),
   });

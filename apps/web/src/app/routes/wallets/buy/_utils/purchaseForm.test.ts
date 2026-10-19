@@ -1,10 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { purchaseDictionary as text } from '../purchaseDictionary';
 import { formatUnitPrice, marketToday, purchaseFormSchema } from './purchaseForm';
 
 afterEach(() => vi.useRealTimers());
 
 describe('when presenting a purchase', () => {
+  it.each(['', '0000-01-01', '2026-02-30', 'not-a-date'])(
+    'should explain invalid date input %s',
+    (transactionDate) => {
+      // Act
+      const result = purchaseFormSchema.safeParse({
+        transactionDate,
+        quantity: '1',
+        description: '',
+      });
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toBe(text.invalidDate);
+    },
+  );
+
   it.each([
     ['230.12345678', 'USD 230.1235'],
     ['0.00005', 'USD 0.0001'],
@@ -56,6 +72,7 @@ describe('when presenting a purchase', () => {
     const today = purchaseFormSchema.safeParse(values);
     // Assert
     expect(future.success).toBe(false);
+    expect(future.error?.issues[0]?.message).toBe(text.futureDate);
     expect(today).toMatchObject({ success: true, data: values });
   });
 });

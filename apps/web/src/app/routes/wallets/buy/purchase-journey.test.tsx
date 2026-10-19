@@ -86,6 +86,38 @@ async function openPurchase() {
 }
 
 describe('when recording a purchase', () => {
+  it.each([
+    { date: '', message: text.invalidDate },
+    { date: '9999-12-31', message: text.futureDate },
+  ])(
+    'should explain an invalid trade date ($date) without requesting or retaining a quote',
+    async ({ date, message }) => {
+      // Arrange
+      let priceRequests = 0;
+      mockApiServer.use(
+        http.get(`${endpoint}/instruments/:symbol/price`, () => {
+          priceRequests += 1;
+          return HttpResponse.json(historicalPrice);
+        }),
+      );
+      const page = await openPurchase();
+      await page.search();
+      await page.select();
+      // Act
+      fireEvent.change(page.date(), { target: { value: date } });
+      fireEvent.blur(page.date());
+      // Assert
+      expect(await screen.findByText(message)).toBeVisible();
+      expect(page.date()).toBeInvalid();
+      expect(page.date()).toHaveAccessibleDescription();
+      expect(page.submit()).toBeDisabled();
+      expect(
+        screen.queryByText(text.exactPrice(historicalPrice.unitPrice)),
+      ).not.toBeInTheDocument();
+      expect(priceRequests).toBe(1);
+    },
+  );
+
   it('should retain a company-name search after a provider failure and allow retry', async () => {
     // Arrange
     const queries: URLSearchParams[] = [];

@@ -1,30 +1,27 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { HistoricalPrice, Instrument } from '@/lib/api/purchases';
+import type { Instrument } from '@/lib/api/purchases';
 
+import type { PurchaseQuoteState } from '../_hooks/usePurchaseQuote';
 import { formatUnitPrice } from '../_utils/purchaseForm';
 import { purchaseDictionary as text } from '../purchaseDictionary';
 
 interface PurchasePriceProps {
   instrument: Instrument | null;
-  price: HistoricalPrice | undefined;
-  loading: boolean;
-  error: string | undefined;
+  state: PurchaseQuoteState;
   disabled: boolean;
   onRetry: () => void;
 }
 
-export function PurchasePrice({
-  instrument,
-  price,
-  loading,
-  error,
-  disabled,
-  onRetry,
-}: PurchasePriceProps) {
+export function PurchasePrice({ instrument, state, disabled, onRetry }: PurchasePriceProps) {
+  const price = state.status === 'ready' ? state.price : undefined;
   return (
-    <div className="flex min-w-0 flex-col gap-3" aria-live="polite" aria-busy={loading}>
+    <div
+      className="flex min-w-0 flex-col gap-3"
+      aria-live="polite"
+      aria-busy={state.status === 'loading'}
+    >
       {instrument ? (
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-sm text-muted-foreground">{text.selected}</p>
@@ -35,16 +32,16 @@ export function PurchasePrice({
       ) : (
         <p className="text-sm text-muted-foreground">{text.needSelection}</p>
       )}
-      {loading ? (
+      {state.status === 'loading' ? (
         <div role="status" className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">{text.loadingPrice}</p>
           <Skeleton className="h-16 w-full" />
         </div>
       ) : null}
-      {error ? (
+      {state.status === 'error' ? (
         <Alert variant="destructive">
           <AlertDescription className="flex flex-col gap-3">
-            <p>{error}</p>
+            <p>{state.message}</p>
             <Button type="button" variant="outline" disabled={disabled} onClick={onRetry}>
               {text.retryPrice}
             </Button>
