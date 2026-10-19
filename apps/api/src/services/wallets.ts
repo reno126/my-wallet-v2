@@ -8,7 +8,7 @@ import type {
 
 import type { ApiFailure } from '../http/api-failure.js';
 import type { WalletRecord, WalletRepository } from '../repositories/wallets.js';
-import type { Result } from '../result.js';
+import { failure, type Result, success } from '../result.ts';
 
 type WalletSummary = zod.infer<typeof walletSummarySchema>;
 type WalletList = zod.infer<typeof walletListSchema>;
@@ -40,9 +40,7 @@ export function createWalletService(repository: WalletRepository) {
     async read(userId: string, walletId: string): Promise<Result<WalletSummary, ApiFailure>> {
       const wallet = await repository.findForUser(userId, walletId);
 
-      return wallet === null
-        ? { ok: false, error: { code: 'NOT_FOUND' } }
-        : { ok: true, value: toWalletSummary(wallet) };
+      return wallet === null ? failure({ code: 'NOT_FOUND' }) : success(toWalletSummary(wallet));
     },
 
     async update(
@@ -52,15 +50,13 @@ export function createWalletService(repository: WalletRepository) {
     ): Promise<Result<WalletSummary, ApiFailure>> {
       const wallet = await repository.updateForUser(userId, walletId, changes);
 
-      return wallet === null
-        ? { ok: false, error: { code: 'NOT_FOUND' } }
-        : { ok: true, value: toWalletSummary(wallet) };
+      return wallet === null ? failure({ code: 'NOT_FOUND' }) : success(toWalletSummary(wallet));
     },
 
     async delete(userId: string, walletId: string): Promise<Result<undefined, ApiFailure>> {
       const deleted = await repository.deleteForUser(userId, walletId);
 
-      return deleted ? { ok: true, value: undefined } : { ok: false, error: { code: 'NOT_FOUND' } };
+      return deleted ? success(undefined) : failure({ code: 'NOT_FOUND' });
     },
   };
 }

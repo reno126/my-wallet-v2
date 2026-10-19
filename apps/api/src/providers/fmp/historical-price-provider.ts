@@ -1,6 +1,6 @@
 import type { ApiFailure } from '../../http/api-failure.js';
 import { mapProviderFailure } from '../../http/provider-failure.ts';
-import type { Result } from '../../result.js';
+import { failure, type Result, success } from '../../result.ts';
 import type {
   HistoricalClose,
   HistoricalInstrumentProfile,
@@ -28,14 +28,11 @@ export function createFmpHistoricalPriceProvider(
       parameters: { symbol },
       responseSchema: fmpHistoricalProfileSchema,
     });
-    if (!result.ok) return { ok: false, error: mapProviderFailure(result.error) };
+    if (!result.ok) return failure(mapProviderFailure(result.error));
     const profile = result.value[0];
-    if (!profile) return { ok: false, error: { code: 'NOT_FOUND' } };
-    if (profile.symbol !== symbol) return { ok: false, error: { code: 'PROVIDER_ERROR' } };
-    return {
-      ok: true,
-      value: { currency: profile.currency ?? null, ipoDate: profile.ipoDate || null },
-    };
+    if (!profile) return failure({ code: 'NOT_FOUND' });
+    if (profile.symbol !== symbol) return failure({ code: 'PROVIDER_ERROR' });
+    return success({ currency: profile.currency ?? null, ipoDate: profile.ipoDate || null });
   }
 
   async function getHistory(
@@ -48,13 +45,10 @@ export function createFmpHistoricalPriceProvider(
       responseSchema: fmpHistoricalPricesSchema,
       parseResponse: parseHistoricalPriceJson,
     });
-    if (!result.ok) return { ok: false, error: mapProviderFailure(result.error) };
-    const failure = validateHistoricalRows(result.value, symbol, expectedCurrency);
-    if (failure) return { ok: false, error: failure };
-    return {
-      ok: true,
-      value: result.value.map(({ date, close }) => ({ date, close })),
-    };
+    if (!result.ok) return failure(mapProviderFailure(result.error));
+    const validationFailure = validateHistoricalRows(result.value, symbol, expectedCurrency);
+    if (validationFailure) return failure(validationFailure);
+    return success(result.value.map(({ date, close }) => ({ date, close })));
   }
 }
 

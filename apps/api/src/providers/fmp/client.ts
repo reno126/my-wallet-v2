@@ -1,7 +1,7 @@
 import { z as zod } from 'zod';
 
 import type { ApiEnvironmentInput } from '../../config/environment.js';
-import type { Result } from '../../result.js';
+import { failure, type Result, success } from '../../result.ts';
 
 const requestSchema = zod.strictObject({
   endpoint: zod.enum([
@@ -57,7 +57,7 @@ export function createFmpClient(options: FmpClientOptions) {
 
   async function request<Value>(input: FmpRequest<Value>): Promise<Result<Value, FmpFailure>> {
     if (!options.environment.FMP_API_KEY) {
-      return { ok: false, error: { code: 'NOT_CONFIGURED' } };
+      return failure({ code: 'NOT_CONFIGURED' });
     }
 
     const parsedRequest = requestSchema.safeParse({
@@ -66,7 +66,7 @@ export function createFmpClient(options: FmpClientOptions) {
     });
 
     if (!parsedRequest.success) {
-      return { ok: false, error: { code: 'INVALID_REQUEST' } };
+      return failure({ code: 'INVALID_REQUEST' });
     }
 
     const requestUrl = new URL(parsedRequest.data.endpoint, options.environment.FMP_BASE_URL);
@@ -75,10 +75,10 @@ export function createFmpClient(options: FmpClientOptions) {
 
     try {
       if (!(await options.reserveRequest())) {
-        return { ok: false, error: { code: 'QUOTA_EXHAUSTED' } };
+        return failure({ code: 'QUOTA_EXHAUSTED' });
       }
     } catch {
-      return { ok: false, error: { code: 'QUOTA_UNAVAILABLE' } };
+      return failure({ code: 'QUOTA_UNAVAILABLE' });
     }
 
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -93,7 +93,7 @@ export function createFmpClient(options: FmpClientOptions) {
 
       if (!response.ok) {
         await response.body?.cancel();
-        return { ok: false, error: { code: 'HTTP_ERROR', status: response.status } };
+        return failure({ code: 'HTTP_ERROR', status: response.status });
       }
 
       let body: unknown;
@@ -103,23 +103,20 @@ export function createFmpClient(options: FmpClientOptions) {
           ? input.parseResponse(await response.text())
           : await response.json();
       } catch {
-        return {
-          ok: false,
-          error: { code: timeoutSignal.aborted ? 'TIMEOUT' : 'INVALID_RESPONSE' },
-        };
+        return failure({ code: timeoutSignal.aborted ? 'TIMEOUT' : 'INVALID_RESPONSE' });
       }
 
       if (typeof body === 'object' && body !== null && 'Error Message' in body) {
-        return { ok: false, error: { code: 'PROVIDER_ERROR' } };
+        return failure({ code: 'PROVIDER_ERROR' });
       }
 
       const parsedResponse = input.responseSchema.safeParse(body);
 
       return parsedResponse.success
-        ? { ok: true, value: parsedResponse.data }
-        : { ok: false, error: { code: 'INVALID_RESPONSE' } };
+        ? success(parsedResponse.data)
+        : failure({ code: 'INVALID_RESPONSE' });
     } catch {
-      return { ok: false, error: { code: timeoutSignal.aborted ? 'TIMEOUT' : 'NETWORK_ERROR' } };
+      return failure({ code: timeoutSignal.aborted ? 'TIMEOUT' : 'NETWORK_ERROR' });
     }
   }
 }

@@ -1,4 +1,5 @@
 import { mapProviderFailure } from '../../http/provider-failure.ts';
+import { failure } from '../../result.ts';
 import { validateBuyInstrument } from '../../services/instrument-eligibility.ts';
 import type { InstrumentVerifier } from '../../services/instrument-verifier.ts';
 import type { createFmpClient } from './client.ts';
@@ -14,10 +15,10 @@ export function createFmpInstrumentVerifier(
         parameters: { symbol },
         responseSchema: fmpProfileResponseSchema,
       });
-      if (!result.ok) return { ok: false, error: mapProviderFailure(result.error) };
+      if (!result.ok) return failure(mapProviderFailure(result.error));
       const profile = result.value[0];
-      if (!profile) return { ok: false, error: { code: 'NOT_FOUND' } };
-      if (profile.symbol !== symbol) return { ok: false, error: { code: 'PROVIDER_ERROR' } };
+      if (!profile) return failure({ code: 'NOT_FOUND' });
+      if (profile.symbol !== symbol) return failure({ code: 'PROVIDER_ERROR' });
       return validateBuyInstrument({
         symbol,
         name: profile.companyName,

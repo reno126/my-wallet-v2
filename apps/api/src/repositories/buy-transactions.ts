@@ -8,7 +8,7 @@ import type {
   PrismaClient,
 } from '../../generated/prisma/client.js';
 import type { ApiFailure } from '../http/api-failure.js';
-import type { Result } from '../result.js';
+import { failure, type Result, success } from '../result.ts';
 import type { VerifiedInstrument } from '../services/instrument-verifier.js';
 
 export type CreateBuyInput = zod.infer<typeof createBuyTransactionSchema>;
@@ -32,12 +32,12 @@ export function createBuyTransactionRepository(prisma: PrismaClient) {
           WHERE "id" = ${walletId}::uuid AND "userId" = ${userId}
           FOR UPDATE
         `;
-        if (!wallet) return { ok: false, error: { code: 'NOT_FOUND' } };
+        if (!wallet) return failure({ code: 'NOT_FOUND' });
         if (
           wallet.reportingCurrency !== input.currency ||
           instrument.quoteCurrency !== input.currency
         )
-          return { ok: false, error: { code: 'CURRENCY_MISMATCH' } };
+          return failure({ code: 'CURRENCY_MISMATCH' });
 
         await database.instrument.upsert({
           where: { symbol: instrument.symbol },
@@ -62,10 +62,7 @@ export function createBuyTransactionRepository(prisma: PrismaClient) {
           _sum: { quantity: true },
         });
         if (totals._sum.quantity === null) throw new Error('Created BUY has no ledger quantity.');
-        return {
-          ok: true,
-          value: { transaction, holdingQuantity: totals._sum.quantity.toFixed() },
-        };
+        return success({ transaction, holdingQuantity: totals._sum.quantity.toFixed() });
       });
     },
   };

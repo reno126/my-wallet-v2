@@ -1,5 +1,5 @@
 import type { ApiFailure } from '../http/api-failure.js';
-import type { Result } from '../result.js';
+import { failure, type Result, success } from '../result.ts';
 import type { VerifiedInstrument } from './instrument-verifier.js';
 
 interface StockClassification {
@@ -27,24 +27,21 @@ export function hasUnsupportedStockClassification(instrument: StockClassificatio
 export function validateBuyInstrument(
   instrument: BuyInstrumentDetails,
 ): Result<VerifiedInstrument, ApiFailure> {
-  if (!instrument.quoteCurrency) return { ok: false, error: { code: 'CURRENCY_UNAVAILABLE' } };
+  if (!instrument.quoteCurrency) return failure({ code: 'CURRENCY_UNAVAILABLE' });
   if (instrument.quoteCurrency.toUpperCase() !== 'USD')
-    return { ok: false, error: { code: 'UNSUPPORTED_CURRENCY' } };
+    return failure({ code: 'UNSUPPORTED_CURRENCY' });
   if (
     hasUnsupportedStockClassification(instrument) ||
     instrument.isEtf !== false ||
     instrument.isFund !== false ||
     !instrument.exchange
   )
-    return { ok: false, error: { code: 'UNSUPPORTED_INSTRUMENT' } };
-  if (!instrument.name) return { ok: false, error: { code: 'PROVIDER_ERROR' } };
-  return {
-    ok: true,
-    value: {
-      symbol: instrument.symbol,
-      name: instrument.name,
-      exchange: instrument.exchange,
-      quoteCurrency: 'USD',
-    },
-  };
+    return failure({ code: 'UNSUPPORTED_INSTRUMENT' });
+  if (!instrument.name) return failure({ code: 'PROVIDER_ERROR' });
+  return success({
+    symbol: instrument.symbol,
+    name: instrument.name,
+    exchange: instrument.exchange,
+    quoteCurrency: 'USD',
+  });
 }

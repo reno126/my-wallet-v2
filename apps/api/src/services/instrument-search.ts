@@ -13,7 +13,7 @@ import {
   type FmpSearchCandidate,
   fmpSearchResponseSchema,
 } from '../providers/fmp/instruments.ts';
-import type { Result } from '../result.js';
+import { failure, type Result, success } from '../result.ts';
 import { hasUnsupportedStockClassification } from './instrument-eligibility.ts';
 
 type SearchQuery = zod.infer<typeof instrumentSearchQuerySchema>;
@@ -35,7 +35,7 @@ export function createInstrumentSearchService(client: FmpClient, now: () => numb
     const query = instrumentSearchQuerySchema.safeParse(input);
 
     if (!query.success) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED' } };
+      return failure({ code: 'VALIDATION_FAILED' });
     }
 
     const normalizedQuery = query.data.q.trim();
@@ -43,7 +43,7 @@ export function createInstrumentSearchService(client: FmpClient, now: () => numb
     const cached = cache.get(cacheKey);
 
     if (cached && cached.expiresAt > now()) {
-      return { ok: true, value: structuredClone(cached.response) };
+      return success(structuredClone(cached.response));
     }
 
     cache.delete(cacheKey);
@@ -54,7 +54,7 @@ export function createInstrumentSearchService(client: FmpClient, now: () => numb
     });
 
     if (!searchResult.ok) {
-      return { ok: false, error: mapProviderFailure(searchResult.error) };
+      return failure(mapProviderFailure(searchResult.error));
     }
 
     const response: SearchResponse = { results: [], excluded: [] };
@@ -90,7 +90,7 @@ export function createInstrumentSearchService(client: FmpClient, now: () => numb
       expiresAt: now() + searchCacheTtlMs,
     });
 
-    return { ok: true, value: response };
+    return success(response);
   }
 }
 
@@ -100,7 +100,7 @@ async function resolveCandidate(
 ): Promise<Result<Instrument | ExcludedInstrument, ApiFailure>> {
   const initialExclusion = getExclusionReason(candidate);
   if (initialExclusion) {
-    return { ok: true, value: excludeCandidate(candidate, initialExclusion) };
+    return success(excludeCandidate(candidate, initialExclusion));
   }
 
   let details = candidate;
@@ -113,22 +113,22 @@ async function resolveCandidate(
     });
 
     if (!profileResult.ok) {
-      return { ok: false, error: mapProviderFailure(profileResult.error) };
+      return failure(mapProviderFailure(profileResult.error));
     }
 
     const profile = profileResult.value[0];
     if (!profile) {
-      return { ok: true, value: excludeCandidate(candidate, 'DETAILS_UNAVAILABLE') };
+      return success(excludeCandidate(candidate, 'DETAILS_UNAVAILABLE'));
     }
     if (profile.symbol !== candidate.symbol) {
-      return { ok: false, error: { code: 'PROVIDER_ERROR' } };
+      return failure({ code: 'PROVIDER_ERROR' });
     }
     if (
       candidate.currency &&
       profile.currency &&
       candidate.currency.toUpperCase() !== profile.currency.toUpperCase()
     ) {
-      return { ok: true, value: excludeCandidate(candidate, 'CURRENCY_MISMATCH') };
+      return success(excludeCandidate(candidate, 'CURRENCY_MISMATCH'));
     }
 
     details = {
@@ -143,21 +143,18 @@ async function resolveCandidate(
 
   const exclusion = getExclusionReason(details);
   if (exclusion) {
-    return { ok: true, value: excludeCandidate(details, exclusion) };
+    return success(excludeCandidate(details, exclusion));
   }
   if (!details.name || details.currency?.toUpperCase() !== 'USD') {
-    return { ok: true, value: excludeCandidate(details, 'DETAILS_UNAVAILABLE') };
+    return success(excludeCandidate(details, 'DETAILS_UNAVAILABLE'));
   }
 
-  return {
-    ok: true,
-    value: {
-      symbol: details.symbol,
-      name: details.name,
-      quoteCurrency: 'USD',
-      exchange: details.exchange || null,
-    },
-  };
+  return success({
+    symbol: details.symbol,
+    name: details.name,
+    quoteCurrency: 'USD',
+    exchange: details.exchange || null,
+  });
 }
 
 function getExclusionReason(

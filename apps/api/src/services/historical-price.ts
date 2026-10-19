@@ -7,7 +7,7 @@ import {
 } from '@my-wallets/contracts';
 
 import type { ApiFailure } from '../http/api-failure.js';
-import type { Result } from '../result.js';
+refactor: centralize result constructionimport { failure, type Result, success } from '../result.ts';
 import type { HistoricalClose, HistoricalPriceProvider } from './historical-price-provider.js';
 import {
   historicalWindowStart,
@@ -35,21 +35,20 @@ export function createHistoricalPriceService(
     const params = instrumentPriceParamsSchema.safeParse({ symbol });
     const query = instrumentPriceQuerySchema.safeParse({ date: requestedDate });
     if (!params.success || !query.success || query.data.date > currentMarketDate(now())) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED' } };
+      return failure({ code: 'VALIDATION_FAILED' });
     }
 
     const normalizedSymbol = params.data.symbol.toUpperCase();
     const date = query.data.date;
     const cacheKey = JSON.stringify([normalizedSymbol, date]);
     const cached = getCachedQuote(cacheKey);
-    if (cached) return { ok: true, value: cached };
+    if (cached) return success(cached);
 
     const profileResult = await provider.getProfile(normalizedSymbol);
     if (!profileResult.ok) return profileResult;
     const profile = profileResult.value;
-    if (!profile.currency) return { ok: false, error: { code: 'CURRENCY_UNAVAILABLE' } };
-    if (profile.currency.toUpperCase() !== 'USD')
-      return { ok: false, error: { code: 'UNSUPPORTED_CURRENCY' } };
+    if (!profile.currency) return failure({ code: 'CURRENCY_UNAVAILABLE' });
+    if (profile.currency.toUpperCase() !== 'USD') return failure({ code: 'UNSUPPORTED_CURRENCY' });
 
     const selected = await findHistoricalClose(provider, {
       symbol: normalizedSymbol,
@@ -60,7 +59,7 @@ export function createHistoricalPriceService(
 
     const value = toHistoricalPrice(normalizedSymbol, date, selected.value, now());
     cacheQuote(cacheKey, value);
-    return { ok: true, value };
+    return success(value);
   }
 
   function getCachedQuote(key: string): HistoricalPrice | undefined {
@@ -88,7 +87,7 @@ async function findHistoricalClose(
 ): Promise<Result<HistoricalClose, ApiFailure>> {
   const { symbol, requestedDate, earliestDate } = input;
   let windowEndDate = requestedDate;
-  if (windowEndDate < earliestDate) return { ok: false, error: { code: 'PRICE_NOT_AVAILABLE' } };
+  if (windowEndDate < earliestDate) return failure({ code: 'PRICE_NOT_AVAILABLE' });
 
   for (let windowIndex = 0; windowIndex < maximumHistoryWindows; windowIndex += 1) {
     const windowStartDate = historicalWindowStart(windowEndDate, earliestDate);
@@ -100,12 +99,11 @@ async function findHistoricalClose(
     });
     if (!historyResult.ok) return historyResult;
     const selected = selectHistoricalPrice(historyResult.value, windowStartDate, windowEndDate);
-    if (selected) return { ok: true, value: selected };
-    if (windowStartDate === earliestDate)
-      return { ok: false, error: { code: 'PRICE_NOT_AVAILABLE' } };
+    if (selected) return success(selected);
+    if (windowStartDate === earliestDate) return failure({ code: 'PRICE_NOT_AVAILABLE' });
     windowEndDate = previousDate(windowStartDate);
   }
-  return { ok: false, error: { code: 'PRICE_LOOKUP_INCOMPLETE' } };
+  return failure({ code: 'PRICE_LOOKUP_INCOMPLETE' });
 }
 
 function toHistoricalPrice(

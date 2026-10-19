@@ -9,7 +9,7 @@ import type {
   PersistedBuy,
 } from '../repositories/buy-transactions.ts';
 import type { WalletRepository } from '../repositories/wallets.ts';
-import type { Result } from '../result.ts';
+import { failure, type Result, success } from '../result.ts';
 import type { InstrumentVerifier, VerifiedInstrument } from './instrument-verifier.ts';
 import { currentMarketDate } from './market-date.ts';
 
@@ -31,10 +31,10 @@ export function createBuyTransactionService(
     ): Promise<Result<BuyResult, ApiFailure>> {
       const parsed = createBuyTransactionSchema.safeParse(input);
       if (!parsed.success || parsed.data.transactionDate > currentMarketDate(now()))
-        return { ok: false, error: { code: 'VALIDATION_FAILED' } };
+        return failure({ code: 'VALIDATION_FAILED' });
       // Check ownership before spending provider quota; recheck under the write lock afterwards.
       const wallet = await dependencies.wallets.findForUser(userId, walletId);
-      if (!wallet) return { ok: false, error: { code: 'NOT_FOUND' } };
+      if (!wallet) return failure({ code: 'NOT_FOUND' });
       const normalizedInput = { ...parsed.data, symbol: parsed.data.symbol.toUpperCase() };
       const verified = await dependencies.instruments.verify(normalizedInput.symbol);
       if (!verified.ok) return verified;
@@ -45,10 +45,7 @@ export function createBuyTransactionService(
         verified.value,
       );
       if (!result.ok) return result;
-      return {
-        ok: true,
-        value: toBuyResult(result.value, verified.value.quoteCurrency),
-      };
+      return success(toBuyResult(result.value, verified.value.quoteCurrency));
     },
   };
 }
