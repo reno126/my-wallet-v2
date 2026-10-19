@@ -20,6 +20,7 @@ export const walletDictionary = {
   },
   detail: {
     title: 'Wallet details',
+    buy: 'Record a purchase',
     back: 'Back to wallets',
     unavailable: 'Wallet unavailable',
     unavailableDescription: 'This wallet does not exist or is not available to your account.',

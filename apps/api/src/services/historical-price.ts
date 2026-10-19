@@ -7,7 +7,7 @@ import {
 } from '@my-wallets/contracts';
 
 import type { ApiFailure } from '../http/api-failure.js';
-refactor: centralize result constructionimport { failure, type Result, success } from '../result.ts';
+import { failure, type Result, success } from '../result.ts';
 import type { HistoricalClose, HistoricalPriceProvider } from './historical-price-provider.js';
 import {
   historicalWindowStart,

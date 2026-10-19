@@ -74,6 +74,31 @@ export const routeObjects = [
             },
           },
           {
+            path: 'wallets/:walletId/buy',
+            lazy: async () => {
+              const routeModule = await import('./routes/wallets/buy/BuyPurchaseModule');
+              return {
+                Component: routeModule.BuyPurchaseComponent,
+                loader: routeModule.buyPurchaseLoader,
+                action: routeModule.buyPurchaseAction,
+              };
+            },
+          },
+          {
+            path: 'wallets/:walletId/buy/search',
+            lazy: async () => {
+              const routeModule = await import('./routes/wallets/buy/purchaseLookups');
+              return { loader: routeModule.instrumentSearchLoader };
+            },
+          },
+          {
+            path: 'wallets/:walletId/buy/price',
+            lazy: async () => {
+              const routeModule = await import('./routes/wallets/buy/purchaseLookups');
+              return { loader: routeModule.purchasePriceLoader };
+            },
+          },
+          {
             path: 'wallets/:walletId',
             lazy: async () => {
               const [routeModule, deleteModule] = await Promise.all([

@@ -79,7 +79,10 @@ export function WalletDetailComponent() {
                 updatedLabel={walletMsg.wallet.updated}
               />
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link to={`/wallets/${data.wallet.id}/buy`}>{walletMsg.detail.buy}</Link>
+              </Button>
               <DeleteWalletDialog key={data.wallet.id} wallet={data.wallet} />
             </CardFooter>
           </Card>
