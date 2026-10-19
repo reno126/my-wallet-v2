@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  currentMarketDate,
   historicalWindowStart,
   previousDate,
   selectHistoricalPrice,
@@ -89,19 +88,6 @@ describe('when selecting a historical trading date', () => {
     // Arrange
     // Act
     const result = previousDate(date);
-
-    // Assert
-    expect(result).toBe(expected);
-  });
-
-  it.each([
-    ['2026-01-01T02:00:00.000Z', '2025-12-31'],
-    ['2026-07-01T03:59:00.000Z', '2026-06-30'],
-    ['2026-07-01T04:00:00.000Z', '2026-07-01'],
-  ])('should define today in New York for UTC instant %s', (timestamp, expected) => {
-    // Arrange
-    // Act
-    const result = currentMarketDate(new Date(timestamp));
 
     // Assert
     expect(result).toBe(expected);

@@ -1,9 +1,8 @@
 import { mapProviderFailure } from '../../http/provider-failure.ts';
+import { validateBuyInstrument } from '../../services/instrument-eligibility.ts';
 import type { InstrumentVerifier } from '../../services/instrument-verifier.ts';
 import type { createFmpClient } from './client.ts';
 import { fmpProfileResponseSchema } from './instruments.ts';
-
-const unsupportedExchanges = new Set(['CRYPTO', 'FOREX', 'COMMODITY', 'INDEX']);
 
 export function createFmpInstrumentVerifier(
   client: ReturnType<typeof createFmpClient>,
@@ -19,26 +18,14 @@ export function createFmpInstrumentVerifier(
       const profile = result.value[0];
       if (!profile) return { ok: false, error: { code: 'NOT_FOUND' } };
       if (profile.symbol !== symbol) return { ok: false, error: { code: 'PROVIDER_ERROR' } };
-      if (!profile.currency) return { ok: false, error: { code: 'CURRENCY_UNAVAILABLE' } };
-      if (profile.currency.toUpperCase() !== 'USD')
-        return { ok: false, error: { code: 'UNSUPPORTED_CURRENCY' } };
-      if (
-        profile.isEtf !== false ||
-        profile.isFund !== false ||
-        !profile.exchange ||
-        unsupportedExchanges.has(profile.exchange.toUpperCase())
-      )
-        return { ok: false, error: { code: 'UNSUPPORTED_INSTRUMENT' } };
-      if (!profile.companyName) return { ok: false, error: { code: 'PROVIDER_ERROR' } };
-      return {
-        ok: true,
-        value: {
-          symbol,
-          name: profile.companyName,
-          exchange: profile.exchange,
-          quoteCurrency: 'USD',
-        },
-      };
+      return validateBuyInstrument({
+        symbol,
+        name: profile.companyName,
+        quoteCurrency: profile.currency,
+        exchange: profile.exchange,
+        isEtf: profile.isEtf,
+        isFund: profile.isFund,
+      });
     },
   };
 }

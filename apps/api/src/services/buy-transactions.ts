@@ -10,8 +10,8 @@ import type {
 } from '../repositories/buy-transactions.ts';
 import type { WalletRepository } from '../repositories/wallets.ts';
 import type { Result } from '../result.ts';
-import { currentMarketDate } from './historical-price-selection.ts';
 import type { InstrumentVerifier, VerifiedInstrument } from './instrument-verifier.ts';
+import { currentMarketDate } from './market-date.ts';
 
 type BuyResult = zod.infer<typeof buyTransactionResultSchema>;
 
@@ -54,7 +54,7 @@ export function createBuyTransactionService(
 }
 
 function toBuyResult(
-  { transaction, quantity }: PersistedBuy,
+  { transaction, holdingQuantity }: PersistedBuy,
   quoteCurrency: VerifiedInstrument['quoteCurrency'],
 ): BuyResult {
   return {
@@ -73,7 +73,7 @@ function toBuyResult(
     holding: {
       walletId: transaction.walletId,
       symbol: transaction.symbol,
-      quantity,
+      quantity: holdingQuantity,
       quoteCurrency,
     },
   };

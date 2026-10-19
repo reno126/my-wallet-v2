@@ -14,7 +14,7 @@ import type { VerifiedInstrument } from '../services/instrument-verifier.js';
 export type CreateBuyInput = zod.infer<typeof createBuyTransactionSchema>;
 export interface PersistedBuy {
   transaction: LedgerTransaction;
-  quantity: string;
+  holdingQuantity: string;
 }
 
 export function createBuyTransactionRepository(prisma: PrismaClient) {
@@ -62,7 +62,10 @@ export function createBuyTransactionRepository(prisma: PrismaClient) {
           _sum: { quantity: true },
         });
         if (totals._sum.quantity === null) throw new Error('Created BUY has no ledger quantity.');
-        return { ok: true, value: { transaction, quantity: totals._sum.quantity.toFixed() } };
+        return {
+          ok: true,
+          value: { transaction, holdingQuantity: totals._sum.quantity.toFixed() },
+        };
       });
     },
   };

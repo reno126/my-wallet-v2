@@ -14,6 +14,7 @@ import {
   fmpSearchResponseSchema,
 } from '../providers/fmp/instruments.ts';
 import type { Result } from '../result.js';
+import { hasUnsupportedStockClassification } from './instrument-eligibility.ts';
 
 type SearchQuery = zod.infer<typeof instrumentSearchQuerySchema>;
 type SearchResponse = zod.infer<typeof instrumentSearchResponseSchema>;
@@ -24,7 +25,6 @@ type FmpClient = ReturnType<typeof createFmpClient>;
 const searchCacheTtlMs = 60_000;
 const searchCacheMaximumEntries = 100;
 const searchResultLimit = 10;
-const unsupportedExchanges = new Set(['CRYPTO', 'FOREX', 'COMMODITY', 'INDEX']);
 
 export function createInstrumentSearchService(client: FmpClient, now: () => number = Date.now) {
   const cache = new Map<string, { response: SearchResponse; expiresAt: number }>();
@@ -166,11 +166,7 @@ function getExclusionReason(
   if (candidate.currency && candidate.currency.toUpperCase() !== 'USD') {
     return 'NON_USD';
   }
-  if (
-    candidate.isEtf ||
-    candidate.isFund ||
-    unsupportedExchanges.has(candidate.exchange?.toUpperCase() ?? '')
-  ) {
+  if (hasUnsupportedStockClassification(candidate)) {
     return 'UNSUPPORTED_INSTRUMENT';
   }
   return undefined;

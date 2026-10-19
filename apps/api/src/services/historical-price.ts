@@ -10,11 +10,11 @@ import type { ApiFailure } from '../http/api-failure.js';
 import type { Result } from '../result.js';
 import type { HistoricalClose, HistoricalPriceProvider } from './historical-price-provider.js';
 import {
-  currentMarketDate,
   historicalWindowStart,
   previousDate,
   selectHistoricalPrice,
 } from './historical-price-selection.ts';
+import { currentMarketDate } from './market-date.ts';
 
 type HistoricalPrice = zod.infer<typeof historicalPriceSchema>;
 const maximumHistoryWindows = 5;
