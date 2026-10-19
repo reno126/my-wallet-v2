@@ -6,12 +6,20 @@ import { LoadError } from '@/components/shared/LoadError';
 import { WalletMetadata } from '@/components/shared/wallets/WalletMetadata';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty';
 import { walletsApi, type WalletSummary } from '@/lib/api/wallets';
 
 import { walletFailureMessage } from '../_utils/walletFailureMessage';
 import { walletDictionary as walletMsg } from '../walletDictionary';
+import { DeleteWalletDialog } from './_components/DeleteWalletDialog';
 
 type WalletDetailData =
   | { status: 'ready'; wallet: WalletSummary }
@@ -71,6 +79,9 @@ export function WalletDetailComponent() {
                 updatedLabel={walletMsg.wallet.updated}
               />
             </CardContent>
+            <CardFooter>
+              <DeleteWalletDialog key={data.wallet.id} wallet={data.wallet} />
+            </CardFooter>
           </Card>
         </>
       ) : (

@@ -18,6 +18,44 @@ afterEach(() => {
 afterAll(() => mockApiServer.close());
 
 describe('wallet API client', () => {
+  it('should delete only the selected wallet with credentials and accept an empty 204 response', async () => {
+    // Arrange
+    const fetchRequest = vi.spyOn(globalThis, 'fetch');
+    let deleteRequest: Request | undefined;
+    mockApiServer.use(
+      http.delete(`https://wallet-api.test/api/wallets/${walletSummary.id}`, ({ request }) => {
+        deleteRequest = request;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    // Act
+    const result = await walletsApi.delete(walletSummary.id);
+    // Assert
+    expect(result).toStrictEqual({ ok: true, value: undefined });
+    expect(fetchRequest.mock.calls[0]?.[0]).toMatchObject({
+      credentials: 'include',
+      method: 'DELETE',
+    });
+    expect(await deleteRequest?.text()).toBe('');
+  });
+
+  it.each([200, 202])(
+    'should reject an unexpected deletion success status of %s',
+    async (status) => {
+      // Arrange
+      mockApiServer.use(
+        http.delete(
+          `https://wallet-api.test/api/wallets/${walletSummary.id}`,
+          () => new HttpResponse(null, { status }),
+        ),
+      );
+      // Act
+      const result = await walletsApi.delete(walletSummary.id);
+      // Assert
+      expect(result).toStrictEqual({ ok: false, error: { kind: 'invalid-response' } });
+    },
+  );
+
   it('loads a page of wallets through the typed endpoint', async () => {
     let requestedUrl = '';
     mockApiServer.use(

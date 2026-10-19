@@ -1,4 +1,4 @@
-import type { z as zod } from 'zod';
+import { z as zod } from 'zod';
 
 import {
   apiErrorSchema,
@@ -47,6 +47,18 @@ export function createWalletApi(client: ApiClient = apiClient) {
         signal,
       );
     },
+    delete(walletId: string, signal?: AbortSignal): Promise<WalletApiResult<undefined>> {
+      return requestWalletResult(
+        () =>
+          client.DELETE('/wallets/{walletId}', {
+            params: { path: { walletId } },
+            signal: signal ?? null,
+          }),
+        zod.undefined(),
+        signal,
+        204,
+      );
+    },
     create(
       input: CreateWalletInput,
       signal?: AbortSignal,
@@ -69,6 +81,7 @@ async function requestWalletResult<Value>(
   request: () => Promise<{ data?: unknown; error?: unknown; response: Response }>,
   schema: zod.ZodType<Value>,
   signal?: AbortSignal,
+  expectedStatus?: number,
 ): Promise<WalletApiResult<Value>> {
   try {
     signal?.throwIfAborted();
@@ -86,6 +99,9 @@ async function requestWalletResult<Value>(
           ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
         },
       };
+    }
+    if (expectedStatus !== undefined && result.response.status !== expectedStatus) {
+      return { ok: false, error: { kind: 'invalid-response' } };
     }
     const parsed = schema.safeParse(result.data);
     return parsed.success

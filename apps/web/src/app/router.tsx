@@ -76,10 +76,14 @@ export const routeObjects = [
           {
             path: 'wallets/:walletId',
             lazy: async () => {
-              const routeModule = await import('./routes/wallets/detail/WalletDetailModule');
+              const [routeModule, deleteModule] = await Promise.all([
+                import('./routes/wallets/detail/WalletDetailModule'),
+                import('./routes/wallets/detail/deleteWalletAction'),
+              ]);
               return {
                 Component: routeModule.WalletDetailComponent,
                 loader: routeModule.walletDetailLoader,
+                action: deleteModule.deleteWalletAction,
               };
             },
           },

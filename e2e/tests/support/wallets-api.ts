@@ -1,11 +1,12 @@
+import { randomUUID } from 'node:crypto';
+
 import type { Page } from '@playwright/test';
 
 interface WalletsApiMock {
   readonly createdWallets: readonly { name: string; reportingCurrency: string }[];
   readonly unexpectedRequests: readonly string[];
+  readonly deleteRequests: readonly string[];
 }
-
-const walletId = '8b4f1d30-0c6e-4a33-a2a4-9a65c1bbd561';
 
 export async function mockWalletsApi(page: Page): Promise<WalletsApiMock> {
   const wallets: Array<{
@@ -18,10 +19,25 @@ export async function mockWalletsApi(page: Page): Promise<WalletsApiMock> {
   }> = [];
   const createdWallets: Array<{ name: string; reportingCurrency: string }> = [];
   const unexpectedRequests: string[] = [];
+  const deleteRequests: string[] = [];
 
   await page.route('**/api/wallets**', async (route) => {
     const request = route.request();
     const requestPath = new URL(request.url()).pathname;
+
+    if (requestPath.startsWith('/api/wallets/') && request.method() === 'DELETE') {
+      deleteRequests.push(requestPath);
+      const walletIndex = wallets.findIndex(
+        (wallet) => `/api/wallets/${wallet.id}` === requestPath,
+      );
+      if (walletIndex === -1) {
+        await route.fulfill({ status: 404, json: {} });
+      } else {
+        wallets.splice(walletIndex, 1);
+        await route.fulfill({ status: 204 });
+      }
+      return;
+    }
 
     if (requestPath.startsWith('/api/wallets/') && request.method() === 'GET') {
       const wallet = wallets.find((candidate) => `/api/wallets/${candidate.id}` === requestPath);
@@ -59,7 +75,7 @@ export async function mockWalletsApi(page: Page): Promise<WalletsApiMock> {
 
       const now = '2026-01-15T12:00:00.000Z';
       const wallet = {
-        id: walletId,
+        id: randomUUID(),
         name: input.name,
         ...(input.description === undefined ? {} : { description: input.description }),
         createdAt: now,
@@ -78,6 +94,9 @@ export async function mockWalletsApi(page: Page): Promise<WalletsApiMock> {
   });
 
   return {
+    get deleteRequests() {
+      return [...deleteRequests];
+    },
     get createdWallets() {
       return [...createdWallets];
     },

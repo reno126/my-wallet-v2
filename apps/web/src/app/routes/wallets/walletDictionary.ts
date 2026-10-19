@@ -30,6 +30,27 @@ export const walletDictionary = {
     created: 'Created',
     updated: 'Updated',
   },
+  delete: {
+    open: 'Delete wallet',
+    firstTitle: 'Permanently delete this wallet?',
+    firstWarning:
+      'Deleting this wallet permanently removes its transactions and wallet data. This cannot be undone.',
+    continue: 'Continue to final warning',
+    finalTitle: 'Final warning: delete wallet',
+    finalWarning:
+      'This is your final confirmation. The wallet and all its transactions will be permanently deleted. There is no undo.',
+    nameLabel: 'Confirm wallet name',
+    nameHint: 'Type the wallet name exactly, including capitalization and spaces.',
+    mismatch: 'The name must match the wallet name exactly.',
+    invalid: 'Confirm the current wallet name before deleting.',
+    cancel: 'Keep wallet',
+    submit: 'Permanently delete wallet',
+    submitting: 'Deleting wallet…',
+    failed: 'We could not delete this wallet. Please try again.',
+    unconfirmed:
+      'We could not confirm whether the wallet was deleted. Return to wallets to check before trying again.',
+    confirmed: 'Your wallet was permanently deleted.',
+  },
   empty: {
     title: 'Your wallet space is ready',
     description: 'Create a wallet to keep an investment plan organized in one place.',
