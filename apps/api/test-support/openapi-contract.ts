@@ -25,21 +25,27 @@ export async function createOpenApiValidator(server: TestServer) {
       const documentedResponse = matchedOperation?.responses?.[String(response.statusCode)];
       expect(documentedResponse).toBeDefined();
 
-      const responseBody: unknown = response.json();
-      const bodyValidation = contractApi.validateResponse(
-        responseBody,
-        operationId ?? '',
-        response.statusCode,
-      );
-      expect(bodyValidation.valid).toBe(true);
-
       const responseContent =
         documentedResponse && 'content' in documentedResponse
           ? documentedResponse.content
           : undefined;
       const documentedMediaTypes = Object.keys(responseContent ?? {});
       const responseMediaType = response.headers['content-type']?.split(';')[0];
-      expect(documentedMediaTypes).toContain(responseMediaType);
+
+      if (response.statusCode === 204) {
+        expect(documentedMediaTypes).toEqual([]);
+        expect(response.payload).toBe('');
+        expect(responseMediaType).toBeUndefined();
+      } else {
+        const responseBody: unknown = response.json();
+        const bodyValidation = contractApi.validateResponse(
+          responseBody,
+          operationId ?? '',
+          response.statusCode,
+        );
+        expect(bodyValidation.valid).toBe(true);
+        expect(documentedMediaTypes).toContain(responseMediaType);
+      }
 
       const headerValidation = contractApi.validateResponseHeaders(
         response.headers,

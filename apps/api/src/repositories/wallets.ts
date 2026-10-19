@@ -69,6 +69,14 @@ export function createWalletRepository(prisma: PrismaClient) {
 
       return wallet ?? null;
     },
+
+    async deleteForUser(userId: string, walletId: string) {
+      const { count } = await prisma.wallet.deleteMany({
+        where: { id: walletId, userId },
+      });
+
+      return count === 1;
+    },
   };
 }
 

@@ -1,5 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
+import { z as zod } from 'zod';
 
 import {
   apiErrorSchema,
@@ -104,6 +105,33 @@ const walletRoutes: FastifyPluginCallbackZod = (server, _options, completePlugin
         request.params.walletId,
         request.body,
       );
+
+      return sendResult(reply, result, request.id);
+    },
+  );
+
+  server.delete(
+    '/:walletId',
+    {
+      schema: {
+        operationId: 'deleteWallet',
+        summary: 'Permanently delete one of the authenticated user’s wallets',
+        tags: ['Wallets'],
+        params: walletIdParamsSchema,
+        response: {
+          204: zod.null().describe('The wallet was permanently deleted.'),
+          ...commonErrorResponses,
+          413: apiErrorSchema,
+          415: apiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await wallets.delete(getAuthenticatedUserId(request), request.params.walletId);
+
+      if (result.ok) {
+        return reply.code(204).send(null);
+      }
 
       return sendResult(reply, result, request.id);
     },
