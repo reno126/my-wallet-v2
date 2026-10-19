@@ -49,6 +49,8 @@ describe('API environment validation', () => {
       WEB_ORIGIN: 'http://localhost:5173',
       GOOGLE_CLIENT_ID: '',
       GOOGLE_CLIENT_SECRET: '',
+      FMP_API_KEY: '',
+      FMP_BASE_URL: 'https://financialmodelingprep.com/stable/',
       DATABASE_URL:
         'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public',
       DATABASE_POOL_MAX: 10,
@@ -244,4 +246,61 @@ describe('API environment validation', () => {
       expectValidationIssue({ ...validProductionEnvironment, ...overrides }, expectedPath);
     },
   );
+});
+
+describe('when configuring the API-only FMP adapter', () => {
+  it('should accept an absent key so controlled-provider tests need no live credentials', () => {
+    // Arrange
+    // Act
+    const environment = apiEnvironmentSchema.parse(validTestEnvironment);
+
+    // Assert
+    expect(environment.FMP_API_KEY).toBe('');
+    expect(environment.FMP_BASE_URL).toBe('https://financialmodelingprep.com/stable/');
+  });
+
+  it('should normalize an explicitly configured base URL and key', () => {
+    // Arrange
+    const input = {
+      ...validTestEnvironment,
+      FMP_API_KEY: ' test-only-key ',
+      FMP_BASE_URL: 'http://127.0.0.1:4567/stable',
+    };
+
+    // Act
+    const environment = apiEnvironmentSchema.parse(input);
+
+    // Assert
+    expect(environment.FMP_API_KEY).toBe('test-only-key');
+    expect(environment.FMP_BASE_URL).toBe('http://127.0.0.1:4567/stable/');
+  });
+
+  it.each([
+    'not-a-url',
+    '',
+    'ftp://provider.example/stable/',
+    'http://provider.example/stable/',
+    'https://user:password@provider.example/stable/',
+    'https://provider.example/stable/?apikey=unsafe',
+    'https://provider.example/stable/#fragment',
+  ])('should reject the unsafe provider URL %s', (baseUrl) => {
+    // Arrange
+    const environment = { ...validTestEnvironment, FMP_BASE_URL: baseUrl };
+
+    // Act
+    // Assert
+    expectValidationIssue(environment, 'FMP_BASE_URL');
+  });
+
+  it('should require HTTPS for production provider requests', () => {
+    // Arrange
+    const environment = {
+      ...validProductionEnvironment,
+      FMP_BASE_URL: 'http://127.0.0.1:4567/stable/',
+    };
+
+    // Act
+    // Assert
+    expectValidationIssue(environment, 'FMP_BASE_URL');
+  });
 });

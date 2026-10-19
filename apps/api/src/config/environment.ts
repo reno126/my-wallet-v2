@@ -2,6 +2,8 @@ import { isIP } from 'node:net';
 
 import { z as zod } from 'zod';
 
+import { fmpApiKeySchema, fmpBaseUrlSchema } from '../providers/fmp/configuration.js';
+
 const localDevelopmentDatabaseUrl =
   'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public';
 const testOnlyAuthSecret = 'test-only-secret-that-is-never-valid-in-production';
@@ -9,7 +11,6 @@ const localBetterAuthUrl = 'http://127.0.0.1:3000';
 const localWebOrigin = 'http://localhost:5173';
 
 const exactHttpOriginSchema = zod
-  .string()
   .url()
   .refine((value) => {
     try {
@@ -95,8 +96,9 @@ export const apiEnvironmentSchema = zod
     WEB_ORIGIN: exactHttpOriginSchema.optional(),
     GOOGLE_CLIENT_ID: zod.string().default(''),
     GOOGLE_CLIENT_SECRET: zod.string().default(''),
+    FMP_API_KEY: fmpApiKeySchema,
+    FMP_BASE_URL: fmpBaseUrlSchema,
     DATABASE_URL: zod
-      .string()
       .url()
       .refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol), {
         message: 'DATABASE_URL must use the PostgreSQL protocol.',
@@ -130,6 +132,14 @@ export const apiEnvironmentSchema = zod
     }
 
     if (environment.NODE_ENV === 'production') {
+      if (!environment.FMP_BASE_URL.startsWith('https://')) {
+        context.addIssue({
+          code: 'custom',
+          path: ['FMP_BASE_URL'],
+          message: 'FMP_BASE_URL must use HTTPS in production.',
+        });
+      }
+
       if (!environment.BETTER_AUTH_URL) {
         context.addIssue({
           code: 'custom',
