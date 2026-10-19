@@ -1,3 +1,4 @@
+import ajvFormats from 'ajv-formats';
 import { OpenAPIBackend } from 'openapi-backend';
 import { expect } from 'vitest';
 
@@ -9,7 +10,12 @@ type InjectResponse = Awaited<ReturnType<TestServer['inject']>>;
 
 export async function createOpenApiValidator(server: TestServer) {
   const document = addRateLimitContract(server.swagger());
-  const contractApi = new OpenAPIBackend({ definition: document, strict: true, apiRoot: '/api' });
+  const contractApi = new OpenAPIBackend({
+    definition: document,
+    strict: true,
+    apiRoot: '/api',
+    customizeAjv: (validator) => ajvFormats.default(validator),
+  });
   await contractApi.init();
 
   return {
