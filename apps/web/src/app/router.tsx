@@ -6,6 +6,7 @@ import { AuthenticatedLayout } from './layouts/AuthenticatedLayout';
 import { RootLayout } from './layouts/RootLayout';
 import { HomeRoute } from './routes/home/HomeRoute';
 import { NotFoundRoute } from './routes/not-found/NotFoundRoute';
+import { PrivateRouteErrorBoundary } from './routes/PrivateRouteErrorBoundary';
 import { RootErrorBoundary } from './routes/RootErrorBoundary';
 import { RootLoadingFallback } from './routes/RootLoadingFallback';
 import { WalletsLoadingState } from './routes/wallets/_components/WalletsLoadingState';
@@ -53,64 +54,69 @@ export const routeObjects = [
         loader: requireSession,
         children: [
           {
-            path: 'wallets',
-            HydrateFallback: WalletsLoadingState,
-            lazy: async () => {
-              const routeModule = await import('./routes/wallets/list/WalletListModule');
-              return {
-                Component: routeModule.WalletListComponent,
-                loader: routeModule.walletListLoader,
-              };
-            },
-          },
-          {
-            path: 'wallets/new',
-            lazy: async () => {
-              const routeModule = await import('./routes/wallets/create/CreateWalletModule');
-              return {
-                Component: routeModule.CreateWalletComponent,
-                action: routeModule.createWalletAction,
-              };
-            },
-          },
-          {
-            path: 'wallets/:walletId/buy',
-            lazy: async () => {
-              const routeModule = await import('./routes/wallets/buy/BuyPurchaseModule');
-              return {
-                Component: routeModule.BuyPurchaseComponent,
-                loader: routeModule.buyPurchaseLoader,
-                action: routeModule.buyPurchaseAction,
-              };
-            },
-          },
-          {
-            path: 'wallets/:walletId/buy/search',
-            lazy: async () => {
-              const routeModule = await import('./routes/wallets/buy/purchaseLookups');
-              return { loader: routeModule.instrumentSearchLoader };
-            },
-          },
-          {
-            path: 'wallets/:walletId/buy/price',
-            lazy: async () => {
-              const routeModule = await import('./routes/wallets/buy/purchaseLookups');
-              return { loader: routeModule.purchasePriceLoader };
-            },
-          },
-          {
-            path: 'wallets/:walletId',
-            lazy: async () => {
-              const [routeModule, deleteModule] = await Promise.all([
-                import('./routes/wallets/detail/WalletDetailModule'),
-                import('./routes/wallets/detail/deleteWalletAction'),
-              ]);
-              return {
-                Component: routeModule.WalletDetailComponent,
-                loader: routeModule.walletDetailLoader,
-                action: deleteModule.deleteWalletAction,
-              };
-            },
+            ErrorBoundary: PrivateRouteErrorBoundary,
+            children: [
+              {
+                path: 'wallets',
+                HydrateFallback: WalletsLoadingState,
+                lazy: async () => {
+                  const routeModule = await import('./routes/wallets/list/WalletListModule');
+                  return {
+                    Component: routeModule.WalletListComponent,
+                    loader: routeModule.walletListLoader,
+                  };
+                },
+              },
+              {
+                path: 'wallets/new',
+                lazy: async () => {
+                  const routeModule = await import('./routes/wallets/create/CreateWalletModule');
+                  return {
+                    Component: routeModule.CreateWalletComponent,
+                    action: routeModule.createWalletAction,
+                  };
+                },
+              },
+              {
+                path: 'wallets/:walletId/buy',
+                lazy: async () => {
+                  const routeModule = await import('./routes/wallets/buy/BuyPurchaseModule');
+                  return {
+                    Component: routeModule.BuyPurchaseComponent,
+                    loader: routeModule.buyPurchaseLoader,
+                    action: routeModule.buyPurchaseAction,
+                  };
+                },
+              },
+              {
+                path: 'wallets/:walletId/buy/search',
+                lazy: async () => {
+                  const routeModule = await import('./routes/wallets/buy/purchaseLookups');
+                  return { loader: routeModule.instrumentSearchLoader };
+                },
+              },
+              {
+                path: 'wallets/:walletId/buy/price',
+                lazy: async () => {
+                  const routeModule = await import('./routes/wallets/buy/purchaseLookups');
+                  return { loader: routeModule.purchasePriceLoader };
+                },
+              },
+              {
+                path: 'wallets/:walletId',
+                lazy: async () => {
+                  const [routeModule, deleteModule] = await Promise.all([
+                    import('./routes/wallets/detail/WalletDetailModule'),
+                    import('./routes/wallets/detail/deleteWalletAction'),
+                  ]);
+                  return {
+                    Component: routeModule.WalletDetailComponent,
+                    loader: routeModule.walletDetailLoader,
+                    action: deleteModule.deleteWalletAction,
+                  };
+                },
+              },
+            ],
           },
         ],
       },

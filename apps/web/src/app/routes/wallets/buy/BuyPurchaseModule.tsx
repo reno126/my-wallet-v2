@@ -1,15 +1,12 @@
-import type { ActionFunctionArgs } from 'react-router';
+import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { data as routeData, Link, redirect, useLoaderData } from 'react-router';
 import { toast } from 'sonner';
 
 import { createBuyTransactionSchema, walletIdParamsSchema } from '@my-wallets/contracts';
-import { LoadError } from '@/components/shared/LoadError';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty';
 import { purchasesApi } from '@/lib/api/purchases';
 
-import { walletDetailLoader } from '../detail/WalletDetailModule';
-import { walletDictionary } from '../walletDictionary';
+import { loadWallet } from '../_utils/loadWallet';
 import { PurchaseForm } from './_components/PurchaseForm';
 import {
   isUnconfirmedPurchaseFailure,
@@ -18,7 +15,9 @@ import {
 import { marketToday } from './_utils/purchaseForm';
 import { purchaseDictionary as text } from './purchaseDictionary';
 
-export const buyPurchaseLoader = walletDetailLoader;
+export async function buyPurchaseLoader(args: LoaderFunctionArgs) {
+  return { wallet: await loadWallet(args) };
+}
 
 export async function buyPurchaseAction({ request, params }: ActionFunctionArgs) {
   const wallet = walletIdParamsSchema.safeParse(params);
@@ -49,7 +48,7 @@ export async function buyPurchaseAction({ request, params }: ActionFunctionArgs)
 }
 
 export function BuyPurchaseComponent() {
-  const data = useLoaderData<typeof buyPurchaseLoader>();
+  const { wallet } = useLoaderData<typeof buyPurchaseLoader>();
   return (
     <section
       className="mx-auto flex w-full max-w-4xl flex-col gap-6"
@@ -57,33 +56,17 @@ export function BuyPurchaseComponent() {
     >
       <div>
         <Button asChild variant="outline">
-          <Link to={data.status === 'ready' ? `/wallets/${data.wallet.id}` : '/wallets'}>
-            {data.status === 'ready' ? text.back : walletDictionary.detail.back}
-          </Link>
+          <Link to={`/wallets/${wallet.id}`}>{text.back}</Link>
         </Button>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         <h1 id="purchase-title" className="text-3xl font-semibold">
           {text.title}
         </h1>
-        {data.status === 'ready' ? (
-          <>
-            <p className="font-medium wrap-anywhere">{data.wallet.name}</p>
-            <p className="text-sm text-muted-foreground">{text.description}</p>
-          </>
-        ) : null}
+        <p className="font-medium wrap-anywhere">{wallet.name}</p>
+        <p className="text-sm text-muted-foreground">{text.description}</p>
       </div>
-      {data.status === 'ready' ? (
-        <PurchaseForm key={data.wallet.id} walletId={data.wallet.id} />
-      ) : data.status === 'unavailable' ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyDescription>{walletDictionary.detail.unavailableDescription}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <LoadError message={data.message} retryLabel={walletDictionary.page.retry} />
-      )}
+      <PurchaseForm key={wallet.id} walletId={wallet.id} />
     </section>
   );
 }

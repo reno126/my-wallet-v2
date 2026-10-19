@@ -3,7 +3,6 @@ import type { LoaderFunctionArgs } from 'react-router';
 import { Link, redirect, useLoaderData, useNavigate, useNavigation } from 'react-router';
 
 import { walletListQuerySchema } from '@my-wallets/contracts';
-import { LoadError } from '@/components/shared/LoadError';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,55 +13,31 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { type WalletList, walletsApi } from '@/lib/api/wallets';
+import { walletsApi } from '@/lib/api/wallets';
 
-import { walletFailureMessage } from '../_utils/walletFailureMessage';
+import { requirePageData } from '../../_utils/requirePageData';
 import { walletDictionary } from '../walletDictionary';
 import { WalletCard } from './_components/WalletCard';
 
-type WalletListData =
-  { status: 'ready'; walletList: WalletList } | { status: 'error'; message: string };
-
-export async function walletListLoader({
-  request,
-}: LoaderFunctionArgs): Promise<WalletListData | Response> {
+export async function walletListLoader({ request }: LoaderFunctionArgs) {
   const pageValues = new URL(request.url).searchParams.getAll('page');
   const query = walletListQuerySchema.safeParse(
     pageValues.length === 0 ? {} : { page: pageValues[0] },
   );
   if (pageValues.length > 1 || !query.success) return redirect('/wallets');
   const result = await walletsApi.list(query.data, request.signal);
-  return result.ok
-    ? { status: 'ready', walletList: result.value }
-    : {
-        status: 'error',
-        message: walletFailureMessage(result.error, { failed: walletDictionary.page.loadFailed }),
-      };
+  return {
+    walletList: requirePageData(result, {
+      title: walletDictionary.page.title,
+      message: walletDictionary.page.loadFailed,
+    }),
+  };
 }
 
 export function WalletListComponent() {
   const navigate = useNavigate();
   const navigation = useNavigation();
-  const data = useLoaderData<typeof walletListLoader>();
-
-  if (data.status === 'error') {
-    return (
-      <section
-        aria-labelledby="wallets-title"
-        className="mx-auto flex w-full max-w-3xl flex-col gap-6"
-      >
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight" id="wallets-title">
-            {walletDictionary.page.title}
-          </h1>
-          <p className="text-muted-foreground">{walletDictionary.page.description}</p>
-        </div>
-        <LoadError message={data.message} retryLabel={walletDictionary.page.retry} />
-      </section>
-    );
-  }
-
-  const { walletList } = data;
+  const { walletList } = useLoaderData<typeof walletListLoader>();
   const isLoading = navigation.state === 'loading';
 
   function changePage(page: number) {

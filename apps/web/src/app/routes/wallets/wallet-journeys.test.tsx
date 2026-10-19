@@ -9,7 +9,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { walletsApi } from '@/lib/api/wallets';
 import { walletPage, walletSummary } from '@/test/wallet-api';
 
+import { appDictionary } from '../../appDictionary';
 import { routeObjects } from '../../router';
+import { purchaseDictionary } from './buy/purchaseDictionary';
 import { createWalletAction } from './create/CreateWalletModule';
 import { walletDictionary as text } from './walletDictionary';
 
@@ -71,6 +73,49 @@ function createGate() {
 }
 
 describe('wallet routes and creation', () => {
+  it.each([
+    { suffix: '', heading: walletSummary.name },
+    { suffix: '/buy', heading: purchaseDictionary.title },
+  ])(
+    'should preserve private navigation and recover a failed wallet read at $suffix',
+    async ({ suffix, heading }) => {
+      // Arrange
+      let reads = 0;
+      mockApiServer.use(
+        http.get(`${endpoint}/${walletSummary.id}`, () => {
+          reads += 1;
+          return reads === 1
+            ? HttpResponse.json({}, { status: 503 })
+            : HttpResponse.json(walletSummary);
+        }),
+      );
+      const page = openWalletPage(`/wallets/${walletSummary.id}${suffix}`);
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(text.detail.loadFailed);
+      expect(screen.getByRole('navigation', { name: appDictionary.navigation.main })).toBeVisible();
+      // Act
+      await page.user.click(screen.getByRole('button', { name: text.page.retry }));
+      // Assert
+      expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
+      expect(reads).toBe(2);
+    },
+  );
+
+  it('should reject invalid wallet response data through the shared page boundary', async () => {
+    // Arrange
+    mockApiServer.use(
+      http.get(`${endpoint}/${walletSummary.id}`, () =>
+        HttpResponse.json({ name: 'Unvalidated server detail' }),
+      ),
+    );
+    // Act
+    openWalletPage(`/wallets/${walletSummary.id}`);
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(text.detail.loadFailed);
+    expect(screen.queryByText('Unvalidated server detail')).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: appDictionary.navigation.main })).toBeVisible();
+  });
+
   it('should open the dedicated create page from an empty dashboard and block invalid input', async () => {
     // Arrange
     let posts = 0;

@@ -1,3 +1,5 @@
+import { appDictionary } from '../../appDictionary';
+
 export const walletDictionary = {
   page: {
     eyebrow: 'Private workspace',
@@ -15,8 +17,8 @@ export const walletDictionary = {
     paginationLabel: 'Wallet pages',
   },
   errors: {
-    rateLimited: 'Too many requests. Please wait before trying again.',
-    retryAfter: (seconds: number) => `Too many requests. Try again in ${seconds} seconds.`,
+    rateLimited: appDictionary.pageErrors.rateLimited,
+    retryAfter: appDictionary.pageErrors.retryAfter,
   },
   detail: {
     title: 'Wallet details',
