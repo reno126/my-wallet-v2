@@ -27,12 +27,15 @@ export type FmpFailure =
   | { code: 'NETWORK_ERROR' | 'TIMEOUT' | 'INVALID_RESPONSE' | 'PROVIDER_ERROR' }
   | { code: 'HTTP_ERROR'; status: number };
 
-interface FmpClientOptions {
-  environment: Pick<ApiEnvironmentInput, 'FMP_API_KEY' | 'FMP_BASE_URL'>;
+export interface FmpDependencies {
   // The store must atomically reserve one unit, return false on exhaustion, and never refund dispatches.
   reserveRequest: () => Promise<boolean>;
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
+}
+
+interface FmpClientOptions extends FmpDependencies {
+  environment: Pick<ApiEnvironmentInput, 'FMP_API_KEY' | 'FMP_BASE_URL'>;
 }
 
 interface FmpRequest<Value> {

@@ -1,5 +1,5 @@
 import { apiEnvironmentSchema } from '../src/config/environment.js';
-import { buildServer } from '../src/server.js';
+import { buildServer, type BuildServerOptions } from '../src/server.js';
 
 export type TestServer = ReturnType<typeof buildServer>;
 
@@ -12,8 +12,12 @@ const baseTestEnvironment = {
     'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_test?schema=public',
 };
 
-export function createTestServer(environmentOverrides: Record<string, string> = {}): TestServer {
+export function createTestServer(
+  environmentOverrides: Record<string, string> = {},
+  options: Pick<BuildServerOptions, 'fmp'> = {},
+): TestServer {
   return buildServer({
+    ...options,
     environment: apiEnvironmentSchema.parse({ ...baseTestEnvironment, ...environmentOverrides }),
     logger: false,
   });

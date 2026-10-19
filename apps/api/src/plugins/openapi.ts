@@ -14,7 +14,6 @@ import {
   currencyCodeSchema,
   dateOnlySchema,
   instrumentSchema,
-  instrumentSearchQuerySchema,
   instrumentSearchResponseSchema,
   resourceIdSchema,
   timestampSchema,
@@ -41,6 +40,11 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
       servers: [{ url: '/api' }],
       tags: [
         { name: 'Health', description: 'API liveness and readiness probes.' },
+        {
+          name: 'Instruments',
+          description:
+            'Authenticated instrument discovery. Results use explicit USD currency and exclusions; responses use Cache-Control: no-store.',
+        },
         {
           name: 'Wallets',
           description:
@@ -76,7 +80,6 @@ function registerPublicSchemas() {
   zod.globalRegistry.add(currencyCodeSchema, { id: 'CurrencyCode' });
   zod.globalRegistry.add(dateOnlySchema, { id: 'DateOnly' });
   zod.globalRegistry.add(instrumentSchema, { id: 'Instrument' });
-  zod.globalRegistry.add(instrumentSearchQuerySchema, { id: 'InstrumentSearchQuery' });
   zod.globalRegistry.add(instrumentSearchResponseSchema, { id: 'InstrumentSearchResponse' });
   zod.globalRegistry.add(resourceIdSchema, { id: 'ResourceId' });
   zod.globalRegistry.add(timestampSchema, { id: 'Timestamp' });

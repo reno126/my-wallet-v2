@@ -24,6 +24,10 @@
                   "PAYLOAD_TOO_LARGE",
                   "UNSUPPORTED_MEDIA_TYPE",
                   "RATE_LIMITED",
+                  "PROVIDER_UNAVAILABLE",
+                  "PROVIDER_QUOTA_EXHAUSTED",
+                  "PROVIDER_ERROR",
+                  "PROVIDER_TIMEOUT",
                   "INTERNAL_SERVER_ERROR"
                 ]
               },
@@ -187,31 +191,58 @@
           "quoteCurrency"
         ]
       },
-      "InstrumentSearchQueryInput": {
-        "type": "object",
-        "properties": {
-          "q": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "q"
-        ]
-      },
       "InstrumentSearchResponseInput": {
         "type": "object",
         "properties": {
           "results": {
+            "maxItems": 10,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InstrumentInput"
             }
+          },
+          "excluded": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quoteCurrency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "NON_USD",
+                    "CURRENCY_MISMATCH",
+                    "UNSUPPORTED_INSTRUMENT",
+                    "DETAILS_UNAVAILABLE"
+                  ]
+                }
+              },
+              "required": [
+                "symbol",
+                "quoteCurrency",
+                "reason"
+              ]
+            }
           }
         },
         "required": [
-          "results"
+          "results",
+          "excluded"
         ]
       },
       "ResourceIdInput": {
@@ -408,6 +439,10 @@
                   "PAYLOAD_TOO_LARGE",
                   "UNSUPPORTED_MEDIA_TYPE",
                   "RATE_LIMITED",
+                  "PROVIDER_UNAVAILABLE",
+                  "PROVIDER_QUOTA_EXHAUSTED",
+                  "PROVIDER_ERROR",
+                  "PROVIDER_TIMEOUT",
                   "INTERNAL_SERVER_ERROR"
                 ]
               },
@@ -577,32 +612,59 @@
         ],
         "additionalProperties": false
       },
-      "InstrumentSearchQuery": {
-        "type": "object",
-        "properties": {
-          "q": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "q"
-        ],
-        "additionalProperties": false
-      },
       "InstrumentSearchResponse": {
         "type": "object",
         "properties": {
           "results": {
+            "maxItems": 10,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Instrument"
             }
+          },
+          "excluded": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quoteCurrency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "NON_USD",
+                    "CURRENCY_MISMATCH",
+                    "UNSUPPORTED_INSTRUMENT",
+                    "DETAILS_UNAVAILABLE"
+                  ]
+                }
+              },
+              "required": [
+                "symbol",
+                "quoteCurrency",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
-          "results"
+          "results",
+          "excluded"
         ],
         "additionalProperties": false
       },
@@ -1228,6 +1290,117 @@
         }
       }
     },
+    "/instruments/search": {
+      "get": {
+        "operationId": "searchInstruments",
+        "summary": "Search by stock symbol or company name",
+        "tags": [
+          "Instruments"
+        ],
+        "description": "Returns up to 10 USD candidates and explicit reasons for excluded results. A profile is requested only when name or currency is missing. Live dispatch requires a configured shared quota reservation store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "\\S"
+            },
+            "in": "query",
+            "name": "q",
+            "required": true
+          },
+          {
+            "schema": {
+              "default": "symbol",
+              "type": "string",
+              "enum": [
+                "symbol",
+                "name"
+              ]
+            },
+            "in": "query",
+            "name": "mode",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets": {
       "get": {
         "operationId": "listWallets",
@@ -1735,6 +1908,10 @@
     {
       "name": "Health",
       "description": "API liveness and readiness probes."
+    },
+    {
+      "name": "Instruments",
+      "description": "Authenticated instrument discovery. Results use explicit USD currency and exclusions; responses use Cache-Control: no-store."
     },
     {
       "name": "Wallets",

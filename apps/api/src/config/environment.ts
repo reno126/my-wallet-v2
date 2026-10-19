@@ -10,17 +10,15 @@ const testOnlyAuthSecret = 'test-only-secret-that-is-never-valid-in-production';
 const localBetterAuthUrl = 'http://127.0.0.1:3000';
 const localWebOrigin = 'http://localhost:5173';
 
-const exactHttpOriginSchema = zod
-  .url()
-  .refine((value) => {
-    try {
-      const parsedOrigin = new URL(value);
+const exactHttpOriginSchema = zod.url().refine((value) => {
+  try {
+    const parsedOrigin = new URL(value);
 
-      return ['http:', 'https:'].includes(parsedOrigin.protocol) && parsedOrigin.origin === value;
-    } catch {
-      return false;
-    }
-  }, 'Value must be an exact HTTP or HTTPS origin without a path.');
+    return ['http:', 'https:'].includes(parsedOrigin.protocol) && parsedOrigin.origin === value;
+  } catch {
+    return false;
+  }
+}, 'Value must be an exact HTTP or HTTPS origin without a path.');
 
 export const apiEnvironmentSchema = zod
   .object({

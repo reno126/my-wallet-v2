@@ -8,7 +8,11 @@ export type ApiFailure =
   | { code: 'VALIDATION_FAILED' }
   | { code: 'PAYLOAD_TOO_LARGE' }
   | { code: 'UNSUPPORTED_MEDIA_TYPE' }
-  | { code: 'RATE_LIMITED' };
+  | { code: 'RATE_LIMITED' }
+  | {
+      code:
+        'PROVIDER_UNAVAILABLE' | 'PROVIDER_QUOTA_EXHAUSTED' | 'PROVIDER_ERROR' | 'PROVIDER_TIMEOUT';
+    };
 
 interface FailureResponse {
   statusCode: number;
@@ -24,6 +28,10 @@ const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; mes
   PAYLOAD_TOO_LARGE: { statusCode: 413, message: apiErrorMessages.PAYLOAD_TOO_LARGE },
   UNSUPPORTED_MEDIA_TYPE: { statusCode: 415, message: apiErrorMessages.UNSUPPORTED_MEDIA_TYPE },
   RATE_LIMITED: { statusCode: 429, message: apiErrorMessages.RATE_LIMITED },
+  PROVIDER_UNAVAILABLE: { statusCode: 503, message: apiErrorMessages.PROVIDER_UNAVAILABLE },
+  PROVIDER_QUOTA_EXHAUSTED: { statusCode: 503, message: apiErrorMessages.PROVIDER_QUOTA_EXHAUSTED },
+  PROVIDER_ERROR: { statusCode: 502, message: apiErrorMessages.PROVIDER_ERROR },
+  PROVIDER_TIMEOUT: { statusCode: 504, message: apiErrorMessages.PROVIDER_TIMEOUT },
 };
 
 export function mapFailureToResponse(failure: ApiFailure, requestId: string): FailureResponse {

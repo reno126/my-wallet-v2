@@ -123,6 +123,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instruments/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search by stock symbol or company name
+         * @description Returns up to 10 USD candidates and explicit reasons for excluded results. A profile is requested only when name or currency is missing. Live dispatch requires a configured shared quota reservation store.
+         */
+        get: operations["searchInstruments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wallets": {
         parameters: {
             query?: never;
@@ -167,7 +187,7 @@ export interface components {
         ApiErrorInput: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceIdInput"];
             };
@@ -206,11 +226,14 @@ export interface components {
             exchange: string | null;
             quoteCurrency: components["schemas"]["CurrencyCodeInput"];
         };
-        InstrumentSearchQueryInput: {
-            q: string;
-        };
         InstrumentSearchResponseInput: {
             results: components["schemas"]["InstrumentInput"][];
+            excluded: {
+                symbol: string;
+                quoteCurrency: string | null;
+                /** @enum {string} */
+                reason: "NON_USD" | "CURRENCY_MISMATCH" | "UNSUPPORTED_INSTRUMENT" | "DETAILS_UNAVAILABLE";
+            }[];
         };
         /** Format: uuid */
         ResourceIdInput: string;
@@ -257,7 +280,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceId"];
             };
@@ -296,11 +319,14 @@ export interface components {
             exchange: string | null;
             quoteCurrency: components["schemas"]["CurrencyCode"];
         };
-        InstrumentSearchQuery: {
-            q: string;
-        };
         InstrumentSearchResponse: {
             results: components["schemas"]["Instrument"][];
+            excluded: {
+                symbol: string;
+                quoteCurrency: string | null;
+                /** @enum {string} */
+                reason: "NON_USD" | "CURRENCY_MISMATCH" | "UNSUPPORTED_INSTRUMENT" | "DETAILS_UNAVAILABLE";
+            }[];
         };
         /** Format: uuid */
         ResourceId: string;
@@ -655,6 +681,84 @@ export interface operations {
             };
             /** @description Default Response */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    searchInstruments: {
+        parameters: {
+            query: {
+                q: string;
+                mode?: "symbol" | "name";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentSearchResponse"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
