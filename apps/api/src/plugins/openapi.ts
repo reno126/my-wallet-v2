@@ -9,6 +9,8 @@ import {
   apiErrorSchema,
   authSessionSchema,
   authUserSchema,
+  buyTransactionResultSchema,
+  createBuyTransactionSchema,
   createTransactionSchema,
   createWalletSchema,
   currencyCodeSchema,
@@ -40,6 +42,7 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
       },
       servers: [{ url: '/api' }],
       tags: [
+        { name: 'Transactions', description: 'Authenticated immutable USD stock purchases.' },
         { name: 'Health', description: 'API liveness and readiness probes.' },
         {
           name: 'Instruments',
@@ -77,6 +80,8 @@ function registerPublicSchemas() {
   zod.globalRegistry.add(authSessionSchema, { id: 'AuthSession' });
   zod.globalRegistry.add(authUserSchema, { id: 'AuthUser' });
   zod.globalRegistry.add(createTransactionSchema, { id: 'CreateTransaction' });
+  zod.globalRegistry.add(createBuyTransactionSchema, { id: 'CreateBuyTransaction' });
+  zod.globalRegistry.add(buyTransactionResultSchema, { id: 'BuyTransactionResult' });
   zod.globalRegistry.add(createWalletSchema, { id: 'CreateWallet' });
   zod.globalRegistry.add(currencyCodeSchema, { id: 'CurrencyCode' });
   zod.globalRegistry.add(dateOnlySchema, { id: 'DateOnly' });

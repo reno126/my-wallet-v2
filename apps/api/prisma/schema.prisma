@@ -11,6 +11,10 @@ enum CurrencyCode {
   USD
 }
 
+enum TransactionSide {
+  BUY
+}
+
 model User {
   id            String    @id
   name          String
@@ -28,17 +32,46 @@ model User {
 }
 
 model Wallet {
-  id                String       @id @default(uuid()) @db.Uuid
+  id                String              @id @default(uuid()) @db.Uuid
   userId            String
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name              String       @db.VarChar(100)
-  description       String?      @db.VarChar(500)
-  reportingCurrency CurrencyCode @default(USD)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String              @db.VarChar(100)
+  description       String?             @db.VarChar(500)
+  reportingCurrency CurrencyCode        @default(USD)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  transactions      LedgerTransaction[]
 
   @@index([userId, createdAt, id])
   @@map("wallet")
+}
+
+model Instrument {
+  symbol        String              @id @db.VarChar(40)
+  name          String              @db.VarChar(300)
+  exchange      String              @db.VarChar(100)
+  quoteCurrency CurrencyCode
+  transactions  LedgerTransaction[]
+
+  @@map("instrument")
+}
+
+model LedgerTransaction {
+  id              String          @id @default(uuid()) @db.Uuid
+  walletId        String          @db.Uuid
+  wallet          Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  symbol          String          @db.VarChar(40)
+  instrument      Instrument      @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+  side            TransactionSide
+  transactionDate DateTime        @db.Date
+  quantity        Decimal         @db.Decimal(30, 8)
+  unitPrice       Decimal         @db.Decimal(30, 8)
+  currency        CurrencyCode
+  description     String?         @db.VarChar(500)
+  createdAt       DateTime        @default(now())
+
+  @@index([walletId, symbol, transactionDate, createdAt, id])
+  @@map("ledger_transaction")
 }
 
 model Session {

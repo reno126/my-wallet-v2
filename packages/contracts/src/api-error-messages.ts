@@ -14,9 +14,11 @@ export const apiErrorMessages = {
   PROVIDER_ERROR: 'The market-data provider could not return valid results. Try again later.',
   PROVIDER_TIMEOUT: 'The market-data provider did not respond in time. Try again later.',
   UNSUPPORTED_CURRENCY: 'Only USD-denominated instruments and prices are supported.',
+  UNSUPPORTED_INSTRUMENT:
+    'Only verified USD-denominated stocks are supported. Funds, ETFs, and instruments without stock classification cannot be purchased.',
   CURRENCY_UNAVAILABLE:
     'The provider did not identify the instrument quote currency. A USD price cannot be assumed.',
-  CURRENCY_MISMATCH: 'The historical price currency does not match the instrument quote currency.',
+  CURRENCY_MISMATCH: 'The monetary currency does not match the instrument or wallet currency.',
   PRICE_NOT_AVAILABLE:
     'No historical closing price is available on or before the requested date in the instrument’s available history.',
   PRICE_LOOKUP_INCOMPLETE:

@@ -18,6 +18,7 @@ export const apiErrorSchema = zod.object({
       'PROVIDER_ERROR',
       'PROVIDER_TIMEOUT',
       'UNSUPPORTED_CURRENCY',
+      'UNSUPPORTED_INSTRUMENT',
       'CURRENCY_UNAVAILABLE',
       'CURRENCY_MISMATCH',
       'PRICE_NOT_AVAILABLE',

@@ -20,7 +20,7 @@ export interface InstrumentApiFixtureOptions {
 }
 
 export async function createInstrumentApiFixture(
-  replies: FakeProviderResponse[],
+  replies: readonly FakeProviderResponse[],
   options: InstrumentApiFixtureOptions = {},
 ) {
   const provider = Fastify({ logger: false, forceCloseConnections: true });
@@ -69,10 +69,14 @@ export async function createInstrumentApiFixture(
         },
   );
   const registeredEmails: string[] = [];
+  const registeredSymbols: string[] = [];
   onTestFinished(async () => {
     try {
       if (server.hasDecorator('prisma') && registeredEmails.length > 0) {
         await server.prisma.user.deleteMany({ where: { email: { in: registeredEmails } } });
+      }
+      if (server.hasDecorator('prisma') && registeredSymbols.length > 0) {
+        await server.prisma.instrument.deleteMany({ where: { symbol: { in: registeredSymbols } } });
       }
     } finally {
       await server.close();
@@ -86,6 +90,11 @@ export async function createInstrumentApiFixture(
       : await createAuthenticatedUser(server, registeredEmails);
 
   return {
+    server,
+    owner,
+    contract,
+    registeredEmails,
+    registeredSymbols,
     used: () => used,
     requests,
     reservationsAtDispatch,

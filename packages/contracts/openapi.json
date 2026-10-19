@@ -29,6 +29,7 @@
                   "PROVIDER_ERROR",
                   "PROVIDER_TIMEOUT",
                   "UNSUPPORTED_CURRENCY",
+                  "UNSUPPORTED_INSTRUMENT",
                   "CURRENCY_UNAVAILABLE",
                   "CURRENCY_MISMATCH",
                   "PRICE_NOT_AVAILABLE",
@@ -98,13 +99,23 @@
         "properties": {
           "symbol": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
           },
           "side": {
             "$ref": "#/components/schemas/TransactionSideInput"
           },
           "transactionDate": {
-            "$ref": "#/components/schemas/DateOnlyInput"
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "pattern": "^(?!0000)"
+              }
+            ]
           },
           "quantity": {
             "type": "string",
@@ -118,7 +129,8 @@
             "$ref": "#/components/schemas/CurrencyCodeInput"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           }
         },
         "required": [
@@ -128,6 +140,98 @@
           "quantity",
           "unitPrice",
           "currency"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBuyTransactionInput": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY"
+            ]
+          },
+          "transactionDate": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "pattern": "^(?!0000)"
+              }
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "BuyTransactionResultInput": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "$ref": "#/components/schemas/TransactionInput"
+          },
+          "holding": {
+            "type": "object",
+            "properties": {
+              "walletId": {
+                "$ref": "#/components/schemas/ResourceIdInput"
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[A-Za-z0-9.^=-]+$"
+              },
+              "quantity": {
+                "type": "string",
+                "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$"
+              },
+              "quoteCurrency": {
+                "$ref": "#/components/schemas/CurrencyCodeInput"
+              }
+            },
+            "required": [
+              "walletId",
+              "symbol",
+              "quantity",
+              "quoteCurrency"
+            ]
+          }
+        },
+        "required": [
+          "transaction",
+          "holding"
         ]
       },
       "CreateWalletInput": {
@@ -331,7 +435,9 @@
           },
           "symbol": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
           },
           "side": {
             "$ref": "#/components/schemas/TransactionSideInput"
@@ -495,6 +601,7 @@
                   "PROVIDER_ERROR",
                   "PROVIDER_TIMEOUT",
                   "UNSUPPORTED_CURRENCY",
+                  "UNSUPPORTED_INSTRUMENT",
                   "CURRENCY_UNAVAILABLE",
                   "CURRENCY_MISMATCH",
                   "PRICE_NOT_AVAILABLE",
@@ -568,13 +675,23 @@
         "properties": {
           "symbol": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
           },
           "side": {
             "$ref": "#/components/schemas/TransactionSide"
           },
           "transactionDate": {
-            "$ref": "#/components/schemas/DateOnly"
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "pattern": "^(?!0000)"
+              }
+            ]
           },
           "quantity": {
             "type": "string",
@@ -588,7 +705,8 @@
             "$ref": "#/components/schemas/CurrencyCode"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           }
         },
         "required": [
@@ -598,6 +716,99 @@
           "quantity",
           "unitPrice",
           "currency"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBuyTransaction": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY"
+            ]
+          },
+          "transactionDate": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "pattern": "^(?!0000)"
+              }
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "BuyTransactionResult": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "$ref": "#/components/schemas/Transaction"
+          },
+          "holding": {
+            "type": "object",
+            "properties": {
+              "walletId": {
+                "$ref": "#/components/schemas/ResourceId"
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[A-Za-z0-9.^=-]+$"
+              },
+              "quantity": {
+                "type": "string",
+                "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$"
+              },
+              "quoteCurrency": {
+                "$ref": "#/components/schemas/CurrencyCode"
+              }
+            },
+            "required": [
+              "walletId",
+              "symbol",
+              "quantity",
+              "quoteCurrency"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "transaction",
+          "holding"
         ],
         "additionalProperties": false
       },
@@ -807,7 +1018,9 @@
           },
           "symbol": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
           },
           "side": {
             "$ref": "#/components/schemas/TransactionSide"
@@ -2126,6 +2339,163 @@
           }
         }
       }
+    },
+    "/wallets/{walletId}/transactions": {
+      "post": {
+        "operationId": "createBuyTransaction",
+        "summary": "Record an immutable USD stock purchase and return its resulting share quantity",
+        "tags": [
+          "Transactions"
+        ],
+        "description": "Preserves the entered date, quantity and unit price. Verifies stock classification and USD quote currency with one charged profile request before persistence. SELL, editing, transaction deletion and history are not available yet.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBuyTransactionInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuyTransactionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [
@@ -2134,6 +2504,10 @@
     }
   ],
   "tags": [
+    {
+      "name": "Transactions",
+      "description": "Authenticated immutable USD stock purchases."
+    },
     {
       "name": "Health",
       "description": "API liveness and readiness probes."

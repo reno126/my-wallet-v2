@@ -200,6 +200,26 @@ export interface paths {
         patch: operations["updateWallet"];
         trace?: never;
     };
+    "/wallets/{walletId}/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record an immutable USD stock purchase and return its resulting share quantity
+         * @description Preserves the entered date, quantity and unit price. Verifies stock classification and USD quote currency with one charged profile request before persistence. SELL, editing, transaction deletion and history are not available yet.
+         */
+        post: operations["createBuyTransaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -207,7 +227,7 @@ export interface components {
         ApiErrorInput: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceIdInput"];
             };
@@ -225,11 +245,30 @@ export interface components {
         CreateTransactionInput: {
             symbol: string;
             side: components["schemas"]["TransactionSideInput"];
-            transactionDate: components["schemas"]["DateOnlyInput"];
+            transactionDate: string & (unknown & unknown);
             quantity: string;
             unitPrice: string;
             currency: components["schemas"]["CurrencyCodeInput"];
             description?: string;
+        };
+        CreateBuyTransactionInput: {
+            symbol: string;
+            /** @enum {string} */
+            side: "BUY";
+            transactionDate: string & (unknown & unknown);
+            quantity: string;
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCodeInput"];
+            description?: string;
+        };
+        BuyTransactionResultInput: {
+            transaction: components["schemas"]["TransactionInput"];
+            holding: {
+                walletId: components["schemas"]["ResourceIdInput"];
+                symbol: string;
+                quantity: string;
+                quoteCurrency: components["schemas"]["CurrencyCodeInput"];
+            };
         };
         CreateWalletInput: {
             name: string;
@@ -311,7 +350,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceId"];
             };
@@ -329,11 +368,30 @@ export interface components {
         CreateTransaction: {
             symbol: string;
             side: components["schemas"]["TransactionSide"];
-            transactionDate: components["schemas"]["DateOnly"];
+            transactionDate: string & (unknown & unknown);
             quantity: string;
             unitPrice: string;
             currency: components["schemas"]["CurrencyCode"];
             description?: string;
+        };
+        CreateBuyTransaction: {
+            symbol: string;
+            /** @enum {string} */
+            side: "BUY";
+            transactionDate: string & (unknown & unknown);
+            quantity: string;
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCode"];
+            description?: string;
+        };
+        BuyTransactionResult: {
+            transaction: components["schemas"]["Transaction"];
+            holding: {
+                walletId: components["schemas"]["ResourceId"];
+                symbol: string;
+                quantity: string;
+                quoteCurrency: components["schemas"]["CurrencyCode"];
+            };
         };
         CreateWallet: {
             name: string;
@@ -1297,6 +1355,132 @@ export interface operations {
             429: components["responses"]["RateLimited"];
             /** @description Default Response */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    createBuyTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBuyTransactionInput"];
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuyTransactionResult"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };

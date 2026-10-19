@@ -12,6 +12,7 @@ export type ApiFailure =
   | {
       code:
         | 'UNSUPPORTED_CURRENCY'
+        | 'UNSUPPORTED_INSTRUMENT'
         | 'CURRENCY_UNAVAILABLE'
         | 'CURRENCY_MISMATCH'
         | 'PRICE_NOT_AVAILABLE'
@@ -41,6 +42,7 @@ const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; mes
   PROVIDER_ERROR: { statusCode: 502, message: apiErrorMessages.PROVIDER_ERROR },
   PROVIDER_TIMEOUT: { statusCode: 504, message: apiErrorMessages.PROVIDER_TIMEOUT },
   UNSUPPORTED_CURRENCY: { statusCode: 422, message: apiErrorMessages.UNSUPPORTED_CURRENCY },
+  UNSUPPORTED_INSTRUMENT: { statusCode: 422, message: apiErrorMessages.UNSUPPORTED_INSTRUMENT },
   CURRENCY_UNAVAILABLE: { statusCode: 422, message: apiErrorMessages.CURRENCY_UNAVAILABLE },
   CURRENCY_MISMATCH: { statusCode: 422, message: apiErrorMessages.CURRENCY_MISMATCH },
   PRICE_NOT_AVAILABLE: { statusCode: 404, message: apiErrorMessages.PRICE_NOT_AVAILABLE },

@@ -7,23 +7,28 @@ import {
   resourceIdSchema,
   timestampSchema,
 } from './common.js';
+import { instrumentSymbolSchema } from './instrument.js';
 
 export const transactionSideSchema = zod.enum(['BUY', 'SELL']);
 
-export const createTransactionSchema = zod.object({
-  symbol: zod.string().min(1),
+export const createTransactionSchema = zod.strictObject({
+  symbol: instrumentSymbolSchema,
   side: transactionSideSchema,
-  transactionDate: dateOnlySchema,
+  transactionDate: zod.iso.date().regex(/^(?!0000)/),
   quantity: positiveDecimalStringSchema,
   unitPrice: positiveDecimalStringSchema,
   currency: currencyCodeSchema,
-  description: zod.string().optional(),
+  description: zod.string().max(500).optional(),
+});
+
+export const createBuyTransactionSchema = createTransactionSchema.extend({
+  side: zod.enum(['BUY']),
 });
 
 export const transactionSchema = zod.object({
   id: resourceIdSchema,
   walletId: resourceIdSchema,
-  symbol: zod.string().min(1),
+  symbol: instrumentSymbolSchema,
   side: transactionSideSchema,
   transactionDate: dateOnlySchema,
   quantity: positiveDecimalStringSchema,
@@ -31,6 +36,16 @@ export const transactionSchema = zod.object({
   currency: currencyCodeSchema,
   description: zod.string().optional(),
   createdAt: timestampSchema,
+});
+
+export const buyTransactionResultSchema = zod.object({
+  transaction: transactionSchema,
+  holding: zod.object({
+    walletId: resourceIdSchema,
+    symbol: instrumentSymbolSchema,
+    quantity: zod.string().regex(/^(?=.*[1-9])(?:0|[1-9]\d*)(?:\.\d{1,8})?$/),
+    quoteCurrency: currencyCodeSchema,
+  }),
 });
 
 export const transactionListSchema = zod.object({
