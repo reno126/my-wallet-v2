@@ -316,8 +316,9 @@ describe('when recording immutable stock purchases', () => {
       { headers: { cookie: 'cookie' in fixture.headers ? fixture.headers.cookie : '' } },
     );
     // Assert
-    for (const response of [invalid, numeric, future, sell, currency, spoofed, invalidWallet])
+    for (const response of [invalid, numeric, future, sell, currency, spoofed, invalidWallet]) {
       expect(response.statusCode).toBe(400);
+    }
     expect(unauthenticated.statusCode).toBe(401);
     expect(missingOrigin.statusCode).toBe(403);
     expect(fixture.used()).toBe(0);

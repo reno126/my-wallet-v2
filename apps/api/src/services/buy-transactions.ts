@@ -30,21 +30,28 @@ export function createBuyTransactionService(
       input: CreateBuyInput,
     ): Promise<Result<BuyResult, ApiFailure>> {
       const parsed = createBuyTransactionSchema.safeParse(input);
-      if (!parsed.success || parsed.data.transactionDate > currentMarketDate(now()))
+      if (!parsed.success || parsed.data.transactionDate > currentMarketDate(now())) {
         return failure({ code: 'VALIDATION_FAILED' });
+      }
       // Check ownership before spending provider quota; recheck under the write lock afterwards.
       const wallet = await dependencies.wallets.findForUser(userId, walletId);
-      if (!wallet) return failure({ code: 'NOT_FOUND' });
+      if (!wallet) {
+        return failure({ code: 'NOT_FOUND' });
+      }
       const normalizedInput = { ...parsed.data, symbol: parsed.data.symbol.toUpperCase() };
       const verified = await dependencies.instruments.verify(normalizedInput.symbol);
-      if (!verified.ok) return verified;
+      if (!verified.ok) {
+        return verified;
+      }
       const result = await dependencies.transactions.createForUser(
         userId,
         walletId,
         normalizedInput,
         verified.value,
       );
-      if (!result.ok) return result;
+      if (!result.ok) {
+        return result;
+      }
       return success(toBuyResult(result.value, verified.value.quoteCurrency));
     },
   };

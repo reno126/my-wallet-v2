@@ -5,13 +5,20 @@ import type { ApiFailure } from '@/lib/api/requestApiResult';
 import { purchaseDictionary as text } from '../purchaseDictionary';
 
 export function purchaseFailureMessage(error: ApiFailure, operation: 'search' | 'price' | 'buy') {
-  if (operation === 'buy' && isUnconfirmedPurchaseFailure(error)) return text.errors.unconfirmed;
-  if (error.kind !== 'http') return text.errors[operation];
-  if (error.status === 401) throw redirect('/login');
-  if (error.status === 429)
+  if (operation === 'buy' && isUnconfirmedPurchaseFailure(error)) {
+    return text.errors.unconfirmed;
+  }
+  if (error.kind !== 'http') {
+    return text.errors[operation];
+  }
+  if (error.status === 401) {
+    throw redirect('/login');
+  }
+  if (error.status === 429) {
     return error.retryAfterSeconds === undefined
       ? text.errors.rateLimited
       : text.errors.retryAfter(error.retryAfterSeconds);
+  }
   switch (error.code) {
     case 'PROVIDER_QUOTA_EXHAUSTED':
       return text.errors.quota;
@@ -30,12 +37,16 @@ export function purchaseFailureMessage(error: ApiFailure, operation: 'search' | 
     case 'PRICE_LOOKUP_INCOMPLETE':
       return text.errors.incomplete;
   }
-  if (operation === 'buy' && [403, 404].includes(error.status)) return text.errors.unavailable;
+  if (operation === 'buy' && [403, 404].includes(error.status)) {
+    return text.errors.unavailable;
+  }
   return text.errors[operation];
 }
 
 export function isUnconfirmedPurchaseFailure(error: ApiFailure): boolean {
-  if (error.kind !== 'http') return true;
+  if (error.kind !== 'http') {
+    return true;
+  }
   const rejectedBeforePersistence =
     error.code !== undefined &&
     [

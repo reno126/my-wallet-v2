@@ -13,7 +13,9 @@ export function walletFailureMessage(
   error: WalletApiFailure,
   { failed, unconfirmed = failed }: WalletFailureMessages,
 ): string {
-  if (error.kind !== 'http') return unconfirmed;
+  if (error.kind !== 'http') {
+    return unconfirmed;
+  }
   if (error.status === 401) {
     throw redirect('/login');
   }

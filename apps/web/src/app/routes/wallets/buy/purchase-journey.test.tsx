@@ -258,7 +258,9 @@ describe('when recording a purchase', () => {
     mockApiServer.use(
       http.get(`${endpoint}/instruments/search`, async () => {
         searches += 1;
-        if (searches === 1) await searchGate.promise;
+        if (searches === 1) {
+          await searchGate.promise;
+        }
         return HttpResponse.json({ results: [stock], excluded: [] });
       }),
     );
@@ -367,8 +369,11 @@ describe('when recording a purchase', () => {
     const expected = status === 429 ? text.errors.retryAfter(30) : text.errors.unconfirmed;
     expect(await screen.findByText(expected)).toBeVisible();
     expect(page.quantity()).toHaveValue(purchaseInput.quantity);
-    if (status === 429) expect(page.submit()).toBeEnabled();
-    else await waitFor(() => expect(page.submit()).toBeDisabled());
+    if (status === 429) {
+      expect(page.submit()).toBeEnabled();
+    } else {
+      await waitFor(() => expect(page.submit()).toBeDisabled());
+    }
   });
 
   it('should redirect expired sessions from a lookup to login', async () => {

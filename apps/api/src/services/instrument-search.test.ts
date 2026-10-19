@@ -22,7 +22,9 @@ function createHarness(bodies: unknown[], quotaLimit = 1000) {
   const client = createFmpClient({
     environment: { FMP_API_KEY: 'test-only-key', FMP_BASE_URL: 'https://provider.test/stable/' },
     reserveRequest: () => {
-      if (used >= quotaLimit) return Promise.resolve(false);
+      if (used >= quotaLimit) {
+        return Promise.resolve(false);
+      }
       used += 1;
       return Promise.resolve(true);
     },
@@ -367,7 +369,9 @@ describe('when a search response is cached', () => {
     // Arrange
     const harness = createHarness([[apple]]);
     const first = await harness.service.search(query);
-    if (!first.ok) throw new Error('Expected a successful search.');
+    if (!first.ok) {
+      throw new Error('Expected a successful search.');
+    }
 
     // Act
     first.value.results.length = 0;

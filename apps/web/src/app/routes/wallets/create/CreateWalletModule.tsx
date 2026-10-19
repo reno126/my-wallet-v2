@@ -32,7 +32,9 @@ export async function createWalletAction({ request }: ActionFunctionArgs) {
     return { error: walletMsg.create.invalid };
   }
   const parsed = walletActionSchema.safeParse(rawValues);
-  if (!parsed.success) return { error: walletMsg.create.invalid };
+  if (!parsed.success) {
+    return { error: walletMsg.create.invalid };
+  }
 
   const result = await walletsApi.create(
     { ...parsed.data, reportingCurrency: 'USD' },
@@ -63,7 +65,9 @@ export function CreateWalletComponent() {
   const isPending = isSubmitting || navigation.state !== 'idle';
   const { setError } = form;
   useEffect(() => {
-    if (actionData?.error) setError('root', { type: 'server', message: actionData.error });
+    if (actionData?.error) {
+      setError('root', { type: 'server', message: actionData.error });
+    }
   }, [actionData, setError]);
 
   async function submitWallet(values: WalletFormValues) {

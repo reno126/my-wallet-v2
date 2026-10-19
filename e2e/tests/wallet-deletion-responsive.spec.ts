@@ -62,5 +62,7 @@ async function expectDialogToFit(dialog: Locator, width: number) {
   expect(bounds.top).toBeGreaterThanOrEqual(0);
   expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewportHeight);
   expect(bounds.content).toBeLessThanOrEqual(bounds.width + 1);
-  if (width < 640) expect(bounds.height).toBe(bounds.viewportHeight);
+  if (width < 640) {
+    expect(bounds.height).toBe(bounds.viewportHeight);
+  }
 }

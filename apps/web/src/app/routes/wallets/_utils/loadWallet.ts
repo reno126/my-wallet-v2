@@ -10,7 +10,9 @@ import { walletDictionary as text } from '../walletDictionary';
 export async function loadWallet({ request, params }: LoaderFunctionArgs) {
   const notFound = { title: text.detail.unavailable, message: text.detail.unavailableDescription };
   const parsed = walletIdParamsSchema.safeParse(params);
-  if (!parsed.success) throw pageFailureResponse(404, notFound);
+  if (!parsed.success) {
+    throw pageFailureResponse(404, notFound);
+  }
   const result = await walletsApi.read(parsed.data.walletId, request.signal);
   return requirePageData(result, {
     title: text.detail.title,

@@ -52,10 +52,13 @@ const buyTransactionRoutes: FastifyPluginCallbackZod = (
     },
     async (request, reply) => {
       const userId = request.authSession?.user.id;
-      if (userId === undefined)
+      if (userId === undefined) {
         throw new Error('Authenticated BUY route reached without a session.');
+      }
       const result = await purchases.create(userId, request.params.walletId, request.body);
-      if (result.ok) return reply.code(201).send(result.value);
+      if (result.ok) {
+        return reply.code(201).send(result.value);
+      }
       return sendResult(reply, result, request.id);
     },
   );

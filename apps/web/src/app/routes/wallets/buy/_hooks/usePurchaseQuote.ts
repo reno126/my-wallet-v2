@@ -49,12 +49,15 @@ export function usePurchaseQuote({ walletId, symbol, transactionDate }: UsePurch
 
   const errorMessage = state.status === 'error' ? state.message : undefined;
   useEffect(() => {
-    if (errorMessage) toast.error(errorMessage);
+    if (errorMessage) {
+      toast.error(errorMessage);
+    }
   }, [errorMessage]);
 
   function requestQuote(request: PurchaseQuoteRequest) {
-    if (!purchaseFormSchema.shape.transactionDate.safeParse(request.transactionDate).success)
+    if (!purchaseFormSchema.shape.transactionDate.safeParse(request.transactionDate).success) {
       return;
+    }
     void fetcher.load(
       `/wallets/${walletId}/buy/price?${new URLSearchParams({
         symbol: request.symbol,
@@ -64,7 +67,9 @@ export function usePurchaseQuote({ walletId, symbol, transactionDate }: UsePurch
   }
 
   function retryQuote() {
-    if (symbol) requestQuote({ symbol, transactionDate });
+    if (symbol) {
+      requestQuote({ symbol, transactionDate });
+    }
   }
 
   return { state, requestQuote, retryQuote };

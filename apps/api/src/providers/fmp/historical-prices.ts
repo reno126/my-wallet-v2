@@ -60,8 +60,9 @@ export function parseHistoricalPriceJson(text: string): unknown {
   return JSON.parse(text, (key: string, value: unknown, context?: { source?: string }): unknown => {
     if (key === 'close' && typeof value === 'number') {
       // Use the original numeric token, never the rounded JavaScript number (Node 22.22+/24+).
-      if (context?.source === undefined)
+      if (context?.source === undefined) {
         throw new Error('JSON source access is required for exact prices.');
+      }
       return context.source;
     }
     return value;

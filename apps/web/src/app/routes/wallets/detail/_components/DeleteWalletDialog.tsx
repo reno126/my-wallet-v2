@@ -42,13 +42,21 @@ export function DeleteWalletDialog({ wallet }: DeleteWalletDialogProps) {
   const isPending = form.formState.isSubmitting || navigation.state !== 'idle';
   const { setError } = form;
   useEffect(() => {
-    if (actionData?.error) setError('root', { type: 'server', message: actionData.error });
+    if (actionData?.error) {
+      setError('root', { type: 'server', message: actionData.error });
+    }
   }, [actionData, setError]);
 
   function changeOpen(open: boolean) {
-    if (isPending) return;
-    if (open) toast.dismiss();
-    if (!open) form.reset();
+    if (isPending) {
+      return;
+    }
+    if (open) {
+      toast.dismiss();
+    }
+    if (!open) {
+      form.reset();
+    }
     setStage(open ? 'warning' : 'closed');
   }
 
@@ -62,7 +70,9 @@ export function DeleteWalletDialog({ wallet }: DeleteWalletDialogProps) {
       <AlertDialogContent
         key={stage}
         onEscapeKeyDown={(event) => {
-          if (isPending) event.preventDefault();
+          if (isPending) {
+            event.preventDefault();
+          }
         }}
       >
         {stage === 'confirm' ? (

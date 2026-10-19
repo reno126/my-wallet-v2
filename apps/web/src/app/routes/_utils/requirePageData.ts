@@ -13,11 +13,15 @@ interface PageReadOptions {
 }
 
 export function requirePageData<Value>(result: ApiResult<Value>, options: PageReadOptions): Value {
-  if (result.ok) return result.value;
+  if (result.ok) {
+    return result.value;
+  }
   const error = result.error;
   const text = appDictionary.pageErrors;
   if (error.kind === 'http') {
-    if (error.status === 401) throw redirect('/login');
+    if (error.status === 401) {
+      throw redirect('/login');
+    }
     if (error.status === 404 || (error.status === 403 && options.hideForbidden)) {
       throw pageFailureResponse(
         404,

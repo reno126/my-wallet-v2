@@ -15,7 +15,9 @@ export async function instrumentSearchLoader({ request }: LoaderFunctionArgs) {
   const query = instrumentSearchQuerySchema.safeParse(
     Object.fromEntries(new URL(request.url).searchParams),
   );
-  if (!query.success) return { status: 'error' as const, message: text.errors.search };
+  if (!query.success) {
+    return { status: 'error' as const, message: text.errors.search };
+  }
   const result = await purchasesApi.search(query.data, request.signal);
   return result.ok
     ? { status: 'ready' as const, query: query.data, ...result.value }
@@ -30,13 +32,14 @@ export async function purchasePriceLoader({ request }: LoaderFunctionArgs) {
     return { status: 'error' as const, message: text.invalidDate };
   }
   const result = await purchasesApi.price(symbol.data.symbol, date.data.date, request.signal);
-  if (!result.ok)
+  if (!result.ok) {
     return {
       status: 'error' as const,
       symbol: symbol.data.symbol,
       date: date.data.date,
       message: purchaseFailureMessage(result.error, 'price'),
     };
+  }
   const usedPreviousTradingDay = result.value.effectiveDate < date.data.date;
   if (
     result.value.symbol !== symbol.data.symbol ||

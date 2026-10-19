@@ -83,7 +83,9 @@ export function InstrumentSearch({
                     disabled={disabled}
                     aria-labelledby="search-mode-label"
                     onValueChange={(value) => {
-                      if (value !== 'symbol' && value !== 'name') return;
+                      if (value !== 'symbol' && value !== 'name') {
+                        return;
+                      }
                       field.onChange(value);
                       invalidate();
                     }}

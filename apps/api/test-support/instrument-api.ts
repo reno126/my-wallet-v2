@@ -33,7 +33,9 @@ export async function createInstrumentApiFixture(
     requests.push(new URL(request.url, 'http://127.0.0.1'));
     reservationsAtDispatch.push(used);
     const next = pendingReplies.shift();
-    if (!next) return reply.code(500).send({});
+    if (!next) {
+      return reply.code(500).send({});
+    }
     if (next.stall) {
       reply.hijack();
       if (next.stall === 'body') {
@@ -61,7 +63,9 @@ export async function createInstrumentApiFixture(
           fmp: {
             timeoutMs: 500,
             reserveRequest: () => {
-              if (used >= (options.quotaLimit ?? 100)) return Promise.resolve(false);
+              if (used >= (options.quotaLimit ?? 100)) {
+                return Promise.resolve(false);
+              }
               used += 1;
               return Promise.resolve(true);
             },

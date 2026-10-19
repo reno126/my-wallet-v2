@@ -73,12 +73,13 @@ describe('when a private route fails', () => {
       action,
       loader: async () => {
         reads += 1;
-        if (reads === 1)
+        if (reads === 1) {
           throw pageFailureResponse(429, {
             title: text.rateLimitedTitle,
             message: text.rateLimited,
             retryAt: Date.now() + 30_000,
           });
+        }
         await retryGate;
         return null;
       },
@@ -120,7 +121,9 @@ describe('when a private route fails', () => {
     // Act
     openRoute({
       loader: () => {
-        if (origin === 'loader') throw failure;
+        if (origin === 'loader') {
+          throw failure;
+        }
         return null;
       },
       Component: function BrokenPage() {

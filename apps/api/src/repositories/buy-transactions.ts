@@ -32,12 +32,15 @@ export function createBuyTransactionRepository(prisma: PrismaClient) {
           WHERE "id" = ${walletId}::uuid AND "userId" = ${userId}
           FOR UPDATE
         `;
-        if (!wallet) return failure({ code: 'NOT_FOUND' });
+        if (!wallet) {
+          return failure({ code: 'NOT_FOUND' });
+        }
         if (
           wallet.reportingCurrency !== input.currency ||
           instrument.quoteCurrency !== input.currency
-        )
+        ) {
           return failure({ code: 'CURRENCY_MISMATCH' });
+        }
 
         await database.instrument.upsert({
           where: { symbol: instrument.symbol },
@@ -61,7 +64,9 @@ export function createBuyTransactionRepository(prisma: PrismaClient) {
           where: { walletId, symbol: instrument.symbol },
           _sum: { quantity: true },
         });
-        if (totals._sum.quantity === null) throw new Error('Created BUY has no ledger quantity.');
+        if (totals._sum.quantity === null) {
+          throw new Error('Created BUY has no ledger quantity.');
+        }
         return success({ transaction, holdingQuantity: totals._sum.quantity.toFixed() });
       });
     },

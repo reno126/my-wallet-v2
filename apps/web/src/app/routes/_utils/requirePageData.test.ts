@@ -12,7 +12,9 @@ function captureFailure(error: ApiFailure, hideForbidden = false): Response {
   try {
     requirePageData({ ok: false, error }, { ...options, hideForbidden });
   } catch (failure) {
-    if (failure instanceof Response) return failure;
+    if (failure instanceof Response) {
+      return failure;
+    }
     throw failure;
   }
   throw new Error('Expected a route response.');

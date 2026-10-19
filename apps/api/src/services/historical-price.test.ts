@@ -19,14 +19,17 @@ function createHarness(bodies: unknown[], quotaLimit = 100) {
   const client = createFmpClient({
     environment: { FMP_API_KEY: 'test-only-key', FMP_BASE_URL: 'https://provider.test/stable/' },
     reserveRequest: () => {
-      if (used >= quotaLimit) return Promise.resolve(false);
+      if (used >= quotaLimit) {
+        return Promise.resolve(false);
+      }
       used += 1;
       return Promise.resolve(true);
     },
     fetch: (input) => {
       requests.push(new URL(input instanceof Request ? input.url : input));
-      if (pendingBodies.length === 0)
+      if (pendingBodies.length === 0) {
         return Promise.reject(new Error('Unexpected provider request.'));
+      }
       const body = pendingBodies.shift();
       return Promise.resolve(body instanceof Response ? body : Response.json(body));
     },
@@ -232,7 +235,9 @@ describe('when looking up historical prices', () => {
     // Arrange
     const harness = createHarness([[profile], [price]]);
     const first = await harness.service.quote('AAPL', '2026-10-18');
-    if (!first.ok) throw new Error('Expected a successful historical quote.');
+    if (!first.ok) {
+      throw new Error('Expected a successful historical quote.');
+    }
 
     // Act
     first.value.unitPrice = '1';

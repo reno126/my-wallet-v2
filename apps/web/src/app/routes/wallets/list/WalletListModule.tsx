@@ -24,7 +24,9 @@ export async function walletListLoader({ request }: LoaderFunctionArgs) {
   const query = walletListQuerySchema.safeParse(
     pageValues.length === 0 ? {} : { page: pageValues[0] },
   );
-  if (pageValues.length > 1 || !query.success) return redirect('/wallets');
+  if (pageValues.length > 1 || !query.success) {
+    return redirect('/wallets');
+  }
   const result = await walletsApi.list(query.data, request.signal);
   return {
     walletList: requirePageData(result, {

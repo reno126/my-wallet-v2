@@ -17,11 +17,15 @@ export function LoadError({ message, retryLabel, retryAt }: LoadErrorProps) {
   const remainingSeconds =
     retryAt === undefined ? 0 : Math.max(0, Math.ceil((retryAt - now) / 1000));
   useEffect(() => {
-    if (retryAt === undefined || retryAt <= Date.now()) return;
+    if (retryAt === undefined || retryAt <= Date.now()) {
+      return;
+    }
     const timer = window.setInterval(() => {
       const currentTime = Date.now();
       setNow(currentTime);
-      if (currentTime >= retryAt) window.clearInterval(timer);
+      if (currentTime >= retryAt) {
+        window.clearInterval(timer);
+      }
     }, 1000);
     return () => window.clearInterval(timer);
   }, [retryAt]);

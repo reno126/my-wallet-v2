@@ -28,7 +28,9 @@ export async function deleteWalletAction({ request, params }: ActionFunctionArgs
     return { error: walletMsg.delete.invalid };
   }
   const parsed = deleteWalletInputSchema.safeParse(input);
-  if (!parsed.success) return { error: walletMsg.delete.invalid };
+  if (!parsed.success) {
+    return { error: walletMsg.delete.invalid };
+  }
 
   const { walletId } = parsedParams.data;
   const currentWallet = await walletsApi.read(walletId, request.signal);

@@ -72,7 +72,9 @@ export function DeleteWalletConfirmation({
             aria-describedby={`${inputId}-hint${errors.confirmationName ? ` ${inputId}-error` : ''}`}
             {...form.register('confirmationName')}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') event.preventDefault();
+              if (event.key === 'Enter') {
+                event.preventDefault();
+              }
             }}
           />
           <FieldDescription id={`${inputId}-hint`}>{walletMsg.delete.nameHint}</FieldDescription>

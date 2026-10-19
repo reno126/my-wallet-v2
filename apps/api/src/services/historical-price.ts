@@ -42,20 +42,30 @@ export function createHistoricalPriceService(
     const date = query.data.date;
     const cacheKey = JSON.stringify([normalizedSymbol, date]);
     const cached = getCachedQuote(cacheKey);
-    if (cached) return success(cached);
+    if (cached) {
+      return success(cached);
+    }
 
     const profileResult = await provider.getProfile(normalizedSymbol);
-    if (!profileResult.ok) return profileResult;
+    if (!profileResult.ok) {
+      return profileResult;
+    }
     const profile = profileResult.value;
-    if (!profile.currency) return failure({ code: 'CURRENCY_UNAVAILABLE' });
-    if (profile.currency.toUpperCase() !== 'USD') return failure({ code: 'UNSUPPORTED_CURRENCY' });
+    if (!profile.currency) {
+      return failure({ code: 'CURRENCY_UNAVAILABLE' });
+    }
+    if (profile.currency.toUpperCase() !== 'USD') {
+      return failure({ code: 'UNSUPPORTED_CURRENCY' });
+    }
 
     const selected = await findHistoricalClose(provider, {
       symbol: normalizedSymbol,
       requestedDate: date,
       earliestDate: profile.ipoDate || '0000-01-01',
     });
-    if (!selected.ok) return selected;
+    if (!selected.ok) {
+      return selected;
+    }
 
     const value = toHistoricalPrice(normalizedSymbol, date, selected.value, now());
     cacheQuote(cacheKey, value);
@@ -64,7 +74,9 @@ export function createHistoricalPriceService(
 
   function getCachedQuote(key: string): HistoricalPrice | undefined {
     const cached = cache.get(key);
-    if (cached && cached.expiresAt > now().getTime()) return { ...cached.value };
+    if (cached && cached.expiresAt > now().getTime()) {
+      return { ...cached.value };
+    }
     cache.delete(key);
     return undefined;
   }
@@ -72,7 +84,9 @@ export function createHistoricalPriceService(
   function cacheQuote(key: string, value: HistoricalPrice): void {
     if (cache.size >= historicalCacheMaximumEntries) {
       const oldestKey = cache.keys().next().value;
-      if (oldestKey !== undefined) cache.delete(oldestKey);
+      if (oldestKey !== undefined) {
+        cache.delete(oldestKey);
+      }
     }
     cache.set(key, {
       value: { ...value },
@@ -87,7 +101,9 @@ async function findHistoricalClose(
 ): Promise<Result<HistoricalClose, ApiFailure>> {
   const { symbol, requestedDate, earliestDate } = input;
   let windowEndDate = requestedDate;
-  if (windowEndDate < earliestDate) return failure({ code: 'PRICE_NOT_AVAILABLE' });
+  if (windowEndDate < earliestDate) {
+    return failure({ code: 'PRICE_NOT_AVAILABLE' });
+  }
 
   for (let windowIndex = 0; windowIndex < maximumHistoryWindows; windowIndex += 1) {
     const windowStartDate = historicalWindowStart(windowEndDate, earliestDate);
@@ -97,10 +113,16 @@ async function findHistoricalClose(
       to: windowEndDate,
       expectedCurrency: 'USD',
     });
-    if (!historyResult.ok) return historyResult;
+    if (!historyResult.ok) {
+      return historyResult;
+    }
     const selected = selectHistoricalPrice(historyResult.value, windowStartDate, windowEndDate);
-    if (selected) return success(selected);
-    if (windowStartDate === earliestDate) return failure({ code: 'PRICE_NOT_AVAILABLE' });
+    if (selected) {
+      return success(selected);
+    }
+    if (windowStartDate === earliestDate) {
+      return failure({ code: 'PRICE_NOT_AVAILABLE' });
+    }
     windowEndDate = previousDate(windowStartDate);
   }
   return failure({ code: 'PRICE_LOOKUP_INCOMPLETE' });

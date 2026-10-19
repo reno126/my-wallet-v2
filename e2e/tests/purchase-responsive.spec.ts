@@ -89,8 +89,9 @@ for (const width of responsiveViewportWidths) {
       'true',
     );
     await expectNoOverflow();
-    if (width === 375 || width === 1440)
+    if (width === 375 || width === 1440) {
       await page.screenshot({ path: test.info().outputPath('purchase-quote.png'), fullPage: true });
+    }
     emptySearch = true;
     await search.fill('UNKNOWN');
     await search.press('Enter');

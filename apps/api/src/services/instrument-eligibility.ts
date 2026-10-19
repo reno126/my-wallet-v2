@@ -27,17 +27,23 @@ export function hasUnsupportedStockClassification(instrument: StockClassificatio
 export function validateBuyInstrument(
   instrument: BuyInstrumentDetails,
 ): Result<VerifiedInstrument, ApiFailure> {
-  if (!instrument.quoteCurrency) return failure({ code: 'CURRENCY_UNAVAILABLE' });
-  if (instrument.quoteCurrency.toUpperCase() !== 'USD')
+  if (!instrument.quoteCurrency) {
+    return failure({ code: 'CURRENCY_UNAVAILABLE' });
+  }
+  if (instrument.quoteCurrency.toUpperCase() !== 'USD') {
     return failure({ code: 'UNSUPPORTED_CURRENCY' });
+  }
   if (
     hasUnsupportedStockClassification(instrument) ||
     instrument.isEtf !== false ||
     instrument.isFund !== false ||
     !instrument.exchange
-  )
+  ) {
     return failure({ code: 'UNSUPPORTED_INSTRUMENT' });
-  if (!instrument.name) return failure({ code: 'PROVIDER_ERROR' });
+  }
+  if (!instrument.name) {
+    return failure({ code: 'PROVIDER_ERROR' });
+  }
   return success({
     symbol: instrument.symbol,
     name: instrument.name,

@@ -132,4 +132,10 @@ export default tseslint.config(
     },
   },
   eslintConfigPrettier,
+  {
+    files: ['**/*.{js,mjs,cjs,ts,tsx,mts,cts}'],
+    rules: {
+      curly: ['error', 'all'],
+    },
+  },
 );

@@ -46,7 +46,9 @@ export async function requestApiResult<Value>(
       : { ok: false, error: { kind: 'invalid-response' } };
   } catch (error) {
     signal?.throwIfAborted();
-    if (error instanceof Error && error.name === 'AbortError') throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error;
+    }
     return {
       ok: false,
       error: { kind: error instanceof SyntaxError ? 'invalid-response' : 'network' },
@@ -55,7 +57,9 @@ export async function requestApiResult<Value>(
 }
 
 function parseRetryAfter(value: string | null): number | undefined {
-  if (value === null) return undefined;
+  if (value === null) {
+    return undefined;
+  }
   const delaySeconds = Number(value);
   if (!Number.isNaN(delaySeconds)) {
     const isValidDelay = /^\d+$/u.test(value) && Number.isFinite(delaySeconds);

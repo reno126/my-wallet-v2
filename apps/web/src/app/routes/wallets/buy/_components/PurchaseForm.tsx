@@ -41,7 +41,9 @@ export function PurchaseForm({ walletId }: PurchaseFormProps) {
   const canSubmit = !isDisabled && quote.state.status === 'ready';
   const { setError } = form;
   useEffect(() => {
-    if (actionData?.error) setError('root', { type: 'server', message: actionData.error });
+    if (actionData?.error) {
+      setError('root', { type: 'server', message: actionData.error });
+    }
   }, [actionData, setError]);
 
   function selectInstrument(instrument: Instrument) {
@@ -66,7 +68,9 @@ export function PurchaseForm({ walletId }: PurchaseFormProps) {
     }
   }
   async function submitPurchase(values: PurchaseFormValues) {
-    if (isDisabled) return;
+    if (isDisabled) {
+      return;
+    }
     if (!selectedInstrument || quote.state.status !== 'ready') {
       form.setError('root', { message: text.invalid });
       return;

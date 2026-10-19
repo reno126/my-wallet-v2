@@ -15,8 +15,9 @@ test('a browser purchase persists the original date and exact decimals in Postgr
   );
   test.setTimeout(60_000);
   const databaseUrl = process.env['DATABASE_URL'];
-  if (!databaseUrl)
+  if (!databaseUrl) {
     throw new Error('The purchase journey requires an explicit local wallet_test DATABASE_URL.');
+  }
   const target = new URL(databaseUrl);
   if (!['localhost', '127.0.0.1'].includes(target.hostname) || target.pathname !== '/wallet_test') {
     throw new Error('The purchase journey may only use the local wallet_test database.');
@@ -68,8 +69,9 @@ test('a browser purchase persists the original date and exact decimals in Postgr
       async (route) => {
         const request = route.request();
         const method = request.method();
-        if (method !== 'GET' && method !== 'POST' && method !== 'DELETE')
+        if (method !== 'GET' && method !== 'POST' && method !== 'DELETE') {
           throw new Error(`Unexpected browser method: ${method}`);
+        }
         const url = new URL(request.url());
         const result = await server.inject({
           method,
@@ -79,8 +81,9 @@ test('a browser purchase persists the original date and exact decimals in Postgr
         });
         const headers: Record<string, string> = {};
         for (const [name, value] of Object.entries(result.headers)) {
-          if (value !== undefined)
+          if (value !== undefined) {
             headers[name] = Array.isArray(value) ? value.join('\n') : String(value);
+          }
         }
         await route.fulfill({ status: result.statusCode, headers, body: result.body });
       },
@@ -134,7 +137,9 @@ test('a browser purchase persists the original date and exact decimals in Postgr
     expect(await server.prisma.ledgerTransaction.count({ where: { symbol } })).toBe(1);
   } finally {
     try {
-      if (!page.isClosed()) await page.unrouteAll({ behavior: 'wait' });
+      if (!page.isClosed()) {
+        await page.unrouteAll({ behavior: 'wait' });
+      }
     } finally {
       try {
         if (server.hasDecorator('prisma')) {

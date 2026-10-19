@@ -15,10 +15,16 @@ export function createFmpInstrumentVerifier(
         parameters: { symbol },
         responseSchema: fmpProfileResponseSchema,
       });
-      if (!result.ok) return failure(mapProviderFailure(result.error));
+      if (!result.ok) {
+        return failure(mapProviderFailure(result.error));
+      }
       const profile = result.value[0];
-      if (!profile) return failure({ code: 'NOT_FOUND' });
-      if (profile.symbol !== symbol) return failure({ code: 'PROVIDER_ERROR' });
+      if (!profile) {
+        return failure({ code: 'NOT_FOUND' });
+      }
+      if (profile.symbol !== symbol) {
+        return failure({ code: 'PROVIDER_ERROR' });
+      }
       return validateBuyInstrument({
         symbol,
         name: profile.companyName,
