@@ -5,13 +5,18 @@ export {
   currencyCodeSchema,
   dateOnlySchema,
   healthStatusSchema,
+  positiveDecimalStringSchema,
   resourceIdSchema,
   timestampSchema,
 } from './schemas/common.js';
 export {
+  historicalPriceSchema,
+  instrumentPriceParamsSchema,
+  instrumentPriceQuerySchema,
   instrumentSchema,
   instrumentSearchQuerySchema,
   instrumentSearchResponseSchema,
+  instrumentSymbolSchema,
 } from './schemas/instrument.js';
 export {
   createTransactionSchema,

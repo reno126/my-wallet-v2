@@ -6,7 +6,8 @@ import {
 } from '@my-wallets/contracts';
 
 import type { ApiFailure } from '../http/api-failure.js';
-import type { createFmpClient, FmpFailure } from '../providers/fmp/client.js';
+import { mapProviderFailure } from '../http/provider-failure.ts';
+import type { createFmpClient } from '../providers/fmp/client.js';
 import {
   fmpProfileResponseSchema,
   type FmpSearchCandidate,
@@ -184,18 +185,4 @@ function excludeCandidate(
     quoteCurrency: candidate.currency?.toUpperCase() || null,
     reason,
   };
-}
-
-function mapProviderFailure(failure: FmpFailure): ApiFailure {
-  switch (failure.code) {
-    case 'QUOTA_EXHAUSTED':
-      return { code: 'PROVIDER_QUOTA_EXHAUSTED' };
-    case 'NOT_CONFIGURED':
-    case 'QUOTA_UNAVAILABLE':
-      return { code: 'PROVIDER_UNAVAILABLE' };
-    case 'TIMEOUT':
-      return { code: 'PROVIDER_TIMEOUT' };
-    default:
-      return { code: 'PROVIDER_ERROR' };
-  }
 }

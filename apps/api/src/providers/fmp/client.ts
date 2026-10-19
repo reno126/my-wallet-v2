@@ -42,6 +42,7 @@ interface FmpRequest<Value> {
   endpoint: zod.infer<typeof requestSchema>['endpoint'];
   parameters: Record<string, string>;
   responseSchema: zod.ZodType<Value>;
+  parseResponse?: (text: string) => unknown;
 }
 
 export function createFmpClient(options: FmpClientOptions) {
@@ -98,7 +99,9 @@ export function createFmpClient(options: FmpClientOptions) {
       let body: unknown;
 
       try {
-        body = await response.json();
+        body = input.parseResponse
+          ? input.parseResponse(await response.text())
+          : await response.json();
       } catch {
         return {
           ok: false,

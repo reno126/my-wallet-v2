@@ -13,5 +13,13 @@ export const apiErrorMessages = {
     'The shared market-data request budget is exhausted. Try again after it resets.',
   PROVIDER_ERROR: 'The market-data provider could not return valid results. Try again later.',
   PROVIDER_TIMEOUT: 'The market-data provider did not respond in time. Try again later.',
+  UNSUPPORTED_CURRENCY: 'Only USD-denominated instruments and prices are supported.',
+  CURRENCY_UNAVAILABLE:
+    'The provider did not identify the instrument quote currency. A USD price cannot be assumed.',
+  CURRENCY_MISMATCH: 'The historical price currency does not match the instrument quote currency.',
+  PRICE_NOT_AVAILABLE:
+    'No historical closing price is available on or before the requested date in the instrument’s available history.',
+  PRICE_LOOKUP_INCOMPLETE:
+    'The historical lookup reached its request limit before earlier history could be checked.',
   INTERNAL_SERVER_ERROR: 'An unexpected error occurred.',
 };

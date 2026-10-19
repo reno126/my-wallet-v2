@@ -1,97 +1,23 @@
-import Fastify from 'fastify';
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { apiErrorSchema, instrumentSearchResponseSchema } from '@my-wallets/contracts';
 
-import { createAuthenticatedUser } from '../../test-support/authenticated-user.js';
-import { createTestServer } from '../../test-support/create-test-server.js';
-import { createOpenApiValidator } from '../../test-support/openapi-contract.js';
-
+import {
+  createInstrumentApiFixture,
+  type FakeProviderResponse,
+  type InstrumentApiFixtureOptions,
+} from '../../test-support/instrument-api.js';
 const apple = { symbol: 'AAPL', name: 'Apple Inc.', currency: 'USD', exchange: 'NASDAQ' };
 const searchPath = '/api/instruments/search';
-
-interface FakeProviderResponse {
-  body?: unknown;
-  status?: number;
-  stall?: boolean;
-}
-
-interface FixtureOptions {
-  quotaLimit?: number;
-  configureQuota?: boolean;
-  authenticate?: boolean;
-  environment?: Record<string, string>;
-}
-
-async function createSearchFixture(replies: FakeProviderResponse[], options: FixtureOptions = {}) {
-  const provider = Fastify({ logger: false, forceCloseConnections: true });
-  const pendingReplies = [...replies];
-  const requests: URL[] = [];
-  const reservationsAtDispatch: number[] = [];
-  let used = 0;
-
-  provider.get('/stable/*', (request, reply) => {
-    requests.push(new URL(request.url, 'http://127.0.0.1'));
-    reservationsAtDispatch.push(used);
-    const next = pendingReplies.shift();
-    if (!next) return reply.code(500).send({});
-    if (next.stall) {
-      reply.hijack();
-      return;
-    }
-    return reply.code(next.status ?? 200).send(next.body ?? []);
-  });
-  onTestFinished(() => provider.close());
-  const providerAddress = await provider.listen({ host: '127.0.0.1', port: 0 });
-  const server = createTestServer(
-    {
-      FMP_API_KEY: 'test-only-provider-key',
-      FMP_BASE_URL: `${providerAddress}/stable/`,
-      ...options.environment,
-    },
-    options.configureQuota === false
-      ? {}
-      : {
-          fmp: {
-            timeoutMs: 500,
-            reserveRequest: () => {
-              if (used >= (options.quotaLimit ?? 100)) return Promise.resolve(false);
-              used += 1;
-              return Promise.resolve(true);
-            },
-          },
-        },
-  );
-  const registeredEmails: string[] = [];
-  onTestFinished(async () => {
-    try {
-      if (server.hasDecorator('prisma') && registeredEmails.length > 0) {
-        await server.prisma.user.deleteMany({ where: { email: { in: registeredEmails } } });
-      }
-    } finally {
-      await server.close();
-    }
-  });
-  await server.ready();
-  const contract = await createOpenApiValidator(server);
-  const owner =
-    options.authenticate === false
-      ? undefined
-      : await createAuthenticatedUser(server, registeredEmails);
-
+async function createSearchFixture(
+  replies: FakeProviderResponse[],
+  options: InstrumentApiFixtureOptions = {},
+) {
+  const fixture = await createInstrumentApiFixture(replies, options);
   return {
-    used: () => used,
-    requests,
-    reservationsAtDispatch,
-    async search(query = 'q=AAPL') {
-      const response = await server.inject({
-        method: 'GET',
-        url: `${searchPath}${query ? `?${query}` : ''}`,
-        headers: owner?.headers ?? {},
-      });
-      contract.assertResponse('get', searchPath, response);
-      expect(response.headers['cache-control']).toBe('no-store');
-      return response;
+    ...fixture,
+    search(query = 'q=AAPL') {
+      return fixture.get(searchPath + (query ? '?' + query : ''));
     },
   };
 }

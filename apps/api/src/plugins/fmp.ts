@@ -3,11 +3,13 @@ import fastifyPlugin from 'fastify-plugin';
 
 import type { ApiPluginOptions } from '../plugin-options.js';
 import { createFmpClient } from '../providers/fmp/client.ts';
+import { createHistoricalPriceService } from '../services/historical-price.ts';
 import { createInstrumentSearchService } from '../services/instrument-search.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
     instrumentSearch: ReturnType<typeof createInstrumentSearchService>;
+    historicalPrices: ReturnType<typeof createHistoricalPriceService>;
   }
 }
 
@@ -26,6 +28,7 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
   });
 
   server.decorate('instrumentSearch', createInstrumentSearchService(client));
+  server.decorate('historicalPrices', createHistoricalPriceService(client));
   completePluginRegistration();
 };
 

@@ -1,6 +1,30 @@
 import { z as zod } from 'zod';
 
-import { currencyCodeSchema } from './common.js';
+import {
+  currencyCodeSchema,
+  dateOnlySchema,
+  positiveDecimalStringSchema,
+  timestampSchema,
+} from './common.js';
+
+export const instrumentSymbolSchema = zod
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[A-Za-z0-9.^=-]+$/);
+
+export const instrumentPriceParamsSchema = zod.strictObject({ symbol: instrumentSymbolSchema });
+export const instrumentPriceQuerySchema = zod.strictObject({ date: dateOnlySchema });
+export const historicalPriceSchema = zod.object({
+  symbol: instrumentSymbolSchema,
+  requestedDate: dateOnlySchema,
+  effectiveDate: dateOnlySchema,
+  unitPrice: positiveDecimalStringSchema,
+  currency: currencyCodeSchema,
+  source: zod.enum(['FMP']),
+  retrievedAt: timestampSchema,
+  usedPreviousTradingDay: zod.boolean(),
+});
 
 export const instrumentSchema = zod.object({
   symbol: zod.string().min(1),

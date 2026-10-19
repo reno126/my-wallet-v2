@@ -28,6 +28,11 @@
                   "PROVIDER_QUOTA_EXHAUSTED",
                   "PROVIDER_ERROR",
                   "PROVIDER_TIMEOUT",
+                  "UNSUPPORTED_CURRENCY",
+                  "CURRENCY_UNAVAILABLE",
+                  "CURRENCY_MISMATCH",
+                  "PRICE_NOT_AVAILABLE",
+                  "PRICE_LOOKUP_INCOMPLETE",
                   "INTERNAL_SERVER_ERROR"
                 ]
               },
@@ -189,6 +194,52 @@
           "name",
           "exchange",
           "quoteCurrency"
+        ]
+      },
+      "HistoricalPriceInput": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "requestedDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "effectiveDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "FMP"
+            ]
+          },
+          "retrievedAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          },
+          "usedPreviousTradingDay": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol",
+          "requestedDate",
+          "effectiveDate",
+          "unitPrice",
+          "currency",
+          "source",
+          "retrievedAt",
+          "usedPreviousTradingDay"
         ]
       },
       "InstrumentSearchResponseInput": {
@@ -443,6 +494,11 @@
                   "PROVIDER_QUOTA_EXHAUSTED",
                   "PROVIDER_ERROR",
                   "PROVIDER_TIMEOUT",
+                  "UNSUPPORTED_CURRENCY",
+                  "CURRENCY_UNAVAILABLE",
+                  "CURRENCY_MISMATCH",
+                  "PRICE_NOT_AVAILABLE",
+                  "PRICE_LOOKUP_INCOMPLETE",
                   "INTERNAL_SERVER_ERROR"
                 ]
               },
@@ -609,6 +665,53 @@
           "name",
           "exchange",
           "quoteCurrency"
+        ],
+        "additionalProperties": false
+      },
+      "HistoricalPrice": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "requestedDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "effectiveDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "FMP"
+            ]
+          },
+          "retrievedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "usedPreviousTradingDay": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol",
+          "requestedDate",
+          "effectiveDate",
+          "unitPrice",
+          "currency",
+          "source",
+          "retrievedAt",
+          "usedPreviousTradingDay"
         ],
         "additionalProperties": false
       },
@@ -1401,6 +1504,132 @@
         }
       }
     },
+    "/instruments/{symbol}/price": {
+      "get": {
+        "operationId": "getHistoricalPrice",
+        "summary": "Get the latest available USD closing price on or before a trade date",
+        "tags": [
+          "Instruments"
+        ],
+        "description": "Preserves the requested date and returns the effective quote date and exact-decimal unit price. Profile and history requests each consume a reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/DateOnlyInput"
+            },
+            "in": "query",
+            "name": "date",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9.^=-]+$"
+            },
+            "in": "path",
+            "name": "symbol",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalPrice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets": {
       "get": {
         "operationId": "listWallets",
@@ -1911,7 +2140,7 @@
     },
     {
       "name": "Instruments",
-      "description": "Authenticated instrument discovery. Results use explicit USD currency and exclusions; responses use Cache-Control: no-store."
+      "description": "Authenticated instrument discovery and historical USD closing prices. Responses use Cache-Control: no-store."
     },
     {
       "name": "Wallets",

@@ -1,0 +1,255 @@
+import { describe, expect, it } from 'vitest';
+
+import { apiErrorSchema, historicalPriceSchema } from '@my-wallets/contracts';
+
+import { createInstrumentApiFixture } from '../../test-support/instrument-api.js';
+
+const profile = { symbol: 'AAPL', currency: 'USD', ipoDate: '1980-12-12' };
+const row = { symbol: 'AAPL', date: '2026-10-16', close: '190.12345678' };
+const pricePath = '/api/instruments/AAPL/price?date=2026-10-18';
+
+describe('when requesting historical quotes through the authenticated API', () => {
+  it('should return exact prices and effective dates while charging profile and history separately', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture(
+      [
+        { body: [profile] },
+        { rawJson: '[{"symbol":"AAPL","date":"2026-10-16","close":9007199254740993.12345678}]' },
+      ],
+      { quotaLimit: 2 },
+    );
+
+    // Act
+    const first = await fixture.get(pricePath);
+    const cached = await fixture.get(pricePath);
+
+    // Assert
+    expect(first.statusCode).toBe(200);
+    expect(historicalPriceSchema.parse(first.json())).toMatchObject({
+      symbol: 'AAPL',
+      requestedDate: '2026-10-18',
+      effectiveDate: '2026-10-16',
+      unitPrice: '9007199254740993.12345678',
+      currency: 'USD',
+      source: 'FMP',
+      usedPreviousTradingDay: true,
+    });
+    expect(cached.json()).toStrictEqual(first.json());
+    expect(fixture.requests.map((request) => request.pathname)).toStrictEqual([
+      '/stable/profile',
+      '/stable/historical-price-eod/full',
+    ]);
+    expect(fixture.reservationsAtDispatch).toStrictEqual([1, 2]);
+    expect(fixture.used()).toBe(2);
+    expect(first.payload).not.toContain('test-only-provider-key');
+  });
+
+  it('should use an exact-date close when available, regardless of provider row order', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([
+      { body: [profile] },
+      { body: [row, { ...row, date: '2026-10-14' }, { ...row, date: '2026-10-19' }] },
+    ]);
+
+    // Act
+    const response = await fixture.get('/api/instruments/AAPL/price?date=2026-10-16');
+
+    // Assert
+    expect(response.statusCode).toBe(200);
+    expect(historicalPriceSchema.parse(response.json())).toMatchObject({
+      requestedDate: '2026-10-16',
+      effectiveDate: '2026-10-16',
+      usedPreviousTradingDay: false,
+    });
+    expect(fixture.used()).toBe(2);
+  });
+
+  it.each([
+    '/api/instruments/AAPL/price',
+    '/api/instruments/AAPL/price?date=2026-02-30',
+    '/api/instruments/AAPL/price?date=2999-01-01',
+    '/api/instruments/AAPL/price?date=2026-10-18&date=2026-10-16',
+    '/api/instruments/AAPL/price?date=2026-10-18&currency=USD',
+    '/api/instruments/AAPL%2FMSFT/price?date=2026-10-18',
+  ])('should reject invalid inputs without spending quota: %s', async (path) => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([]);
+
+    // Act
+    const response = await fixture.get(path);
+
+    // Assert
+    expect(response.statusCode).toBe(400);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('VALIDATION_FAILED');
+    expect(fixture.used()).toBe(0);
+    expect(fixture.requests).toHaveLength(0);
+  });
+
+  it('should require a session before contacting the provider', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([], { authenticate: false });
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(401);
+    expect(fixture.used()).toBe(0);
+  });
+
+  it.each([
+    { details: { ...profile, currency: 'EUR' }, code: 'UNSUPPORTED_CURRENCY' },
+    { details: { symbol: 'AAPL' }, code: 'CURRENCY_UNAVAILABLE' },
+  ])('should explain $code before sending a historical request', async ({ details, code }) => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([{ body: [details] }]);
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(422);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe(code);
+    expect(fixture.used()).toBe(1);
+  });
+
+  it('should reject conflicting historical currency rather than relabeling it USD', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([
+      { body: [profile] },
+      { body: [{ ...row, currency: 'EUR' }] },
+    ]);
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(422);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('CURRENCY_MISMATCH');
+    expect(fixture.used()).toBe(2);
+  });
+
+  it('should report no available history only after reaching the known IPO boundary', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([
+      { body: [{ ...profile, ipoDate: '2025-01-01' }] },
+      { body: [] },
+    ]);
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(404);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('PRICE_NOT_AVAILABLE');
+    expect(fixture.used()).toBe(2);
+  });
+
+  it('should expose bounded incomplete coverage without a false not-found result', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([
+      { body: [profile] },
+      ...Array.from({ length: 5 }, () => ({ body: [] })),
+    ]);
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(503);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('PRICE_LOOKUP_INCOMPLETE');
+    expect(fixture.used()).toBe(6);
+  });
+
+  it('should preserve the profile charge when the historical reservation is exhausted', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([{ body: [profile] }], { quotaLimit: 1 });
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(503);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_QUOTA_EXHAUSTED');
+    expect(fixture.used()).toBe(1);
+    expect(fixture.requests).toHaveLength(1);
+  });
+
+  it('should leave normal startup closed to live requests until quota persistence is connected', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([], { configureQuota: false });
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(503);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_UNAVAILABLE');
+    expect(fixture.requests).toHaveLength(0);
+  });
+
+  it('should charge a failed historical response and each dispatched request of an explicit retry', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([
+      { body: [profile] },
+      { status: 503, body: { 'Error Message': 'private-provider-details' } },
+      { body: [profile] },
+      { body: [row] },
+    ]);
+
+    // Act
+    const failure = await fixture.get(pricePath);
+    const retry = await fixture.get(pricePath);
+
+    // Assert
+    expect(failure.statusCode).toBe(502);
+    expect(failure.payload).not.toContain('private-provider-details');
+    expect(retry.statusCode).toBe(200);
+    expect(fixture.used()).toBe(4);
+  });
+
+  it('should retain the charges when the historical body times out', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([{ body: [profile] }, { stall: 'body' }]);
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(504);
+    expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_TIMEOUT');
+    expect(fixture.used()).toBe(2);
+  });
+
+  it.each(['[{"symbol":"AAPL","date":"2026-10-16","close":190.123456789}]', '{broken'])(
+    'should reject malformed or excessive-precision history: %s',
+    async (rawJson) => {
+      // Arrange
+      const fixture = await createInstrumentApiFixture([{ body: [profile] }, { rawJson }]);
+
+      // Act
+      const response = await fixture.get(pricePath);
+
+      // Assert
+      expect(response.statusCode).toBe(502);
+      expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_ERROR');
+      expect(fixture.used()).toBe(2);
+    },
+  );
+
+  it('should apply the authenticated user limit before serving a cached quote', async () => {
+    // Arrange
+    const fixture = await createInstrumentApiFixture([{ body: [profile] }, { body: [row] }], {
+      environment: { API_AUTHENTICATED_RATE_LIMIT_MAX: '1' },
+    });
+    await fixture.get(pricePath);
+
+    // Act
+    const response = await fixture.get(pricePath);
+
+    // Assert
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBeDefined();
+    expect(fixture.used()).toBe(2);
+  });
+});

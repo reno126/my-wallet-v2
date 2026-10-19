@@ -11,6 +11,14 @@ export type ApiFailure =
   | { code: 'RATE_LIMITED' }
   | {
       code:
+        | 'UNSUPPORTED_CURRENCY'
+        | 'CURRENCY_UNAVAILABLE'
+        | 'CURRENCY_MISMATCH'
+        | 'PRICE_NOT_AVAILABLE'
+        | 'PRICE_LOOKUP_INCOMPLETE';
+    }
+  | {
+      code:
         'PROVIDER_UNAVAILABLE' | 'PROVIDER_QUOTA_EXHAUSTED' | 'PROVIDER_ERROR' | 'PROVIDER_TIMEOUT';
     };
 
@@ -32,6 +40,11 @@ const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; mes
   PROVIDER_QUOTA_EXHAUSTED: { statusCode: 503, message: apiErrorMessages.PROVIDER_QUOTA_EXHAUSTED },
   PROVIDER_ERROR: { statusCode: 502, message: apiErrorMessages.PROVIDER_ERROR },
   PROVIDER_TIMEOUT: { statusCode: 504, message: apiErrorMessages.PROVIDER_TIMEOUT },
+  UNSUPPORTED_CURRENCY: { statusCode: 422, message: apiErrorMessages.UNSUPPORTED_CURRENCY },
+  CURRENCY_UNAVAILABLE: { statusCode: 422, message: apiErrorMessages.CURRENCY_UNAVAILABLE },
+  CURRENCY_MISMATCH: { statusCode: 422, message: apiErrorMessages.CURRENCY_MISMATCH },
+  PRICE_NOT_AVAILABLE: { statusCode: 404, message: apiErrorMessages.PRICE_NOT_AVAILABLE },
+  PRICE_LOOKUP_INCOMPLETE: { statusCode: 503, message: apiErrorMessages.PRICE_LOOKUP_INCOMPLETE },
 };
 
 export function mapFailureToResponse(failure: ApiFailure, requestId: string): FailureResponse {

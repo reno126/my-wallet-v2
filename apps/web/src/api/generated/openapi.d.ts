@@ -143,6 +143,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instruments/{symbol}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the latest available USD closing price on or before a trade date
+         * @description Preserves the requested date and returns the effective quote date and exact-decimal unit price. Profile and history requests each consume a reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly.
+         */
+        get: operations["getHistoricalPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wallets": {
         parameters: {
             query?: never;
@@ -187,7 +207,7 @@ export interface components {
         ApiErrorInput: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceIdInput"];
             };
@@ -225,6 +245,17 @@ export interface components {
             name: string;
             exchange: string | null;
             quoteCurrency: components["schemas"]["CurrencyCodeInput"];
+        };
+        HistoricalPriceInput: {
+            symbol: string;
+            requestedDate: components["schemas"]["DateOnlyInput"];
+            effectiveDate: components["schemas"]["DateOnlyInput"];
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCodeInput"];
+            /** @enum {string} */
+            source: "FMP";
+            retrievedAt: components["schemas"]["TimestampInput"];
+            usedPreviousTradingDay: boolean;
         };
         InstrumentSearchResponseInput: {
             results: components["schemas"]["InstrumentInput"][];
@@ -280,7 +311,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceId"];
             };
@@ -318,6 +349,17 @@ export interface components {
             name: string;
             exchange: string | null;
             quoteCurrency: components["schemas"]["CurrencyCode"];
+        };
+        HistoricalPrice: {
+            symbol: string;
+            requestedDate: components["schemas"]["DateOnly"];
+            effectiveDate: components["schemas"]["DateOnly"];
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCode"];
+            /** @enum {string} */
+            source: "FMP";
+            retrievedAt: components["schemas"]["Timestamp"];
+            usedPreviousTradingDay: boolean;
         };
         InstrumentSearchResponse: {
             results: components["schemas"]["Instrument"][];
@@ -722,6 +764,103 @@ export interface operations {
             };
             /** @description Default Response */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getHistoricalPrice: {
+        parameters: {
+            query: {
+                date: components["schemas"]["DateOnlyInput"];
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoricalPrice"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

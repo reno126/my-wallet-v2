@@ -1,10 +1,12 @@
 import { z as zod } from 'zod';
 
-import { currencyCodeSchema, dateOnlySchema, resourceIdSchema, timestampSchema } from './common.js';
-
-const positiveDecimalStringSchema = zod
-  .string()
-  .regex(/^(?=.*[1-9])(?:0|[1-9]\d{0,21})(?:\.\d{1,8})?$/);
+import {
+  currencyCodeSchema,
+  dateOnlySchema,
+  positiveDecimalStringSchema,
+  resourceIdSchema,
+  timestampSchema,
+} from './common.js';
 
 export const transactionSideSchema = zod.enum(['BUY', 'SELL']);
 
