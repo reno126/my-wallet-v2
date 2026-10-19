@@ -13,7 +13,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { walletsApi } from '@/lib/api/wallets';
+import { createRequestApi } from '@/lib/api/createRequestApi';
 
 import { requirePageData } from '../../_utils/requirePageData';
 import { walletDictionary } from '../walletDictionary';
@@ -27,7 +27,8 @@ export async function walletListLoader({ request }: LoaderFunctionArgs) {
   if (pageValues.length > 1 || !query.success) {
     return redirect('/wallets');
   }
-  const result = await walletsApi.list(query.data, request.signal);
+  const api = createRequestApi(request.signal);
+  const result = await api.wallets.list(query.data);
   return {
     walletList: requirePageData(result, {
       title: walletDictionary.page.title,

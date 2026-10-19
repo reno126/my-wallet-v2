@@ -6,9 +6,9 @@ import {
   walletListSchema,
   walletSummarySchema,
 } from '@my-wallets/contracts';
-import { apiClient, createApiClient } from '@/api/client';
 
-import { type ApiFailure, type ApiResult, requestApiResult } from './requestApiResult';
+import type { RequestClient } from './createRequestClient';
+import type { ApiFailure, ApiResult } from './requestApiResult';
 
 export type WalletListQuery = zod.infer<typeof walletListQuerySchema>;
 export type CreateWalletInput = zod.infer<typeof createWalletSchema>;
@@ -16,53 +16,38 @@ export type WalletSummary = zod.infer<typeof walletSummarySchema>;
 export type WalletList = zod.infer<typeof walletListSchema>;
 
 export type WalletApiFailure = ApiFailure;
-type ApiClient = ReturnType<typeof createApiClient>;
 
-export function createWalletApi(client: ApiClient = apiClient) {
+export function createWalletApi({ client, request }: RequestClient) {
   return {
-    list(query: WalletListQuery, signal?: AbortSignal): Promise<ApiResult<WalletList>> {
-      return requestApiResult(
-        () => client.GET('/wallets', { params: { query }, signal: signal ?? null }),
-        walletListSchema,
-        signal,
-      );
+    list(query: WalletListQuery): Promise<ApiResult<WalletList>> {
+      return request(() => client.GET('/wallets', { params: { query } }), walletListSchema);
     },
-    read(walletId: string, signal?: AbortSignal): Promise<ApiResult<WalletSummary>> {
-      return requestApiResult(
+    read(walletId: string): Promise<ApiResult<WalletSummary>> {
+      return request(
         () =>
           client.GET('/wallets/{walletId}', {
             params: { path: { walletId } },
-            signal: signal ?? null,
           }),
         walletSummarySchema,
-        signal,
       );
     },
-    delete(walletId: string, signal?: AbortSignal): Promise<ApiResult<undefined>> {
-      return requestApiResult(
+    delete(walletId: string): Promise<ApiResult<undefined>> {
+      return request(
         () =>
           client.DELETE('/wallets/{walletId}', {
             params: { path: { walletId } },
-            signal: signal ?? null,
           }),
         zod.undefined(),
-        signal,
         204,
       );
     },
-    create(input: CreateWalletInput, signal?: AbortSignal): Promise<ApiResult<WalletSummary>> {
+    create(input: CreateWalletInput): Promise<ApiResult<WalletSummary>> {
       const body = {
         name: input.name,
         reportingCurrency: input.reportingCurrency,
         ...(input.description === undefined ? {} : { description: input.description }),
       };
-      return requestApiResult(
-        () => client.POST('/wallets', { body, signal: signal ?? null }),
-        walletSummarySchema,
-        signal,
-      );
+      return request(() => client.POST('/wallets', { body }), walletSummarySchema);
     },
   };
 }
-
-export const walletsApi = createWalletApi();

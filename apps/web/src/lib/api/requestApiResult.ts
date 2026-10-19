@@ -17,13 +17,13 @@ export type ApiResult<Value> = { ok: true; value: Value } | { ok: false; error: 
 export async function requestApiResult<Value>(
   request: () => Promise<{ data?: unknown; error?: unknown; response: Response }>,
   schema: zod.ZodType<Value>,
-  signal?: AbortSignal,
+  signal: AbortSignal,
   expectedStatus?: number,
 ): Promise<ApiResult<Value>> {
   try {
-    signal?.throwIfAborted();
+    signal.throwIfAborted();
     const result = await request();
-    signal?.throwIfAborted();
+    signal.throwIfAborted();
     if (!result.response.ok) {
       const parsedError = apiErrorSchema.safeParse(result.error);
       const retryAfterSeconds = parseRetryAfter(result.response.headers.get('retry-after'));
@@ -45,7 +45,7 @@ export async function requestApiResult<Value>(
       ? { ok: true, value: parsed.data }
       : { ok: false, error: { kind: 'invalid-response' } };
   } catch (error) {
-    signal?.throwIfAborted();
+    signal.throwIfAborted();
     if (error instanceof Error && error.name === 'AbortError') {
       throw error;
     }

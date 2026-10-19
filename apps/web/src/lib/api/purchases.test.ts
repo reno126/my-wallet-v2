@@ -2,15 +2,15 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { createApiClient } from '@/api/client';
 import { historicalPrice, purchaseInput, purchaseResult, stock } from '@/test/purchase-api';
 import { walletSummary } from '@/test/wallet-api';
 
+import { createRequestClient } from './createRequestClient';
 import { createPurchasesApi } from './purchases';
 
 const endpoint = 'https://wallet-api.test/api';
 const mockApiServer = setupServer();
-const purchases = createPurchasesApi(createApiClient(endpoint));
+const purchases = createPurchasesApi(createRequestClient(new AbortController().signal, endpoint));
 beforeAll(() => mockApiServer.listen());
 afterEach(() => {
   mockApiServer.resetHandlers();

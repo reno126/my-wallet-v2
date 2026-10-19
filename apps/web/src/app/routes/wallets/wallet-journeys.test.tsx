@@ -6,7 +6,6 @@ import { createMemoryRouter, RouterContextProvider, RouterProvider } from 'react
 import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { walletsApi } from '@/lib/api/wallets';
 import { walletPage, walletSummary } from '@/test/wallet-api';
 
 import { appDictionary } from '../../appDictionary';
@@ -21,7 +20,11 @@ vi.mock('@/lib/auth-client', () => ({
 }));
 vi.mock('@/api/client', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/api/client')>();
-  return { ...original, apiClient: original.createApiClient('https://wallet-api.test/api') };
+  return {
+    ...original,
+    createApiClient: (baseUrl?: string, signal?: AbortSignal) =>
+      original.createApiClient(baseUrl ?? 'https://wallet-api.test/api', signal),
+  };
 });
 const endpoint = 'https://wallet-api.test/api/wallets';
 const mockApiServer = setupServer();
@@ -418,22 +421,14 @@ describe('wallet routes and creation', () => {
     // Arrange
     const gate = createGate();
     const requestStarted = createGate();
-    const creationSettled = createGate();
+    const responseReleased = createGate();
     const successToast = vi.spyOn(toast, 'success');
-    const createWallet = walletsApi.create.bind(walletsApi);
-    let requestSignal: AbortSignal | undefined;
-    vi.spyOn(walletsApi, 'create').mockImplementation(async (input, signal) => {
-      requestSignal = signal;
-      try {
-        return await createWallet(input, signal);
-      } finally {
-        creationSettled.resolve();
-      }
-    });
+    const fetchRequest = vi.spyOn(globalThis, 'fetch');
     mockApiServer.use(
       http.post(endpoint, async () => {
         requestStarted.resolve();
         await gate.promise;
+        responseReleased.resolve();
         return HttpResponse.json(walletSummary, { status: 201 });
       }),
     );
@@ -443,14 +438,17 @@ describe('wallet routes and creation', () => {
       // Act
       await page.submit();
       await requestStarted.promise;
+      const submittedRequest = fetchRequest.mock.calls
+        .map(([input]) => input)
+        .find((input) => input instanceof Request && input.method === 'POST');
       await page.user.click(screen.getByRole('link', { name: /^wallets$/i }));
       // Assert
       expect(await screen.findByRole('heading', { name: text.empty.title })).toBeVisible();
-      await waitFor(() => expect(requestSignal?.aborted).toBe(true));
+      await waitFor(() => expect(submittedRequest).toMatchObject({ signal: { aborted: true } }));
     } finally {
       gate.resolve();
     }
-    await act(() => creationSettled.promise);
+    await act(() => responseReleased.promise);
     expect(page.router.state.location.pathname).toBe('/wallets');
     expect(successToast).not.toHaveBeenCalled();
     expect(screen.queryByText(text.create.confirmed)).not.toBeInTheDocument();

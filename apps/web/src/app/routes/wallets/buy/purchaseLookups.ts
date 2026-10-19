@@ -5,7 +5,7 @@ import {
   instrumentPriceQuerySchema,
   instrumentSearchQuerySchema,
 } from '@my-wallets/contracts';
-import { purchasesApi } from '@/lib/api/purchases';
+import { createRequestApi } from '@/lib/api/createRequestApi';
 
 import { purchaseFailureMessage } from './_utils/purchaseFailureMessage';
 import { marketToday } from './_utils/purchaseForm';
@@ -18,7 +18,8 @@ export async function instrumentSearchLoader({ request }: LoaderFunctionArgs) {
   if (!query.success) {
     return { status: 'error' as const, message: text.errors.search };
   }
-  const result = await purchasesApi.search(query.data, request.signal);
+  const api = createRequestApi(request.signal);
+  const result = await api.purchases.search(query.data);
   return result.ok
     ? { status: 'ready' as const, query: query.data, ...result.value }
     : { status: 'error' as const, message: purchaseFailureMessage(result.error, 'search') };
@@ -31,7 +32,8 @@ export async function purchasePriceLoader({ request }: LoaderFunctionArgs) {
   if (!symbol.success || !date.success || date.data.date > marketToday()) {
     return { status: 'error' as const, message: text.invalidDate };
   }
-  const result = await purchasesApi.price(symbol.data.symbol, date.data.date, request.signal);
+  const api = createRequestApi(request.signal);
+  const result = await api.purchases.price(symbol.data.symbol, date.data.date);
   if (!result.ok) {
     return {
       status: 'error' as const,

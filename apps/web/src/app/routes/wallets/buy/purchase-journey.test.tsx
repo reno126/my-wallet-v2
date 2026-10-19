@@ -19,7 +19,11 @@ vi.mock('@/lib/auth-client', () => ({
 }));
 vi.mock('@/api/client', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/api/client')>();
-  return { ...original, apiClient: original.createApiClient('https://wallet-api.test/api') };
+  return {
+    ...original,
+    createApiClient: (baseUrl?: string, signal?: AbortSignal) =>
+      original.createApiClient(baseUrl ?? 'https://wallet-api.test/api', signal),
+  };
 });
 const endpoint = 'https://wallet-api.test/api';
 const transactionEndpoint = `${endpoint}/wallets/${walletSummary.id}/transactions`;

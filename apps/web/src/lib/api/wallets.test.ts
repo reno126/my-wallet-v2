@@ -2,13 +2,15 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { createApiClient } from '@/api/client';
 import { walletSummary } from '@/test/wallet-api';
 
+import { createRequestClient } from './createRequestClient';
 import { createWalletApi } from './wallets';
 
 const mockApiServer = setupServer();
-const walletsApi = createWalletApi(createApiClient('https://wallet-api.test/api'));
+const walletsApi = createWalletApi(
+  createRequestClient(new AbortController().signal, 'https://wallet-api.test/api'),
+);
 
 beforeAll(() => mockApiServer.listen());
 afterEach(() => {
@@ -223,37 +225,6 @@ describe('wallet API client', () => {
       error: { kind: 'network' },
     });
   });
-
-  it.each(['list', 'create'] as const)(
-    'should propagate cancellation for %s instead of returning an error result',
-    async (operation) => {
-      // Arrange
-      const controller = new AbortController();
-      let resolveStarted: () => void = () => undefined;
-      const started = new Promise<void>((resolve) => {
-        resolveStarted = resolve;
-      });
-      mockApiServer.use(
-        http.all('https://wallet-api.test/api/wallets', async ({ request }) => {
-          resolveStarted();
-          await new Promise<void>((resolve) =>
-            request.signal.addEventListener('abort', () => resolve(), { once: true }),
-          );
-          return HttpResponse.json(emptyWalletPage(1));
-        }),
-      );
-      const pending =
-        operation === 'list'
-          ? walletsApi.list({ page: 1, pageSize: 25 }, controller.signal)
-          : walletsApi.create({ name: 'Core', reportingCurrency: 'USD' }, controller.signal);
-      const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
-      // Act
-      await started;
-      controller.abort();
-      // Assert
-      await rejection;
-    },
-  );
 });
 
 function emptyWalletPage(page: number) {

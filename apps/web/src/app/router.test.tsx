@@ -25,8 +25,8 @@ vi.mock('../lib/auth-client', () => ({
   },
 }));
 
-vi.mock('@/lib/api/wallets', () => ({
-  walletsApi: { list: mockListWallets, create: vi.fn() },
+vi.mock('@/lib/api/createRequestApi', () => ({
+  createRequestApi: () => ({ wallets: { list: mockListWallets, create: vi.fn() } }),
 }));
 
 function LoadingRouteFallback() {

@@ -8,52 +8,44 @@ import {
   instrumentSearchQuerySchema,
   instrumentSearchResponseSchema,
 } from '@my-wallets/contracts';
-import { apiClient, type createApiClient } from '@/api/client';
 
-import { requestApiResult } from './requestApiResult';
+import type { RequestClient } from './createRequestClient';
 
 export type Instrument = zod.infer<typeof instrumentSchema>;
 export type HistoricalPrice = zod.infer<typeof historicalPriceSchema>;
 export type BuyInput = zod.infer<typeof createBuyTransactionSchema>;
 
-export function createPurchasesApi(client: ReturnType<typeof createApiClient> = apiClient) {
+export function createPurchasesApi({ client, request }: RequestClient) {
   return {
-    search(query: zod.infer<typeof instrumentSearchQuerySchema>, signal?: AbortSignal) {
-      return requestApiResult(
-        () => client.GET('/instruments/search', { params: { query }, signal: signal ?? null }),
+    search(query: zod.infer<typeof instrumentSearchQuerySchema>) {
+      return request(
+        () => client.GET('/instruments/search', { params: { query } }),
         instrumentSearchResponseSchema,
-        signal,
         200,
       );
     },
-    price(symbol: string, date: string, signal?: AbortSignal) {
-      return requestApiResult(
+    price(symbol: string, date: string) {
+      return request(
         () =>
           client.GET('/instruments/{symbol}/price', {
             params: { path: { symbol }, query: { date } },
-            signal: signal ?? null,
           }),
         historicalPriceSchema,
-        signal,
         200,
       );
     },
-    buy(walletId: string, body: BuyInput, signal?: AbortSignal) {
+    buy(walletId: string, body: BuyInput) {
       const { description, ...required } = body;
       const input = { ...required, ...(description === undefined ? {} : { description }) };
-      return requestApiResult(
+      return request(
         () =>
           client.POST('/wallets/{walletId}/transactions', {
             params: { path: { walletId } },
             body: input,
-            signal: signal ?? null,
           }),
         buyTransactionResultSchema,
-        signal,
         201,
       );
     },
   };
 }
-
-export const purchasesApi = createPurchasesApi();

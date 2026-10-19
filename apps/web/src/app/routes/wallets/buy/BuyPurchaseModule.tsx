@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import { createBuyTransactionSchema, walletIdParamsSchema } from '@my-wallets/contracts';
 import { Button } from '@/components/ui/button';
-import { purchasesApi } from '@/lib/api/purchases';
+import { createRequestApi } from '@/lib/api/createRequestApi';
 
 import { loadWallet } from '../_utils/loadWallet';
 import { PurchaseForm } from './_components/PurchaseForm';
@@ -32,7 +32,8 @@ export async function buyPurchaseAction({ request, params }: ActionFunctionArgs)
   if (!wallet.success || !parsed.success || parsed.data.transactionDate > marketToday()) {
     return routeData({ error: text.invalid, unconfirmed: false }, { status: 400 });
   }
-  const result = await purchasesApi.buy(wallet.data.walletId, parsed.data, request.signal);
+  const api = createRequestApi(request.signal);
+  const result = await api.purchases.buy(wallet.data.walletId, parsed.data);
   if (!result.ok) {
     const error = purchaseFailureMessage(result.error, 'buy');
     toast.error(error);
