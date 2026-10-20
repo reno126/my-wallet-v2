@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitEvent, useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useFetcher, useRevalidator } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,9 +15,9 @@ import {
 import type { Holding } from '@/lib/api/ledger';
 import { marketToday } from '@/lib/marketDate';
 
+import { useTransactionMutation } from '../_hooks/useTransactionMutation';
 import { sellFormSchema, type SellFormValues } from '../_utils/sellForm';
 import { ledgerDictionary as text } from '../ledgerDictionary';
-import type { transactionAction } from '../transactionAction';
 import { MutationFailure } from './MutationFailure';
 import { SaleFields } from './SaleFields';
 
@@ -29,40 +28,37 @@ interface SellDialogProps {
 export function SellDialog({ holding }: SellDialogProps) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  const fetcher = useFetcher<typeof transactionAction>();
-  const revalidator = useRevalidator();
+  const mutation = useTransactionMutation();
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema(holding.quantity)),
     mode: 'onBlur',
     defaultValues: { quantity: '', unitPrice: '', transactionDate: marketToday(), description: '' },
   });
-  const busy =
-    form.formState.isSubmitting || fetcher.state !== 'idle' || revalidator.state !== 'idle';
-  const failure = fetcher.data && 'error' in fetcher.data ? fetcher.data : undefined;
+  const busy = form.formState.isSubmitting || mutation.busy;
+  const { failure, succeeded, unconfirmed } = mutation;
   const { setError } = form;
   useEffect(() => {
     if (failure) {
       setError('root', { type: 'server', message: failure.error });
     }
   }, [failure, setError]);
-  const succeeded = fetcher.data?.ok && fetcher.state === 'idle';
 
   function changeOpen(next: boolean) {
     if (busy) {
       return;
     }
-    if (next && !failure?.unconfirmed) {
-      fetcher.reset();
+    if (next && !unconfirmed) {
+      mutation.reset();
       form.reset();
     }
     setOpen(next);
   }
   async function save(values: SellFormValues) {
-    if (busy || failure?.unconfirmed) {
+    if (busy || unconfirmed) {
       return;
     }
     form.clearErrors('root');
-    await fetcher.submit(
+    await mutation.submit(
       { ...values, symbol: holding.symbol, side: 'SELL', currency: holding.quoteCurrency },
       {
         method: 'post',
@@ -114,12 +110,12 @@ export function SellDialog({ holding }: SellDialogProps) {
           aria-busy={busy}
           className="flex min-h-0 flex-1 flex-col gap-5"
         >
-          <SaleFields form={form} disabled={busy || Boolean(failure?.unconfirmed)} id={id} />
+          <SaleFields form={form} disabled={busy || unconfirmed} id={id} />
           {!busy && form.formState.errors.root?.message ? (
             <MutationFailure
               message={form.formState.errors.root.message}
               onRefreshed={() => {
-                fetcher.reset();
+                mutation.reset();
                 form.clearErrors('root');
               }}
             />
@@ -133,7 +129,7 @@ export function SellDialog({ holding }: SellDialogProps) {
             >
               {text.cancel}
             </Button>
-            <Button type="submit" disabled={busy || Boolean(failure?.unconfirmed)}>
+            <Button type="submit" disabled={busy || unconfirmed}>
               {busy ? text.sell.pending : text.sell.submit}
             </Button>
           </DialogFooter>

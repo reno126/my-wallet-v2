@@ -65,7 +65,7 @@ function invalidTransactionResult() {
 }
 
 function transactionFailure(error: ApiFailure) {
-  let message = text.errors.failed;
+  let message: string = text.errors.failed;
   const unconfirmed = error.kind !== 'http' || error.status >= 500;
   if (unconfirmed) {
     message = text.errors.unconfirmed;

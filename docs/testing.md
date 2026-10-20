@@ -64,7 +64,7 @@ After preparing the test database, include the PostgreSQL purchase journey with:
 pnpm exec dotenv -e .env.ci.local -- pnpm test:e2e
 ```
 
-The browser suite covers authentication, wallet creation/deletion, purchase interactions, ledger history and summaries, sale validation, deletion confirmation/conflicts, page-failure recovery, and responsive states. Ledger viewport checks cover 320, 375, 768, 1024 and 1440 pixels, including full-viewport mobile dialogs, keyboard focus, long names, empty/closed positions, and recoverable load failures. Provider behavior is controlled, so automated checks do not consume live FMP quota.
+The browser suite covers authentication, wallet creation/deletion, purchase interactions, ledger history and summaries, sale validation, deletion confirmation/conflicts, page-failure recovery, and responsive states. Ledger viewport checks cover 320, 375, 768, 1024 and 1440 pixels, including full-viewport mobile dialogs, keyboard focus, long names, empty/closed positions, and recoverable load failures. Router component tests also cover sale-state isolation across wallet/instrument navigation, preserving form values through holding refreshes, and blocking uncertain sale/delete retries until a manual refresh. Provider behavior is controlled, so automated checks do not consume live FMP quota.
 
 ## Contract ownership
 

@@ -54,7 +54,7 @@ export function InstrumentDetailComponent() {
         </p>
         <p className="text-sm text-muted-foreground">{text.ledgerOnly}</p>
         <div className="flex flex-wrap gap-3">
-          <SellDialog holding={holding} />
+          <SellDialog key={`${holding.walletId}:${holding.symbol}`} holding={holding} />
           <Button asChild variant="outline">
             <Link to={`/wallets/${wallet.id}/buy`}>{text.buy}</Link>
           </Button>

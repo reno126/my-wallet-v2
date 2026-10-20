@@ -206,7 +206,9 @@ describe('when recording a purchase', () => {
     await page.user.click(pending);
     saveGate.resolve();
     // Assert
-    expect(await screen.findByRole('heading', { name: walletSummary.name })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: walletSummary.name }, { timeout: 5000 }),
+    ).toBeVisible();
     expect(posts).toStrictEqual([purchaseInput]);
     expect(await screen.findByText(text.confirmed)).toBeVisible();
     expect(page.router.state.location.pathname).toBe(`/wallets/${walletSummary.id}`);

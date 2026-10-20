@@ -106,8 +106,8 @@ function openPage(suffix = '') {
   return {
     router,
     user,
-    async sell() {
-      await user.click(await screen.findByRole('button', { name: text.sell.open('AAPL') }));
+    async sell(symbol = 'AAPL') {
+      await user.click(await screen.findByRole('button', { name: text.sell.open(symbol) }));
     },
     async fillSale(quantity = '0.5', price = '20') {
       await user.type(screen.getByRole('textbox', { name: text.sell.quantity }), quantity);
@@ -237,6 +237,12 @@ describe('when managing the ledger through wallet routes', () => {
     });
     expect((await screen.findAllByText('Gain: USD 7.50')).length).toBeGreaterThan(0);
     expect(page.router.state.location.pathname).toBe(path);
+    // Act
+    await page.sell();
+    // Assert
+    expect(screen.getByRole('textbox', { name: text.sell.quantity })).toHaveValue('');
+    expect(screen.getByRole('button', { name: text.sell.submit })).toBeEnabled();
+    expect(mutations).toHaveLength(1);
   });
 
   it('should preserve sale values when the server rejects chronological overselling', async () => {
@@ -302,6 +308,148 @@ describe('when managing the ledger through wallet routes', () => {
       );
     },
   );
+
+  it.each([
+    { view: 'wallet detail', suffix: '' },
+    { view: 'instrument detail', suffix: '/instruments/AAPL' },
+  ])('should isolate uncertain sales between wallets in $view', async ({ suffix }) => {
+    // Arrange
+    const secondWallet = {
+      ...walletSummary,
+      id: '8e414ffe-56a1-4c25-9caf-a661474640b8',
+      name: 'Second wallet',
+    };
+    const secondHolding = { ...ledgerHolding, walletId: secondWallet.id };
+    const secondEndpoint = `https://ledger.test/api/wallets/${secondWallet.id}`;
+    server.use(
+      http.post(`${endpoint}/transactions`, () => HttpResponse.error()),
+      http.get(secondEndpoint, () => HttpResponse.json(secondWallet)),
+      http.get(`${secondEndpoint}/holdings`, () =>
+        HttpResponse.json(walletHoldings([secondHolding], secondWallet.id)),
+      ),
+      http.get(`${secondEndpoint}/holdings/AAPL`, () => HttpResponse.json(secondHolding)),
+      http.get(`${secondEndpoint}/transactions`, () =>
+        HttpResponse.json({
+          ...ledgerHistory,
+          transactions: ledgerHistory.transactions.map((row) => ({
+            ...row,
+            walletId: secondWallet.id,
+          })),
+        }),
+      ),
+    );
+    const page = openPage(suffix);
+    await page.sell();
+    await page.fillSale();
+    await page.submitSale();
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(
+      text.errors.unconfirmed,
+    );
+    // Act
+    await page.user.click(screen.getByRole('button', { name: text.cancel }));
+    await act(async () => {
+      await page.router.navigate(`/wallets/${secondWallet.id}${suffix}`);
+    });
+    await page.sell();
+    // Assert
+    expect(screen.getByText(new RegExp(secondWallet.name))).toBeVisible();
+    expect(screen.getByRole('textbox', { name: text.sell.quantity })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: text.sell.price })).toHaveValue('');
+    expect(screen.getByRole('button', { name: text.sell.submit })).toBeEnabled();
+    expect(within(screen.getByRole('dialog')).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('should isolate uncertain sales when navigating to another instrument in the same wallet', async () => {
+    // Arrange
+    const secondHolding = { ...ledgerHolding, symbol: 'MSFT', name: 'Microsoft' };
+    server.use(
+      http.post(`${endpoint}/transactions`, () => HttpResponse.error()),
+      http.get(`${endpoint}/holdings/MSFT`, () => HttpResponse.json(secondHolding)),
+    );
+    const page = openPage('/instruments/AAPL');
+    await page.sell();
+    await page.fillSale();
+    await page.submitSale();
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(
+      text.errors.unconfirmed,
+    );
+    // Act
+    await page.user.click(screen.getByRole('button', { name: text.cancel }));
+    await act(async () => {
+      await page.router.navigate(`${path}/instruments/MSFT`);
+    });
+    expect(screen.getByRole('heading', { name: /MSFT · Microsoft/ })).toBeVisible();
+    await page.sell('MSFT');
+    // Assert
+    expect(screen.getByRole('textbox', { name: text.sell.quantity })).toHaveValue('');
+    expect(screen.getByRole('button', { name: text.sell.submit })).toBeEnabled();
+    expect(within(screen.getByRole('dialog')).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('should preserve sale values through a holding refresh and unblock an uncertain outcome without retrying', async () => {
+    // Arrange
+    let posts = 0;
+    server.use(
+      http.post(`${endpoint}/transactions`, () => {
+        posts += 1;
+        return HttpResponse.error();
+      }),
+    );
+    const page = openPage();
+    await page.sell();
+    await page.fillSale();
+    await page.submitSale();
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(
+      text.errors.unconfirmed,
+    );
+    holding = { ...holding, quantity: '1.25' };
+    // Act
+    await page.user.click(screen.getByRole('button', { name: text.refresh }));
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: text.sell.submit })).toBeEnabled(),
+    );
+    expect(screen.getByRole('textbox', { name: text.sell.quantity })).toHaveValue('0.5');
+    expect(screen.getByRole('textbox', { name: text.sell.price })).toHaveValue('20');
+    expect(
+      within(screen.getByRole('dialog')).getByText(`${text.sell.available}: 1.25`),
+    ).toBeVisible();
+    expect(within(screen.getByRole('dialog')).queryByRole('alert')).not.toBeInTheDocument();
+    expect(posts).toBe(1);
+  });
+
+  it('should block repeated deletion after an uncertain outcome until the ledger is refreshed', async () => {
+    // Arrange
+    let deletes = 0;
+    server.use(
+      http.delete(`${endpoint}/transactions/:transactionId`, () => {
+        deletes += 1;
+        return HttpResponse.json({}, { status: 500 });
+      }),
+    );
+    const page = openPage();
+    await page.delete();
+    // Act
+    await page.user.click(screen.getByRole('button', { name: text.delete.submit }));
+    // Assert
+    expect(await within(screen.getByRole('alertdialog')).findByRole('alert')).toHaveTextContent(
+      text.errors.unconfirmed,
+    );
+    expect(screen.getByRole('button', { name: text.delete.submit })).toBeDisabled();
+    // Act
+    await page.user.click(screen.getByRole('button', { name: text.cancel }));
+    await page.delete();
+    // Assert
+    expect(screen.getByRole('button', { name: text.delete.submit })).toBeDisabled();
+    // Act
+    await page.user.click(screen.getByRole('button', { name: text.refresh }));
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: text.delete.submit })).toBeEnabled(),
+    );
+    expect(within(screen.getByRole('alertdialog')).queryByRole('alert')).not.toBeInTheDocument();
+    expect(deletes).toBe(1);
+  });
 
   it('should require deletion confirmation, allow cancellation and revalidate instrument accounting after deletion', async () => {
     // Arrange

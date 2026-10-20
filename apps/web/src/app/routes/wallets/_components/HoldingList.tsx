@@ -7,7 +7,8 @@ import type { Holding } from '@/lib/api/ledger';
 import { formatQuantity, formatUsd } from '@/lib/formatFinancial';
 
 import { ledgerDictionary as text } from '../ledgerDictionary';
-import { ProfitLoss } from './LedgerSummary';
+import { LedgerMetric } from './LedgerMetric';
+import { ProfitLoss } from './ProfitLoss';
 import { SellDialog } from './SellDialog';
 
 interface HoldingListProps {
@@ -25,7 +26,7 @@ export function HoldingList({ holdings }: HoldingListProps) {
       </h2>
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         {holdings.map((holding) => (
-          <Card key={holding.symbol}>
+          <Card key={`${holding.walletId}:${holding.symbol}`}>
             <CardHeader>
               <CardTitle as="h3">{holding.symbol}</CardTitle>
               <CardDescription className="wrap-anywhere">
@@ -35,32 +36,20 @@ export function HoldingList({ holdings }: HoldingListProps) {
             <CardContent className="flex min-w-0 flex-col gap-4">
               {holding.quantity === '0' ? <Badge variant="secondary">{text.closed}</Badge> : null}
               <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-muted-foreground">{text.quantity}</dt>
-                  <dd title={holding.quantity} className="wrap-anywhere tabular-nums">
-                    {formatQuantity(holding.quantity)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{text.cost}</dt>
-                  <dd className="wrap-anywhere tabular-nums">
-                    {formatUsd(holding.remainingCostBasis)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{text.average}</dt>
-                  <dd className="wrap-anywhere tabular-nums">
-                    {holding.averageUnitCost === null
-                      ? text.noAverage
-                      : formatUsd(holding.averageUnitCost, 4)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{text.realized}</dt>
-                  <dd className="wrap-anywhere tabular-nums">
-                    <ProfitLoss value={holding.realizedProfitLoss} />
-                  </dd>
-                </div>
+                <LedgerMetric label={text.quantity} exactValue={holding.quantity}>
+                  {formatQuantity(holding.quantity)}
+                </LedgerMetric>
+                <LedgerMetric label={text.cost}>
+                  {formatUsd(holding.remainingCostBasis)}
+                </LedgerMetric>
+                <LedgerMetric label={text.average}>
+                  {holding.averageUnitCost === null
+                    ? text.noAverage
+                    : formatUsd(holding.averageUnitCost, 4)}
+                </LedgerMetric>
+                <LedgerMetric label={text.realized}>
+                  <ProfitLoss value={holding.realizedProfitLoss} />
+                </LedgerMetric>
               </dl>
               <div className="flex flex-wrap gap-3">
                 <Button

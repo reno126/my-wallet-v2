@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useFetcher, useRevalidator } from 'react-router';
 
 import {
   AlertDialog,
@@ -15,8 +14,8 @@ import { Button } from '@/components/ui/button';
 import type { HistoryEntry } from '@/lib/api/ledger';
 import { formatQuantity, formatUsd } from '@/lib/formatFinancial';
 
+import { useTransactionMutation } from '../_hooks/useTransactionMutation';
 import { ledgerDictionary as text } from '../ledgerDictionary';
-import type { transactionAction } from '../transactionAction';
 import { MutationFailure } from './MutationFailure';
 
 interface DeleteTransactionDialogProps {
@@ -29,17 +28,13 @@ export function DeleteTransactionDialog({
   returnToWallet,
 }: DeleteTransactionDialogProps) {
   const [open, setOpen] = useState(false);
-  const fetcher = useFetcher<typeof transactionAction>();
-  const revalidator = useRevalidator();
-  const busy = fetcher.state !== 'idle' || revalidator.state !== 'idle';
-  const failure = fetcher.data && 'error' in fetcher.data ? fetcher.data : undefined;
-  const succeeded = fetcher.data?.ok && fetcher.state === 'idle';
+  const { busy, failure, succeeded, unconfirmed, submit, reset } = useTransactionMutation();
   function changeOpen(next: boolean) {
     if (busy) {
       return;
     }
-    if (next && !failure?.unconfirmed) {
-      fetcher.reset();
+    if (next && !unconfirmed) {
+      reset();
     }
     setOpen(next);
   }
@@ -70,16 +65,14 @@ export function DeleteTransactionDialog({
           {formatQuantity(transaction.quantity)} {text.quantity} ·{' '}
           {formatUsd(transaction.totalAmount)}
         </p>
-        {failure && !busy ? (
-          <MutationFailure message={failure.error} onRefreshed={() => fetcher.reset()} />
-        ) : null}
+        {failure && !busy ? <MutationFailure message={failure.error} onRefreshed={reset} /> : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
           <Button
             variant="destructive"
-            disabled={busy || Boolean(failure?.unconfirmed)}
+            disabled={busy || unconfirmed}
             onClick={() =>
-              void fetcher.submit(
+              void submit(
                 { transactionId: transaction.id, returnToWallet },
                 {
                   method: 'delete',
