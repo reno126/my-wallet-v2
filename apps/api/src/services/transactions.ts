@@ -9,6 +9,7 @@ import type { WalletRepository } from '../repositories/wallets.ts';
 import { failure, type Result, success } from '../result.ts';
 import type { InstrumentVerifier } from './instrument-verifier.ts';
 import { currentMarketDate } from './market-date.ts';
+import { toTransactionDto } from './transaction-dto.ts';
 
 type TransactionResult = zod.infer<typeof transactionResultSchema>;
 type CreateTransactionInput = zod.infer<typeof createTransactionSchema>;
@@ -77,18 +78,7 @@ function toTransactionResult({
   quoteCurrency,
 }: PersistedTransaction): TransactionResult {
   return {
-    transaction: {
-      id: transaction.id,
-      walletId: transaction.walletId,
-      symbol: transaction.symbol,
-      side: transaction.side,
-      transactionDate: transaction.transactionDate.toISOString().slice(0, 10),
-      quantity: transaction.quantity.toFixed(),
-      unitPrice: transaction.unitPrice.toFixed(),
-      currency: transaction.currency,
-      ...(transaction.description === null ? {} : { description: transaction.description }),
-      createdAt: transaction.createdAt.toISOString(),
-    },
+    transaction: toTransactionDto(transaction),
     holding: {
       walletId: transaction.walletId,
       symbol: transaction.symbol,

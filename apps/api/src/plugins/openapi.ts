@@ -16,15 +16,18 @@ import {
   currencyCodeSchema,
   dateOnlySchema,
   historicalPriceSchema,
+  holdingSchema,
   instrumentSchema,
   instrumentSearchResponseSchema,
   resourceIdSchema,
   timestampSchema,
+  transactionHistoryEntrySchema,
   transactionListSchema,
   transactionResultSchema,
   transactionSchema,
   transactionSideSchema,
   updateWalletSchema,
+  walletHoldingsSchema,
   walletListSchema,
   walletSummarySchema,
 } from '@my-wallets/contracts';
@@ -92,14 +95,17 @@ function registerPublicSchemas() {
   zod.globalRegistry.add(dateOnlySchema, { id: 'DateOnly' });
   zod.globalRegistry.add(instrumentSchema, { id: 'Instrument' });
   zod.globalRegistry.add(historicalPriceSchema, { id: 'HistoricalPrice' });
+  zod.globalRegistry.add(holdingSchema, { id: 'Holding' });
   zod.globalRegistry.add(instrumentSearchResponseSchema, { id: 'InstrumentSearchResponse' });
   zod.globalRegistry.add(resourceIdSchema, { id: 'ResourceId' });
   zod.globalRegistry.add(timestampSchema, { id: 'Timestamp' });
   zod.globalRegistry.add(transactionListSchema, { id: 'TransactionList' });
+  zod.globalRegistry.add(transactionHistoryEntrySchema, { id: 'TransactionHistoryEntry' });
   zod.globalRegistry.add(transactionSchema, { id: 'Transaction' });
   zod.globalRegistry.add(transactionSideSchema, { id: 'TransactionSide' });
   zod.globalRegistry.add(updateWalletSchema, { id: 'UpdateWallet' });
   zod.globalRegistry.add(walletListSchema, { id: 'WalletList' });
+  zod.globalRegistry.add(walletHoldingsSchema, { id: 'WalletHoldings' });
   zod.globalRegistry.add(walletSummarySchema, { id: 'WalletSummary' });
 }
 

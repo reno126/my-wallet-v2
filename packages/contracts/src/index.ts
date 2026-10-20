@@ -4,7 +4,11 @@ export { authSessionSchema, authUserSchema } from './schemas/auth.js';
 export {
   currencyCodeSchema,
   dateOnlySchema,
+  decimalStringSchema,
   healthStatusSchema,
+  nonnegativeDecimalStringSchema,
+  paginationQuerySchema,
+  paginationSchema,
   positiveDecimalStringSchema,
   resourceIdSchema,
   timestampSchema,
@@ -18,11 +22,14 @@ export {
   instrumentSearchResponseSchema,
   instrumentSymbolSchema,
 } from './schemas/instrument.js';
+export { holdingParamsSchema, holdingSchema, walletHoldingsSchema } from './schemas/ledger.js';
 export {
   buyTransactionResultSchema,
   createBuyTransactionSchema,
   createTransactionSchema,
+  transactionHistoryEntrySchema,
   transactionIdParamsSchema,
+  transactionListQuerySchema,
   transactionListSchema,
   transactionResultSchema,
   transactionSchema,

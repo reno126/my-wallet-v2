@@ -386,6 +386,70 @@
           "usedPreviousTradingDay"
         ]
       },
+      "HoldingInput": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "description": "Original acquisition cost of remaining FIFO lots, without display rounding."
+          },
+          "averageUnitCost": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining cost divided by quantity at 100 significant digits; null when quantity is zero."
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          }
+        },
+        "required": [
+          "walletId",
+          "symbol",
+          "name",
+          "exchange",
+          "quoteCurrency",
+          "quantity",
+          "remainingCostBasis",
+          "averageUnitCost",
+          "realizedProfitLoss",
+          "lastTransactionDate"
+        ],
+        "additionalProperties": false
+      },
       "InstrumentSearchResponseInput": {
         "type": "object",
         "properties": {
@@ -456,12 +520,121 @@
           "transactions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TransactionInput"
+              "$ref": "#/components/schemas/TransactionHistoryEntryInput"
             }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "page",
+              "pageSize",
+              "totalCount",
+              "totalPages"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "transactions"
+          "transactions",
+          "pagination"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionHistoryEntryInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "side": {
+            "$ref": "#/components/schemas/TransactionSideInput"
+          },
+          "transactionDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          },
+          "canDelete": {
+            "type": "boolean",
+            "description": "Latest entry for its wallet/instrument in this snapshot; the DELETE endpoint rechecks eligibility."
+          },
+          "totalAmount": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "description": "Exact quantity multiplied by unit price, in the transaction currency."
+          },
+          "realizedProfitLoss": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FIFO realized P/L for this SELL, in the transaction currency; null for BUY."
+          }
+        },
+        "required": [
+          "id",
+          "walletId",
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency",
+          "createdAt",
+          "canDelete",
+          "totalAmount",
+          "realizedProfitLoss"
         ]
       },
       "TransactionInput": {
@@ -582,6 +755,51 @@
         "required": [
           "wallets",
           "pagination"
+        ],
+        "additionalProperties": false
+      },
+      "WalletHoldingsInput": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateOnlyInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldingInput"
+            },
+            "description": "All instruments with ledger history, including closed positions, in ascending symbol order."
+          }
+        },
+        "required": [
+          "walletId",
+          "reportingCurrency",
+          "remainingCostBasis",
+          "realizedProfitLoss",
+          "lastTransactionDate",
+          "holdings"
         ],
         "additionalProperties": false
       },
@@ -1008,6 +1226,70 @@
         ],
         "additionalProperties": false
       },
+      "Holding": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "description": "Original acquisition cost of remaining FIFO lots, without display rounding."
+          },
+          "averageUnitCost": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining cost divided by quantity at 100 significant digits; null when quantity is zero."
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          }
+        },
+        "required": [
+          "walletId",
+          "symbol",
+          "name",
+          "exchange",
+          "quoteCurrency",
+          "quantity",
+          "remainingCostBasis",
+          "averageUnitCost",
+          "realizedProfitLoss",
+          "lastTransactionDate"
+        ],
+        "additionalProperties": false
+      },
       "InstrumentSearchResponse": {
         "type": "object",
         "properties": {
@@ -1080,12 +1362,121 @@
           "transactions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Transaction"
+              "$ref": "#/components/schemas/TransactionHistoryEntry"
             }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "page",
+              "pageSize",
+              "totalCount",
+              "totalPages"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "transactions"
+          "transactions",
+          "pagination"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "side": {
+            "$ref": "#/components/schemas/TransactionSide"
+          },
+          "transactionDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "canDelete": {
+            "type": "boolean",
+            "description": "Latest entry for its wallet/instrument in this snapshot; the DELETE endpoint rechecks eligibility."
+          },
+          "totalAmount": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "description": "Exact quantity multiplied by unit price, in the transaction currency."
+          },
+          "realizedProfitLoss": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FIFO realized P/L for this SELL, in the transaction currency; null for BUY."
+          }
+        },
+        "required": [
+          "id",
+          "walletId",
+          "symbol",
+          "side",
+          "transactionDate",
+          "quantity",
+          "unitPrice",
+          "currency",
+          "createdAt",
+          "canDelete",
+          "totalAmount",
+          "realizedProfitLoss"
         ],
         "additionalProperties": false
       },
@@ -1208,6 +1599,51 @@
         "required": [
           "wallets",
           "pagination"
+        ],
+        "additionalProperties": false
+      },
+      "WalletHoldings": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateOnly"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "description": "All instruments with ledger history, including closed positions, in ascending symbol order."
+          }
+        },
+        "required": [
+          "walletId",
+          "reportingCurrency",
+          "remainingCostBasis",
+          "realizedProfitLoss",
+          "lastTransactionDate",
+          "holdings"
         ],
         "additionalProperties": false
       },
@@ -2423,13 +2859,121 @@
       }
     },
     "/wallets/{walletId}/transactions": {
+      "get": {
+        "operationId": "listTransactions",
+        "summary": "Read paginated wallet history, optionally filtered by instrument",
+        "tags": [
+          "Transactions"
+        ],
+        "description": "Newest first by transaction date, creation timestamp and id. Exact totals and SELL realized P/L use the complete symbol ledger before pagination. BUY realized P/L is null. canDelete identifies the latest row for each wallet/instrument in this snapshot; DELETE rechecks eligibility under the write lock. An unknown symbol filter returns an empty list.",
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "in": "query",
+            "name": "page",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "pageSize",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9.^=-]+$"
+            },
+            "in": "query",
+            "name": "symbol",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "createTransaction",
         "summary": "Record an immutable USD stock trade and return its resulting share quantity",
         "tags": [
           "Transactions"
         ],
-        "description": "Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing and history are not available yet.",
+        "description": "Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing is unsupported.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2577,6 +3121,169 @@
             }
           },
           "504": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{walletId}/holdings": {
+      "get": {
+        "operationId": "getWalletHoldings",
+        "summary": "Read ledger-only wallet totals and instrument holdings",
+        "tags": [
+          "Wallets"
+        ],
+        "description": "A consistent owned-wallet snapshot, ordered by symbol. Includes closed positions with zero quantity and null average cost so realized P/L remains visible. Empty wallets return zero totals, no holdings and a null last transaction date. Amounts are unrounded decimal strings in USD. No live prices, current values, unrealized P/L or provider requests.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletHoldings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{walletId}/holdings/{symbol}": {
+      "get": {
+        "operationId": "getWalletHolding",
+        "summary": "Read ledger-only accounting for one instrument in an owned wallet",
+        "tags": [
+          "Wallets"
+        ],
+        "description": "Returns remaining quantity, original acquisition cost of remaining FIFO lots, weighted-average remaining unit cost, total realized P/L and last transaction date. Closed positions remain readable. Symbols are case-insensitive. A symbol with no ledger in this wallet returns 404, even when shared instrument metadata exists.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ResourceIdInput"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9.^=-]+$"
+            },
+            "in": "path",
+            "name": "symbol",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Holding"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
             "description": "Default Response",
             "content": {
               "application/json": {

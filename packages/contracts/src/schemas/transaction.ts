@@ -3,6 +3,10 @@ import { z as zod } from 'zod';
 import {
   currencyCodeSchema,
   dateOnlySchema,
+  decimalStringSchema,
+  nonnegativeDecimalStringSchema,
+  paginationQuerySchema,
+  paginationSchema,
   positiveDecimalStringSchema,
   resourceIdSchema,
   timestampSchema,
@@ -59,6 +63,25 @@ export const buyTransactionResultSchema = transactionResultSchema.extend({
   }),
 });
 
-export const transactionListSchema = zod.object({
-  transactions: zod.array(transactionSchema),
+export const transactionListQuerySchema = paginationQuerySchema.extend({
+  symbol: instrumentSymbolSchema.optional(),
+});
+
+export const transactionHistoryEntrySchema = transactionSchema.extend({
+  canDelete: zod
+    .boolean()
+    .describe(
+      'Latest entry for its wallet/instrument in this snapshot; the DELETE endpoint rechecks eligibility.',
+    ),
+  totalAmount: nonnegativeDecimalStringSchema.describe(
+    'Exact quantity multiplied by unit price, in the transaction currency.',
+  ),
+  realizedProfitLoss: decimalStringSchema
+    .nullable()
+    .describe('FIFO realized P/L for this SELL, in the transaction currency; null for BUY.'),
+});
+
+export const transactionListSchema = zod.strictObject({
+  transactions: zod.array(transactionHistoryEntrySchema),
+  pagination: paginationSchema,
 });

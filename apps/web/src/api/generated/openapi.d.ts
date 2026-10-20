@@ -207,13 +207,57 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Read paginated wallet history, optionally filtered by instrument
+         * @description Newest first by transaction date, creation timestamp and id. Exact totals and SELL realized P/L use the complete symbol ledger before pagination. BUY realized P/L is null. canDelete identifies the latest row for each wallet/instrument in this snapshot; DELETE rechecks eligibility under the write lock. An unknown symbol filter returns an empty list.
+         */
+        get: operations["listTransactions"];
         put?: never;
         /**
          * Record an immutable USD stock trade and return its resulting share quantity
-         * @description Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing and history are not available yet.
+         * @description Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing is unsupported.
          */
         post: operations["createTransaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wallets/{walletId}/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read ledger-only wallet totals and instrument holdings
+         * @description A consistent owned-wallet snapshot, ordered by symbol. Includes closed positions with zero quantity and null average cost so realized P/L remains visible. Empty wallets return zero totals, no holdings and a null last transaction date. Amounts are unrounded decimal strings in USD. No live prices, current values, unrealized P/L or provider requests.
+         */
+        get: operations["getWalletHoldings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wallets/{walletId}/holdings/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read ledger-only accounting for one instrument in an owned wallet
+         * @description Returns remaining quantity, original acquisition cost of remaining FIFO lots, weighted-average remaining unit cost, total realized P/L and last transaction date. Closed positions remain readable. Symbols are case-insensitive. A symbol with no ledger in this wallet returns 404, even when shared instrument metadata exists.
+         */
+        get: operations["getWalletHolding"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -325,6 +369,20 @@ export interface components {
             retrievedAt: components["schemas"]["TimestampInput"];
             usedPreviousTradingDay: boolean;
         };
+        HoldingInput: {
+            walletId: components["schemas"]["ResourceIdInput"];
+            symbol: string;
+            name: string;
+            exchange: string;
+            quoteCurrency: components["schemas"]["CurrencyCodeInput"];
+            quantity: string;
+            /** @description Original acquisition cost of remaining FIFO lots, without display rounding. */
+            remainingCostBasis: string;
+            /** @description Remaining cost divided by quantity at 100 significant digits; null when quantity is zero. */
+            averageUnitCost: string | null;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnlyInput"];
+        };
         InstrumentSearchResponseInput: {
             results: components["schemas"]["InstrumentInput"][];
             excluded: {
@@ -339,7 +397,31 @@ export interface components {
         /** Format: date-time */
         TimestampInput: string;
         TransactionListInput: {
-            transactions: components["schemas"]["TransactionInput"][];
+            transactions: components["schemas"]["TransactionHistoryEntryInput"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalCount: number;
+                totalPages: number;
+            };
+        };
+        TransactionHistoryEntryInput: {
+            id: components["schemas"]["ResourceIdInput"];
+            walletId: components["schemas"]["ResourceIdInput"];
+            symbol: string;
+            side: components["schemas"]["TransactionSideInput"];
+            transactionDate: components["schemas"]["DateOnlyInput"];
+            quantity: string;
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCodeInput"];
+            description?: string;
+            createdAt: components["schemas"]["TimestampInput"];
+            /** @description Latest entry for its wallet/instrument in this snapshot; the DELETE endpoint rechecks eligibility. */
+            canDelete: boolean;
+            /** @description Exact quantity multiplied by unit price, in the transaction currency. */
+            totalAmount: string;
+            /** @description FIFO realized P/L for this SELL, in the transaction currency; null for BUY. */
+            realizedProfitLoss: string | null;
         };
         TransactionInput: {
             id: components["schemas"]["ResourceIdInput"];
@@ -367,6 +449,15 @@ export interface components {
                 totalCount: number;
                 totalPages: number;
             };
+        };
+        WalletHoldingsInput: {
+            walletId: components["schemas"]["ResourceIdInput"];
+            reportingCurrency: components["schemas"]["CurrencyCodeInput"];
+            remainingCostBasis: string;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnlyInput"] | null;
+            /** @description All instruments with ledger history, including closed positions, in ascending symbol order. */
+            holdings: components["schemas"]["HoldingInput"][];
         };
         WalletSummaryInput: {
             id: components["schemas"]["ResourceIdInput"];
@@ -457,6 +548,20 @@ export interface components {
             retrievedAt: components["schemas"]["Timestamp"];
             usedPreviousTradingDay: boolean;
         };
+        Holding: {
+            walletId: components["schemas"]["ResourceId"];
+            symbol: string;
+            name: string;
+            exchange: string;
+            quoteCurrency: components["schemas"]["CurrencyCode"];
+            quantity: string;
+            /** @description Original acquisition cost of remaining FIFO lots, without display rounding. */
+            remainingCostBasis: string;
+            /** @description Remaining cost divided by quantity at 100 significant digits; null when quantity is zero. */
+            averageUnitCost: string | null;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnly"];
+        };
         InstrumentSearchResponse: {
             results: components["schemas"]["Instrument"][];
             excluded: {
@@ -471,7 +576,31 @@ export interface components {
         /** Format: date-time */
         Timestamp: string;
         TransactionList: {
-            transactions: components["schemas"]["Transaction"][];
+            transactions: components["schemas"]["TransactionHistoryEntry"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                totalCount: number;
+                totalPages: number;
+            };
+        };
+        TransactionHistoryEntry: {
+            id: components["schemas"]["ResourceId"];
+            walletId: components["schemas"]["ResourceId"];
+            symbol: string;
+            side: components["schemas"]["TransactionSide"];
+            transactionDate: components["schemas"]["DateOnly"];
+            quantity: string;
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCode"];
+            description?: string;
+            createdAt: components["schemas"]["Timestamp"];
+            /** @description Latest entry for its wallet/instrument in this snapshot; the DELETE endpoint rechecks eligibility. */
+            canDelete: boolean;
+            /** @description Exact quantity multiplied by unit price, in the transaction currency. */
+            totalAmount: string;
+            /** @description FIFO realized P/L for this SELL, in the transaction currency; null for BUY. */
+            realizedProfitLoss: string | null;
         };
         Transaction: {
             id: components["schemas"]["ResourceId"];
@@ -499,6 +628,15 @@ export interface components {
                 totalCount: number;
                 totalPages: number;
             };
+        };
+        WalletHoldings: {
+            walletId: components["schemas"]["ResourceId"];
+            reportingCurrency: components["schemas"]["CurrencyCode"];
+            remainingCostBasis: string;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnly"] | null;
+            /** @description All instruments with ledger history, including closed positions, in ascending symbol order. */
+            holdings: components["schemas"]["Holding"][];
         };
         WalletSummary: {
             id: components["schemas"]["ResourceId"];
@@ -1402,6 +1540,69 @@ export interface operations {
             };
         };
     };
+    listTransactions: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                symbol?: string;
+            };
+            header?: never;
+            path: {
+                walletId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionList"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     createTransaction: {
         parameters: {
             query?: never;
@@ -1528,6 +1729,125 @@ export interface operations {
             };
             /** @description Default Response */
             504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getWalletHoldings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletHoldings"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getWalletHolding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: components["schemas"]["ResourceIdInput"];
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Holding"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

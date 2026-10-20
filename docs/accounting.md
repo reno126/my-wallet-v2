@@ -2,7 +2,7 @@
 
 [Project overview](../README.md)
 
-Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence, and 6C adds latest-only deletion. Both operations lock the owned wallet and replay the resulting symbol ledger before committing; failures roll back the mutation. Ledger read endpoints follow in 6D and the UI in 6E.
+Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence, and 6C adds latest-only deletion. Both operations lock the owned wallet and replay the resulting symbol ledger before committing; failures roll back the mutation. Slice 6D exposes ledger-only history and accounting snapshots; the UI follows in 6E.
 
 ## Position replay
 
@@ -28,9 +28,15 @@ The core uses Prisma's existing Decimal runtime with a private cloned context: 1
 
 Division is confined to weighted-average unit cost. Non-terminating averages are approximated to 100 significant digits, providing more than 18 fractional digits throughout the supported price range. Exact remaining cost basis and quantity are retained separately. Decimal strings use fixed notation without exponent conversion or JavaScript `number` conversion.
 
-Presentation helpers apply the canonical display policy: `formatUsdAmount` uses 2 decimal places, `formatUsdUnitPrice` uses 4, and `formatShareQuantity` uses at most 6 with trailing zeros trimmed. Ties round away from zero, including negative profit/loss; rounded zero has no negative sign. Monetary helper inputs carry `currency: 'USD'`. Invalid plain-decimal strings and negative share quantities throw `RangeError`. These helpers return numeric text without currency symbols or grouping. Formatting is a separate step and never feeds back into accounting; future API read models must preserve their full decimal-string values.
+Presentation helpers apply the canonical display policy: `formatUsdAmount` uses 2 decimal places, `formatUsdUnitPrice` uses 4, and `formatShareQuantity` uses at most 6 with trailing zeros trimmed. Ties round away from zero, including negative profit/loss; rounded zero has no negative sign. Monetary helper inputs carry `currency: 'USD'`. Invalid plain-decimal strings and negative share quantities throw `RangeError`. These helpers return numeric text without currency symbols or grouping. Formatting is a separate step and never feeds back into accounting; API read models preserve their full decimal-string values.
 
 Unit tests cover multiple and fractional lots, maximum-sized exact multiplication and sums, repeating division, chronological oversells, deterministic ordering, removal/re-entry replay, input immutability and validation, isolated Decimal settings, and positive/negative half-way display rounding. See [testing](testing.md) for the verification workflow.
+
+## Ledger read models
+
+The [ledger read API](api.md#ledger-history-and-holdings) replays the same FIFO core from a committed, ownership-scoped database snapshot. The service groups transactions by instrument, calculates each position and sale, then sums exact remaining acquisition cost and realized P/L for the wallet. Closed positions retain accumulated realized results and have no average unit cost. The wallet's last trade date is the maximum user-entered transaction date across all positions; server creation time never replaces that date.
+
+History is ordered newest first using the same total order as replay and deletion. Per-sale realized P/L and latest-only deletion flags are determined before applying the requested page. History totals are exact quantity/price products, independent of presentation rounding. Empty wallets have no last trade date; symbols without ledger history are not positions. No live-price valuation or provider lookup is involved.
 
 ## Latest deletion and correction
 

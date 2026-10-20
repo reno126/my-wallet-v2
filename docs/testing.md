@@ -35,6 +35,8 @@ pnpm exec dotenv -e .env.ci.local -- pnpm --filter @my-wallets/api exec vitest r
 
 Apply migrations and generate Prisma/build contracts first when running Vitest directly rather than the package's `test` script.
 
+Ledger read integration tests validate the actual OpenAPI response/status/media/header contract for history, wallet holdings and instrument summaries. They cover empty wallets, open/closed/reopened positions, exact products beyond JavaScript safe integers, repeating averages, date/time/ID ordering, latest-delete flags across pages, symbol filters, ownership, validation, rate limits and sanitized failures. A held, uncommitted deletion verifies that reads return the previous committed ledger without waiting for the wallet write lock; subsequent reads see the committed deletion. Deletion/re-entry tests verify the public read summaries and history rather than relying only on internal calculation results.
+
 To run frontend tests alone with bounded worker startup:
 
 ```sh

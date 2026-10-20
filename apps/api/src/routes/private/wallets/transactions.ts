@@ -32,7 +32,7 @@ const transactionRoutes: FastifyPluginCallbackZod = (
         operationId: 'createTransaction',
         summary: 'Record an immutable USD stock trade and return its resulting share quantity',
         description:
-          'Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing and history are not available yet.',
+          'Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing is unsupported.',
         tags: ['Transactions'],
         params: walletIdParamsSchema,
         body: createTransactionSchema,

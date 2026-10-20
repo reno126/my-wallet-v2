@@ -1,6 +1,12 @@
 import { z as zod } from 'zod';
 
-import { currencyCodeSchema, resourceIdSchema, timestampSchema } from './common.js';
+import {
+  currencyCodeSchema,
+  paginationQuerySchema,
+  paginationSchema,
+  resourceIdSchema,
+  timestampSchema,
+} from './common.js';
 
 const walletNameSchema = zod.string().trim().min(1).max(100);
 const walletDescriptionSchema = zod.string().trim().max(500);
@@ -23,12 +29,7 @@ export const updateWalletSchema = zod
 
 export const walletIdParamsSchema = zod.object({ walletId: zod.string().uuid() }).strict();
 
-export const walletListQuerySchema = zod
-  .object({
-    page: zod.coerce.number().int().min(1).max(10_000).default(1),
-    pageSize: zod.coerce.number().int().min(1).max(100).default(25),
-  })
-  .strict();
+export const walletListQuerySchema = paginationQuerySchema;
 
 export const walletSummarySchema = zod
   .object({
@@ -44,13 +45,6 @@ export const walletSummarySchema = zod
 export const walletListSchema = zod
   .object({
     wallets: zod.array(walletSummarySchema),
-    pagination: zod
-      .object({
-        page: zod.number().int().min(1),
-        pageSize: zod.number().int().min(1).max(100),
-        totalCount: zod.number().int().nonnegative(),
-        totalPages: zod.number().int().nonnegative(),
-      })
-      .strict(),
+    pagination: paginationSchema,
   })
   .strict();

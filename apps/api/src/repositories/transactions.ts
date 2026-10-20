@@ -15,6 +15,7 @@ import type { CreateTransactionCommand } from '../domain/transaction.ts';
 import { compareTransactions } from '../domain/transaction-order.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
+import { toLedgerEntry } from './ledger-entry.ts';
 
 export interface PersistedTransaction {
   transaction: LedgerTransaction;
@@ -168,20 +169,6 @@ async function readLedger(
     omit: { description: true },
   });
   return ledger.map(toLedgerEntry);
-}
-
-function toLedgerEntry(entry: Omit<LedgerTransaction, 'description'>): LedgerEntry {
-  return {
-    id: entry.id,
-    walletId: entry.walletId,
-    symbol: entry.symbol,
-    side: entry.side,
-    currency: entry.currency,
-    transactionDate: entry.transactionDate.toISOString().slice(0, 10),
-    createdAt: entry.createdAt,
-    quantity: entry.quantity.toFixed(),
-    unitPrice: entry.unitPrice.toFixed(),
-  };
 }
 
 function replayPosition(scope: PositionScope, ledger: readonly LedgerEntry[]): PositionAccounting {
