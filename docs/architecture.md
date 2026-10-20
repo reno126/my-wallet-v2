@@ -31,7 +31,9 @@ The database stores shared instrument records and wallet-owned transactions. Del
 
 When pricing persistence is introduced, wallet-specific materialized summaries and refresh subscriptions must also reference the wallet with cascading cleanup. Global price snapshots, quota accounting, and symbol-level refresh work must remain independent of wallet ownership. Deleting a refresh subscription must preserve work needed by another wallet. Real PostgreSQL deletion regression tests remain required with those models in 7A–7C; the current suite cannot verify cleanup or preservation of tables that do not yet exist.
 
-Endpoint behavior and provider request costs are documented in [API behavior](api.md). Future accounting, price persistence, and refresh coordination remain in the [delivery slice map](../IMPLEMENTATION_PLAN.md#delivery-slice-map).
+The pure [accounting core](accounting.md) replays one wallet/instrument ledger in deterministic order, consumes original acquisition lots using FIFO, and calculates remaining cost basis, weighted-average unit cost, and realized P/L with exact decimal arithmetic. It is independent of persistence and HTTP. SELL persistence and its locking, latest-delete/replay, and accounting read endpoints remain in slices 6B–6D.
+
+Endpoint behavior and provider request costs are documented in [API behavior](api.md). Price persistence and refresh coordination remain in the [delivery slice map](../IMPLEMENTATION_PLAN.md#delivery-slice-map).
 
 ## Route configuration
 

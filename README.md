@@ -4,7 +4,7 @@ My Wallet is an application for managing separate USD investment wallets and rec
 
 ## Development status
 
-Authentication, wallet lifecycle, instrument search, historical quotes, and the BUY ledger/purchase flow are implemented. Normal provider dispatch currently returns an unavailable state until the durable shared quota store is connected; see [provider availability](docs/api.md#provider-availability). SELL, accounting/history, and valuation/refresh features follow the [implementation plan](IMPLEMENTATION_PLAN.md#delivery-slice-map).
+Authentication, wallet lifecycle, instrument search, historical quotes, the BUY ledger/purchase flow, and the pure FIFO accounting core are implemented. Normal provider dispatch currently returns an unavailable state until the durable shared quota store is connected; see [provider availability](docs/api.md#provider-availability). SELL persistence, accounting/history endpoints and UI, and valuation/refresh features follow the [implementation plan](IMPLEMENTATION_PLAN.md#delivery-slice-map).
 
 ## Quick start
 
@@ -31,6 +31,7 @@ Open [the app](http://127.0.0.1:5173). The API listens on `http://127.0.0.1:3000
 
 - [Local development](docs/local-development.md) — environment files, PostgreSQL, migrations, Prisma Studio, and reset safeguards.
 - [Architecture](docs/architecture.md) — workspace boundaries, provider accounting, ledger invariants, routing, cancellation, and UI flows.
+- [Accounting](docs/accounting.md) — FIFO replay, remaining acquisition cost, decimal precision, and presentation rounding.
 - [API behavior](docs/api.md) — OpenAPI/Swagger links, endpoint semantics, provider limitations, and request costs.
 - [Testing](docs/testing.md) — local CI, contract checks, database tests, and browser journeys.
 - [Security and deployment](docs/security-and-deployment.md) — credentials, cookies, request limits, trusted proxies, and hosting requirements.
