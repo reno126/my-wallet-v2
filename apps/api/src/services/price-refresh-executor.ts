@@ -17,7 +17,7 @@ export function createPriceRefreshExecutor(options: PriceRefreshExecutorOptions)
   const now = options.now ?? (() => new Date());
   return { execute };
 
-  async function execute(symbol: string, attempt: number): Promise<Date | null> {
+  async function execute(symbol: string): Promise<Date | null> {
     const lease = await options.work.claim(symbol, refreshLeaseMs);
     if (!lease) {
       return null;
@@ -37,7 +37,7 @@ export function createPriceRefreshExecutor(options: PriceRefreshExecutorOptions)
       providerFailure = result.error;
     } catch (error) {
       try {
-        await recordFailure(lease, { code: 'PROVIDER_UNAVAILABLE', retryable: false }, attempt);
+        await recordFailure(lease, { code: 'PROVIDER_UNAVAILABLE', retryable: false });
       } catch (recordingError) {
         throw new AggregateError(
           [error, recordingError],
@@ -47,22 +47,20 @@ export function createPriceRefreshExecutor(options: PriceRefreshExecutorOptions)
       }
       throw error;
     }
-    return recordFailure(lease, providerFailure, attempt);
+    return recordFailure(lease, providerFailure);
   }
 
-  async function recordFailure(
-    lease: RefreshLease,
-    failure: RefreshFailure,
-    attempt: number,
-  ): Promise<Date | null> {
+  async function recordFailure(lease: RefreshLease, failure: RefreshFailure): Promise<Date | null> {
     const instant = now();
     const decision = refreshRetryDecision(
       failure,
-      attempt,
+      lease.attempt,
       instant,
       options.calendar.nextReset(instant),
     );
-    const recorded = await options.work.fail(lease, failure.code, decision.nextAttemptAt);
+    const recorded = await options.work.fail(lease, failure.code, decision.nextAttemptAt, {
+      retry: decision.retry,
+    });
     return recorded && decision.retry ? decision.nextAttemptAt : null;
   }
 }

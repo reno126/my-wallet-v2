@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { addRateLimitContract } from './openapi-document.js';
 import { buildServer } from './server.js';
 
-const server = buildServer({ logger: false });
+const server = buildServer({ logger: false, recoverRefreshWork: false });
 
 try {
   await server.ready();

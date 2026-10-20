@@ -19,19 +19,23 @@ const snapshot: Omit<PriceSnapshot, 'symbol'> = {
 };
 
 function createFixture(concurrency?: number, now?: () => Date) {
+  const attempts = new Map<string, number>();
   const work = {
     requestForWallet: vi
       .fn<ReturnType<typeof createRefreshWorkRepository>['requestForWallet']>()
       .mockResolvedValue(true),
     claim: vi
       .fn<ReturnType<typeof createRefreshWorkRepository>['claim']>()
-      .mockImplementation((symbol) =>
-        Promise.resolve({
+      .mockImplementation((symbol) => {
+        const attempt = (attempts.get(symbol) ?? 0) + 1;
+        attempts.set(symbol, attempt);
+        return Promise.resolve({
           symbol,
           token: 'lease-token',
           expiresAt: new Date(Date.now() + 180_000),
-        }),
-      ),
+          attempt,
+        });
+      }),
     complete: vi
       .fn<ReturnType<typeof createRefreshWorkRepository>['complete']>()
       .mockResolvedValue(true),
@@ -155,6 +159,7 @@ describe('when coordinating current-price refreshes', () => {
       expect.anything(),
       'PROVIDER_TIMEOUT',
       new Date(instant.getTime() + 1000),
+      { retry: true },
     );
 
     // Act
@@ -187,6 +192,7 @@ describe('when coordinating current-price refreshes', () => {
       expect.anything(),
       'PROVIDER_ERROR',
       new Date(instant.getTime() + 303_000),
+      { retry: false },
     );
     expect(fixture.work.complete).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
@@ -231,7 +237,9 @@ describe('when coordinating current-price refreshes', () => {
     await fixture.scheduler.enqueue('AAPL');
 
     // Assert
-    expect(fixture.work.fail).toHaveBeenCalledWith(expect.anything(), code, new Date(nextAttempt));
+    expect(fixture.work.fail).toHaveBeenCalledWith(expect.anything(), code, new Date(nextAttempt), {
+      retry: false,
+    });
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -280,6 +288,7 @@ describe('when coordinating current-price refreshes', () => {
       expect.anything(),
       'PROVIDER_UNAVAILABLE',
       expect.any(Date),
+      { retry: false },
     );
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
   });
@@ -356,6 +365,108 @@ describe('when coordinating current-price refreshes', () => {
     // Act
     // Assert
     expect(() => createFixture(concurrency)).toThrow(ZodError);
+  });
+
+  it('should drain an active refresh while skipping queued and newly requested work', async () => {
+    // Arrange
+    const fixture = createFixture(1);
+    const provider = deferred<Awaited<ReturnType<CurrentPriceProvider['getQuote']>>>();
+    fixture.provider.getQuote.mockReturnValue(provider.promise);
+    const active = fixture.scheduler.enqueue('AAPL');
+    const queued = fixture.scheduler.enqueue('MSFT');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Act
+    const stopping = fixture.scheduler.stop();
+    const duplicateStop = fixture.scheduler.stop();
+    const accepted = await fixture.scheduler.requestForWallet('user', 'wallet', 'GOOG');
+    await fixture.scheduler.enqueue('META');
+    provider.resolve(success(snapshot));
+    await Promise.all([stopping, active, queued]);
+
+    // Assert
+    expect(duplicateStop).toBe(stopping);
+    expect(accepted).toBe(false);
+    expect(fixture.work.requestForWallet).not.toHaveBeenCalled();
+    expect(fixture.work.claim).toHaveBeenCalledTimes(1);
+    expect(fixture.provider.getQuote).toHaveBeenCalledExactlyOnceWith('AAPL');
+    expect(fixture.work.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('should cancel a retry wait without dispatching again', async () => {
+    // Arrange
+    const fixture = createFixture();
+    fixture.provider.getQuote.mockResolvedValue(
+      failure({ code: 'PROVIDER_TIMEOUT', retryable: true }),
+    );
+    const task = fixture.scheduler.enqueue('AAPL');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Act
+    await fixture.scheduler.stop();
+    await task;
+
+    // Assert
+    expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
+    expect(fixture.work.fail).toHaveBeenCalledWith(
+      expect.anything(),
+      'PROVIDER_TIMEOUT',
+      expect.any(Date),
+      { retry: true },
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('should retain a retry after an in-flight failure during shutdown', async () => {
+    // Arrange
+    const fixture = createFixture();
+    const provider = deferred<Awaited<ReturnType<CurrentPriceProvider['getQuote']>>>();
+    fixture.provider.getQuote.mockReturnValue(provider.promise);
+    const task = fixture.scheduler.enqueue('AAPL');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Act
+    const stopping = fixture.scheduler.stop();
+    provider.resolve(failure({ code: 'PROVIDER_TIMEOUT', retryable: true }));
+    await Promise.all([stopping, task]);
+
+    // Assert
+    expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
+    expect(fixture.work.fail).toHaveBeenCalledWith(
+      expect.anything(),
+      'PROVIDER_TIMEOUT',
+      expect.any(Date),
+      { retry: true },
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('should drain intent persistence without enqueueing it after shutdown begins', async () => {
+    // Arrange
+    const fixture = createFixture();
+    const persisted = deferred<boolean>();
+    fixture.work.requestForWallet.mockReturnValue(persisted.promise);
+    const request = fixture.scheduler.requestForWallet('user', 'wallet', 'AAPL');
+    let drained = false;
+
+    // Act
+    const stopping = fixture.scheduler.stop().then(() => {
+      drained = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Assert
+    expect(drained).toBe(false);
+
+    // Act
+    persisted.resolve(true);
+    const accepted = await request;
+    await stopping;
+
+    // Assert
+    expect(accepted).toBe(false);
+    expect(fixture.provider.getQuote).not.toHaveBeenCalled();
+    expect(drained).toBe(true);
   });
 
   it.each(['3', null, true])('should reject untyped non-number concurrency %s', (concurrency) => {

@@ -340,6 +340,44 @@ describe('when persisting shared market data in PostgreSQL', () => {
     expect(await fixture.cache.latest(fixture.symbol)).toEqual(fixture.snapshot);
   });
 
+  it('should preserve a pending retry cycle and reset attempts only for eligible new demand', async () => {
+    // Arrange
+    const fixture = await createFixture();
+    await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+    const first = requireLease(await fixture.work.claim(fixture.symbol, 60_000));
+    const retryAt = new Date(fixture.now().getTime() + 1000);
+    await fixture.work.fail(first, 'PROVIDER_TIMEOUT', retryAt, { retry: true });
+
+    // Act
+    await fixture.otherWork.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+
+    // Assert
+    expect(await fixture.otherWork.claim(fixture.symbol, 60_000)).toBeNull();
+
+    // Act
+    fixture.setNow(retryAt.toISOString());
+    const second = requireLease(await fixture.otherWork.claim(fixture.symbol, 60_000));
+    await fixture.otherWork.complete(second, fixture.snapshot);
+    await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+    const nextCycle = requireLease(await fixture.work.claim(fixture.symbol, 60_000));
+    const cooldown = new Date(fixture.now().getTime() + 300_000);
+    await fixture.work.fail(nextCycle, 'PROVIDER_ERROR', cooldown);
+    await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+
+    // Assert
+    expect(second.attempt).toBe(2);
+    expect(nextCycle.attempt).toBe(1);
+    expect(await fixture.work.claim(fixture.symbol, 60_000)).toBeNull();
+
+    // Act
+    fixture.setNow(cooldown.toISOString());
+    await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+    const afterCooldown = requireLease(await fixture.work.claim(fixture.symbol, 60_000));
+
+    // Assert
+    expect(afterCooldown.attempt).toBe(1);
+  });
+
   it.each(['0', 'NaN', '-1', '1.000000009', '10000000000000000000000'])(
     'should reject invalid or excess quote precision before persistence: %s',
     async (unitPrice) => {

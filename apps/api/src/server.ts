@@ -17,6 +17,7 @@ export interface BuildServerOptions {
   environment?: ApiEnvironmentInput;
   logger?: FastifyServerOptions['logger'];
   fmp?: FmpDependencies;
+  recoverRefreshWork?: boolean;
 }
 
 export function buildServer(options: BuildServerOptions = {}) {
@@ -67,6 +68,7 @@ export function buildServer(options: BuildServerOptions = {}) {
   const serverDirectory = dirname(fileURLToPath(import.meta.url));
   const pluginOptions: ApiPluginOptions = {
     environment,
+    recoverRefreshWork: options.recoverRefreshWork ?? true,
     ...(options.fmp === undefined ? {} : { fmp: options.fmp }),
   };
 

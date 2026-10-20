@@ -43,6 +43,8 @@ Scheduler unit tests verify symbol deduplication while queued, running and waiti
 
 The scheduler integration suite also exercises the registered `server.priceRefresh` decorator with controlled provider dispatch, persistence and fresh-cache reuse. Error-path tests verify that failure-recording exceptions release queue entries and retain the original execution error when both operations fail. Type-contract tests exclude unrelated API failures and retryable quota/currency failures from refresh results.
 
+Recovery integration tests use independent clients and reconstructed schedulers against PostgreSQL. They preserve unexpired leases, race expired claims, fence late results, resume persisted retries without resetting their allowance, retain quota charges, skip terminal/orphan work and paginate unfinished intent. A real Fastify close verifies that queued work remains pending while active price persistence finishes before Prisma disconnects. Recovery and scheduler unit tests use fake timers for deadline cancellation and shutdown admission; signal tests cover one-time close and listener cleanup. API test servers and OpenAPI export explicitly disable automatic startup reconstruction; hook-wiring tests exercise enabled, disabled and missing-key behavior independently. Tests use controlled providers and owned fixture keys rather than live FMP requests.
+
 To run frontend tests alone with bounded worker startup:
 
 ```sh

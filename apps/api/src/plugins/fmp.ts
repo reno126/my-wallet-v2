@@ -12,6 +12,7 @@ import { createProviderQuotaRepository } from '../repositories/provider-quota.ts
 import { createRefreshWorkRepository } from '../repositories/refresh-work.ts';
 import { createHistoricalPriceService } from '../services/historical-price.ts';
 import { createInstrumentSearchService } from '../services/instrument-search.ts';
+import { createPriceRefreshRecovery } from '../services/price-refresh-recovery.ts';
 import { createPriceRefreshScheduler } from '../services/price-refresh-scheduler.ts';
 
 declare module 'fastify' {
@@ -38,18 +39,34 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
   });
 
   server.decorate('instrumentSearch', createInstrumentSearchService(client));
-  server.decorate(
-    'priceRefresh',
-    createPriceRefreshScheduler({
-      work: createRefreshWorkRepository(server.prisma),
-      cache: createPriceCacheRepository(server.prisma),
-      provider: createFmpCurrentPriceProvider(client, createMarketCalendar('America/New_York')),
-      calendar: createMarketCalendar(options.environment.FMP_QUOTA_TIMEZONE),
-      concurrency: options.environment.FMP_REFRESH_CONCURRENCY,
-      onError: () =>
-        server.log.error('Background price refresh failed; persisted work may require recovery.'),
-    }),
-  );
+  const work = createRefreshWorkRepository(server.prisma);
+  const scheduler = createPriceRefreshScheduler({
+    work,
+    cache: createPriceCacheRepository(server.prisma),
+    provider: createFmpCurrentPriceProvider(client, createMarketCalendar('America/New_York')),
+    calendar: createMarketCalendar(options.environment.FMP_QUOTA_TIMEZONE),
+    concurrency: options.environment.FMP_REFRESH_CONCURRENCY,
+    onError: () =>
+      server.log.error('Background price refresh failed; persisted work may require recovery.'),
+  });
+  server.decorate('priceRefresh', scheduler);
+  const recovery = createPriceRefreshRecovery({
+    work,
+    quota,
+    scheduler,
+    onError: () =>
+      server.log.error('Price refresh recovery failed; persisted work remains available.'),
+  });
+  server.addHook('onReady', async () => {
+    if (options.recoverRefreshWork !== false && options.environment.FMP_API_KEY) {
+      await recovery.start();
+    }
+  });
+  async function stopRefreshes() {
+    await Promise.all([recovery.stop(), scheduler.stop()]);
+  }
+  server.addHook('preClose', stopRefreshes);
+  server.addHook('onClose', stopRefreshes);
   server.decorate('instrumentVerifier', createFmpInstrumentVerifier(client));
   server.decorate(
     'historicalPrices',

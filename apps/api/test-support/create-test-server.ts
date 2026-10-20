@@ -14,9 +14,10 @@ const baseTestEnvironment = {
 
 export function createTestServer(
   environmentOverrides: Record<string, string> = {},
-  options: Pick<BuildServerOptions, 'fmp'> = {},
+  options: Pick<BuildServerOptions, 'fmp' | 'recoverRefreshWork'> = {},
 ): TestServer {
   return buildServer({
+    recoverRefreshWork: false,
     ...options,
     environment: apiEnvironmentSchema.parse({ ...baseTestEnvironment, ...environmentOverrides }),
     logger: false,

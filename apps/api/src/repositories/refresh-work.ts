@@ -10,13 +10,14 @@ export interface RefreshLease {
   symbol: string;
   token: string;
   expiresAt: Date;
+  attempt: number;
 }
 
 export function createRefreshWorkRepository(
   prisma: PrismaClient,
   now: () => Date = () => new Date(),
 ) {
-  return { requestForWallet, claim, complete, fail };
+  return { requestForWallet, claim, complete, fail, unfinished };
 
   async function requestForWallet(
     userId: string,
@@ -39,7 +40,12 @@ export function createRefreshWorkRepository(
         VALUES (${symbol}, 'PENDING', ${instant}, ${instant}, 0)
         ON CONFLICT ("symbol") DO UPDATE
         SET "requestedAt" = EXCLUDED."requestedAt", "updatedAt" = EXCLUDED."updatedAt",
-          "status" = CASE WHEN "refresh_work"."status" IN ('RUNNING', 'FAILED')
+          "attempts" = CASE WHEN "refresh_work"."status" = 'SUCCEEDED'
+            OR ("refresh_work"."status" = 'FAILED' AND
+              ("refresh_work"."nextAttemptAt" IS NULL OR "refresh_work"."nextAttemptAt" <= ${instant}))
+            THEN 0 ELSE "refresh_work"."attempts" END,
+          "status" = CASE WHEN "refresh_work"."status" = 'RUNNING'
+            OR ("refresh_work"."status" = 'FAILED' AND "refresh_work"."nextAttemptAt" > ${instant})
             THEN "refresh_work"."status" ELSE 'PENDING'::"RefreshStatus" END
       `;
       await database.refreshSubscription.upsert({
@@ -59,7 +65,8 @@ export function createRefreshWorkRepository(
     const instant = now();
     const token = randomUUID();
     const expiresAt = new Date(instant.getTime() + leaseMs);
-    const claimed = await prisma.refreshWork.updateMany({
+    const claimed = await prisma.refreshWork.updateManyAndReturn({
+      select: { attempts: true },
       where: {
         symbol,
         subscriptions: { some: {} },
@@ -80,7 +87,8 @@ export function createRefreshWorkRepository(
         updatedAt: instant,
       },
     });
-    return claimed.count === 1 ? { symbol, token, expiresAt } : null;
+    const work = claimed[0];
+    return work ? { symbol, token, expiresAt, attempt: work.attempts } : null;
   }
 
   async function complete(lease: RefreshLease, snapshot: Omit<PriceSnapshot, 'symbol'>) {
@@ -104,12 +112,17 @@ export function createRefreshWorkRepository(
     });
   }
 
-  async function fail(lease: RefreshLease, code: ApiFailure['code'], nextAttemptAt: Date) {
+  async function fail(
+    lease: RefreshLease,
+    code: ApiFailure['code'],
+    nextAttemptAt: Date,
+    options: { retry: boolean } = { retry: false },
+  ) {
     const instant = now();
     const changed = await prisma.refreshWork.updateMany({
       where: activeLease(lease, instant),
       data: {
-        status: 'FAILED',
+        status: options.retry ? 'PENDING' : 'FAILED',
         leaseToken: null,
         leaseExpiresAt: null,
         lastFailureCode: code,
@@ -118,6 +131,33 @@ export function createRefreshWorkRepository(
       },
     });
     return changed.count === 1;
+  }
+
+  async function* unfinished(): AsyncGenerator<{ symbol: string; notBefore: Date }> {
+    let after: string | undefined;
+    for (;;) {
+      const rows = await prisma.refreshWork.findMany({
+        where: {
+          status: { in: ['PENDING', 'RUNNING'] },
+          subscriptions: { some: {} },
+          ...(after === undefined ? {} : { symbol: { gt: after } }),
+        },
+        select: { symbol: true, status: true, nextAttemptAt: true, leaseExpiresAt: true },
+        orderBy: { symbol: 'asc' },
+        take: 100,
+      });
+      for (const row of rows) {
+        yield {
+          symbol: row.symbol,
+          notBefore: (row.status === 'RUNNING' ? row.leaseExpiresAt : row.nextAttemptAt) ?? now(),
+        };
+      }
+      const last = rows.at(-1);
+      if (rows.length < 100 || !last) {
+        return;
+      }
+      after = last.symbol;
+    }
   }
 }
 
