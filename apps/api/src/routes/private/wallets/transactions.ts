@@ -1,4 +1,3 @@
-import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { z as zod } from 'zod';
 
@@ -10,6 +9,7 @@ import {
   walletIdParamsSchema,
 } from '@my-wallets/contracts';
 
+import { getAuthenticatedUserId } from '../../../http/get-authenticated-user-id.ts';
 import { sendResult } from '../../../http/send-result.ts';
 import { createTransactionRepository } from '../../../repositories/transactions.ts';
 import { createWalletRepository } from '../../../repositories/wallets.ts';
@@ -108,11 +108,3 @@ const transactionRoutes: FastifyPluginCallbackZod = (
 };
 
 export default transactionRoutes;
-
-function getAuthenticatedUserId(request: FastifyRequest): string {
-  const userId = request.authSession?.user.id;
-  if (userId === undefined) {
-    throw new Error('Authenticated transaction route reached without a session.');
-  }
-  return userId;
-}
