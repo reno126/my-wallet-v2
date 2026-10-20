@@ -14,7 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldError, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { createRequestApi } from '@/lib/api/createRequestApi';
+import { createRequestClient } from '@/lib/api/createRequestClient';
+import { createWalletApi } from '@/lib/api/wallets';
 
 import { walletFailureMessage } from '../_utils/walletFailureMessage';
 import { walletDictionary as walletMsg } from '../walletDictionary';
@@ -36,8 +37,9 @@ export async function createWalletAction({ request }: ActionFunctionArgs) {
     return { error: walletMsg.create.invalid };
   }
 
-  const api = createRequestApi(request.signal);
-  const result = await api.wallets.create({ ...parsed.data, reportingCurrency: 'USD' });
+  const client = createRequestClient(request.signal);
+  const wallets = createWalletApi(client);
+  const result = await wallets.create({ ...parsed.data, reportingCurrency: 'USD' });
   if (!result.ok) {
     return {
       error: walletFailureMessage(result.error, {

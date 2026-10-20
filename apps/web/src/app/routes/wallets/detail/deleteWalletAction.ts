@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { z as zod } from 'zod';
 
 import { walletIdParamsSchema } from '@my-wallets/contracts';
-import { createRequestApi } from '@/lib/api/createRequestApi';
+import { createRequestClient } from '@/lib/api/createRequestClient';
+import { createWalletApi } from '@/lib/api/wallets';
 
 import { walletFailureMessage } from '../_utils/walletFailureMessage';
 import { walletDictionary as walletMsg } from '../walletDictionary';
@@ -33,8 +34,9 @@ export async function deleteWalletAction({ request, params }: ActionFunctionArgs
   }
 
   const { walletId } = parsedParams.data;
-  const api = createRequestApi(request.signal);
-  const currentWallet = await api.wallets.read(walletId);
+  const client = createRequestClient(request.signal);
+  const wallets = createWalletApi(client);
+  const currentWallet = await wallets.read(walletId);
   if (!currentWallet.ok) {
     return {
       error: walletFailureMessage(currentWallet.error, { failed: walletMsg.delete.failed }),
@@ -43,7 +45,7 @@ export async function deleteWalletAction({ request, params }: ActionFunctionArgs
   if (parsed.data.confirmationName !== currentWallet.value.name) {
     return { error: walletMsg.delete.invalid };
   }
-  const result = await api.wallets.delete(walletId);
+  const result = await wallets.delete(walletId);
   if (!result.ok) {
     return {
       error: walletFailureMessage(result.error, {

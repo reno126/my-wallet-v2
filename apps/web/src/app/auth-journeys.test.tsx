@@ -31,8 +31,8 @@ vi.mock('../lib/auth-client', () => ({
   },
 }));
 
-vi.mock('@/lib/api/createRequestApi', () => ({
-  createRequestApi: () => ({ wallets: { list: mockListWallets, create: vi.fn() } }),
+vi.mock('@/lib/api/wallets', () => ({
+  createWalletApi: () => ({ list: mockListWallets, create: vi.fn() }),
 }));
 
 async function fillSignInForm(user: UserEvent) {

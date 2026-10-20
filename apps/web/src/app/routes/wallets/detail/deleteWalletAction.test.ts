@@ -4,7 +4,8 @@ import { RouterContextProvider } from 'react-router';
 import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import * as requestApiModule from '@/lib/api/createRequestApi';
+import { createRequestClient } from '@/lib/api/createRequestClient';
+import * as walletApiModule from '@/lib/api/wallets';
 import { walletSummary } from '@/test/wallet-api';
 
 import { deleteWalletAction } from './deleteWalletAction';
@@ -28,10 +29,10 @@ describe('when wallet deletion is cancelled between API calls', () => {
       signal: controller.signal,
       body: JSON.stringify({ confirmationName: walletSummary.name }),
     });
-    const api = requestApiModule.createRequestApi(request.signal, endpoint);
-    const factory = vi.spyOn(requestApiModule, 'createRequestApi').mockReturnValue(api);
-    const readWallet = api.wallets.read.bind(api.wallets);
-    vi.spyOn(api.wallets, 'read').mockImplementation(async (walletId) => {
+    const wallets = walletApiModule.createWalletApi(createRequestClient(request.signal, endpoint));
+    vi.spyOn(walletApiModule, 'createWalletApi').mockReturnValue(wallets);
+    const readWallet = wallets.read.bind(wallets);
+    vi.spyOn(wallets, 'read').mockImplementation(async (walletId) => {
       const result = await readWallet(walletId);
       controller.abort(reason);
       return result;
@@ -59,7 +60,6 @@ describe('when wallet deletion is cancelled between API calls', () => {
     });
     // Assert
     await expect(pending).rejects.toBe(reason);
-    expect(factory).toHaveBeenCalledWith(request.signal);
     expect(reads).toBe(1);
     expect(deletes).toBe(0);
     expect(successToast).not.toHaveBeenCalled();

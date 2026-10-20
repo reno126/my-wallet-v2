@@ -5,7 +5,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { historicalPrice, purchaseInput, stock } from '@/test/purchase-api';
 import { walletSummary } from '@/test/wallet-api';
 
-import { createRequestApi } from './createRequestApi';
+import { createRequestClient, type RequestClient } from './createRequestClient';
+import { createPurchasesApi } from './purchases';
+import { createWalletApi } from './wallets';
 
 const endpoint = 'https://wallet-api.test/api';
 const mockApiServer = setupServer();
@@ -24,26 +26,37 @@ function createGate() {
   return { promise, resolve };
 }
 
-type RequestApi = ReturnType<typeof createRequestApi>;
 const operations = [
-  { name: 'wallet list', run: (api: RequestApi) => api.wallets.list({ page: 1, pageSize: 25 }) },
-  { name: 'wallet read', run: (api: RequestApi) => api.wallets.read(walletSummary.id) },
-  { name: 'wallet delete', run: (api: RequestApi) => api.wallets.delete(walletSummary.id) },
+  {
+    name: 'wallet list',
+    run: (client: RequestClient) => createWalletApi(client).list({ page: 1, pageSize: 25 }),
+  },
+  {
+    name: 'wallet read',
+    run: (client: RequestClient) => createWalletApi(client).read(walletSummary.id),
+  },
+  {
+    name: 'wallet delete',
+    run: (client: RequestClient) => createWalletApi(client).delete(walletSummary.id),
+  },
   {
     name: 'wallet create',
-    run: (api: RequestApi) => api.wallets.create({ name: 'Core', reportingCurrency: 'USD' }),
+    run: (client: RequestClient) =>
+      createWalletApi(client).create({ name: 'Core', reportingCurrency: 'USD' }),
   },
   {
     name: 'stock search',
-    run: (api: RequestApi) => api.purchases.search({ q: 'AAPL', mode: 'symbol' }),
+    run: (client: RequestClient) =>
+      createPurchasesApi(client).search({ q: 'AAPL', mode: 'symbol' }),
   },
   {
     name: 'historical price',
-    run: (api: RequestApi) => api.purchases.price(stock.symbol, historicalPrice.requestedDate),
+    run: (client: RequestClient) =>
+      createPurchasesApi(client).price(stock.symbol, historicalPrice.requestedDate),
   },
   {
     name: 'purchase',
-    run: (api: RequestApi) => api.purchases.buy(walletSummary.id, purchaseInput),
+    run: (client: RequestClient) => createPurchasesApi(client).buy(walletSummary.id, purchaseInput),
   },
 ];
 
@@ -52,11 +65,11 @@ describe('when API calls share a route request signal', () => {
     // Arrange
     const controller = new AbortController();
     const reason = { code: 'SUPERSEDED' };
-    const api = createRequestApi(controller.signal, endpoint);
+    const wallets = createWalletApi(createRequestClient(controller.signal, endpoint));
     const fetchRequest = vi.spyOn(globalThis, 'fetch');
     controller.abort(reason);
     // Act
-    const pending = api.wallets.read(walletSummary.id);
+    const pending = wallets.read(walletSummary.id);
     // Assert
     await expect(pending).rejects.toBe(reason);
     expect(fetchRequest).not.toHaveBeenCalled();
@@ -65,7 +78,7 @@ describe('when API calls share a route request signal', () => {
   it.each(operations)('should propagate cancellation through $name to HTTP', async ({ run }) => {
     // Arrange
     const controller = new AbortController();
-    const api = createRequestApi(controller.signal, endpoint);
+    const client = createRequestClient(controller.signal, endpoint);
     const started = createGate();
     let outgoingSignal: AbortSignal | undefined;
     mockApiServer.use(
@@ -79,7 +92,7 @@ describe('when API calls share a route request signal', () => {
       }),
     );
     // Act
-    const pending = run(api);
+    const pending = run(client);
     const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     await started.promise;
     controller.abort();
@@ -94,7 +107,7 @@ describe('when API calls share a route request signal', () => {
       // Arrange
       const controller = new AbortController();
       const reason = { code: 'SUPERSEDED' };
-      const api = createRequestApi(controller.signal, endpoint);
+      const wallets = createWalletApi(createRequestClient(controller.signal, endpoint));
       const started = createGate();
       const release = createGate();
       vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
@@ -106,7 +119,7 @@ describe('when API calls share a route request signal', () => {
         return Response.json(walletSummary);
       });
       // Act
-      const pending = api.wallets.read(walletSummary.id);
+      const pending = wallets.read(walletSummary.id);
       const rejection = expect(pending).rejects.toBe(reason);
       await started.promise;
       controller.abort(reason);
@@ -116,12 +129,50 @@ describe('when API calls share a route request signal', () => {
     },
   );
 
+  it('should cancel both domain APIs composed with the same request client', async () => {
+    // Arrange
+    const controller = new AbortController();
+    const reason = { code: 'NAVIGATED_AWAY' };
+    const client = createRequestClient(controller.signal, endpoint);
+    const wallets = createWalletApi(client);
+    const purchases = createPurchasesApi(client);
+    const started = createGate();
+    const outgoingSignals: AbortSignal[] = [];
+    mockApiServer.use(
+      http.all(`${endpoint}/*`, async ({ request }) => {
+        outgoingSignals.push(request.signal);
+        if (outgoingSignals.length === 2) {
+          started.resolve();
+        }
+        await new Promise<void>((resolve) =>
+          request.signal.addEventListener('abort', () => resolve(), { once: true }),
+        );
+        return HttpResponse.json({});
+      }),
+    );
+    // Act
+    const walletPending = wallets.list({ page: 1, pageSize: 25 });
+    const purchasePending = purchases.search({ q: stock.symbol, mode: 'symbol' });
+    const rejections = Promise.all([
+      expect(walletPending).rejects.toBe(reason),
+      expect(purchasePending).rejects.toBe(reason),
+    ]);
+    await started.promise;
+    controller.abort(reason);
+    // Assert
+    await rejections;
+    expect(outgoingSignals).toHaveLength(2);
+    for (const signal of outgoingSignals) {
+      expect(signal.aborted).toBe(true);
+    }
+  });
+
   it('should keep another request running when one request is cancelled', async () => {
     // Arrange
     const first = new AbortController();
     const second = new AbortController();
-    const firstApi = createRequestApi(first.signal, endpoint);
-    const secondApi = createRequestApi(second.signal, endpoint);
+    const wallets = createWalletApi(createRequestClient(first.signal, endpoint));
+    const purchases = createPurchasesApi(createRequestClient(second.signal, endpoint));
     const firstStarted = createGate();
     const secondStarted = createGate();
     const releaseSearch = createGate();
@@ -142,9 +193,9 @@ describe('when API calls share a route request signal', () => {
       }),
     );
     // Act
-    const firstPending = firstApi.wallets.list({ page: 1, pageSize: 25 });
+    const firstPending = wallets.list({ page: 1, pageSize: 25 });
     const firstRejection = expect(firstPending).rejects.toMatchObject({ name: 'AbortError' });
-    const secondPending = secondApi.purchases.search({ q: stock.symbol, mode: 'symbol' });
+    const secondPending = purchases.search({ q: stock.symbol, mode: 'symbol' });
     await Promise.all([firstStarted.promise, secondStarted.promise]);
     first.abort();
     // Assert

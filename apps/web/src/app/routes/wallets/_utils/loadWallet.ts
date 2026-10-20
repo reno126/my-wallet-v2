@@ -1,7 +1,8 @@
 import type { LoaderFunctionArgs } from 'react-router';
 
 import { walletIdParamsSchema } from '@my-wallets/contracts';
-import { createRequestApi } from '@/lib/api/createRequestApi';
+import { createRequestClient } from '@/lib/api/createRequestClient';
+import { createWalletApi } from '@/lib/api/wallets';
 
 import { pageFailureResponse } from '../../_utils/pageFailure';
 import { requirePageData } from '../../_utils/requirePageData';
@@ -13,8 +14,9 @@ export async function loadWallet({ request, params }: LoaderFunctionArgs) {
   if (!parsed.success) {
     throw pageFailureResponse(404, notFound);
   }
-  const api = createRequestApi(request.signal);
-  const result = await api.wallets.read(parsed.data.walletId);
+  const client = createRequestClient(request.signal);
+  const wallets = createWalletApi(client);
+  const result = await wallets.read(parsed.data.walletId);
   return requirePageData(result, {
     title: text.detail.title,
     message: text.detail.loadFailed,
