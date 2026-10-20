@@ -9,6 +9,7 @@ export const apiErrorSchema = zod.object({
       'FORBIDDEN',
       'NOT_FOUND',
       'CONFLICT',
+      'INSUFFICIENT_HOLDING',
       'VALIDATION_FAILED',
       'PAYLOAD_TOO_LARGE',
       'UNSUPPORTED_MEDIA_TYPE',

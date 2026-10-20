@@ -21,6 +21,7 @@ import {
   resourceIdSchema,
   timestampSchema,
   transactionListSchema,
+  transactionResultSchema,
   transactionSchema,
   transactionSideSchema,
   updateWalletSchema,
@@ -42,7 +43,10 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
       },
       servers: [{ url: '/api' }],
       tags: [
-        { name: 'Transactions', description: 'Authenticated immutable USD stock purchases.' },
+        {
+          name: 'Transactions',
+          description: 'Authenticated immutable USD stock purchases and sales.',
+        },
         { name: 'Health', description: 'API liveness and readiness probes.' },
         {
           name: 'Instruments',
@@ -82,6 +86,7 @@ function registerPublicSchemas() {
   zod.globalRegistry.add(createTransactionSchema, { id: 'CreateTransaction' });
   zod.globalRegistry.add(createBuyTransactionSchema, { id: 'CreateBuyTransaction' });
   zod.globalRegistry.add(buyTransactionResultSchema, { id: 'BuyTransactionResult' });
+  zod.globalRegistry.add(transactionResultSchema, { id: 'TransactionResult' });
   zod.globalRegistry.add(createWalletSchema, { id: 'CreateWallet' });
   zod.globalRegistry.add(currencyCodeSchema, { id: 'CurrencyCode' });
   zod.globalRegistry.add(dateOnlySchema, { id: 'DateOnly' });

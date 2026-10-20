@@ -38,13 +38,19 @@ export const transactionSchema = zod.object({
   createdAt: timestampSchema,
 });
 
-export const buyTransactionResultSchema = zod.object({
+export const transactionResultSchema = zod.object({
   transaction: transactionSchema,
   holding: zod.object({
     walletId: resourceIdSchema,
     symbol: instrumentSymbolSchema,
-    quantity: zod.string().regex(/^(?=.*[1-9])(?:0|[1-9]\d*)(?:\.\d{1,8})?$/),
+    quantity: zod.string().regex(/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/),
     quoteCurrency: currencyCodeSchema,
+  }),
+});
+
+export const buyTransactionResultSchema = transactionResultSchema.extend({
+  holding: transactionResultSchema.shape.holding.extend({
+    quantity: zod.string().regex(/^(?=.*[1-9])(?:0|[1-9]\d*)(?:\.\d{1,8})?$/),
   }),
 });
 

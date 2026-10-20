@@ -3,6 +3,8 @@ export const apiErrorMessages = {
   FORBIDDEN: 'You do not have permission to perform this action.',
   NOT_FOUND: 'The requested resource was not found.',
   CONFLICT: 'The request conflicts with the current resource state.',
+  INSUFFICIENT_HOLDING:
+    'The sale exceeds the shares available at its trade date or would leave a later sale without enough shares.',
   VALIDATION_FAILED: 'The request is invalid.',
   PAYLOAD_TOO_LARGE: 'The request body is too large.',
   UNSUPPORTED_MEDIA_TYPE: 'The request content type is not supported.',

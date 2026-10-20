@@ -5,6 +5,7 @@ export type ApiFailure =
   | { code: 'FORBIDDEN' }
   | { code: 'NOT_FOUND' }
   | { code: 'CONFLICT' }
+  | { code: 'INSUFFICIENT_HOLDING' }
   | { code: 'VALIDATION_FAILED' }
   | { code: 'PAYLOAD_TOO_LARGE' }
   | { code: 'UNSUPPORTED_MEDIA_TYPE' }
@@ -33,6 +34,7 @@ const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; mes
   FORBIDDEN: { statusCode: 403, message: apiErrorMessages.FORBIDDEN },
   NOT_FOUND: { statusCode: 404, message: apiErrorMessages.NOT_FOUND },
   CONFLICT: { statusCode: 409, message: apiErrorMessages.CONFLICT },
+  INSUFFICIENT_HOLDING: { statusCode: 409, message: apiErrorMessages.INSUFFICIENT_HOLDING },
   VALIDATION_FAILED: { statusCode: 400, message: apiErrorMessages.VALIDATION_FAILED },
   PAYLOAD_TOO_LARGE: { statusCode: 413, message: apiErrorMessages.PAYLOAD_TOO_LARGE },
   UNSUPPORTED_MEDIA_TYPE: { statusCode: 415, message: apiErrorMessages.UNSUPPORTED_MEDIA_TYPE },

@@ -9,7 +9,7 @@ This document describes the implemented application. Requirements, delivery orde
 - `apps/web`: React SPA using React Router Data Mode. It renders validated API data and owns forms, navigation, and page feedback.
 - `apps/api`: Fastify application owning authentication, authorization, financial validation, persistence, and all FMP communication.
 - `packages/contracts`: browser-safe Zod schemas, the generated OpenAPI document, and types shared across the API/browser boundary.
-- PostgreSQL and Prisma store users, sessions, wallets, shared instruments, and immutable BUY transactions. Future accounting and pricing models follow their mapped delivery slices.
+- PostgreSQL and Prisma store users, sessions, wallets, shared instruments, and immutable BUY/SELL transactions. Future read models and pricing persistence follow their mapped delivery slices.
 
 The browser calls the application API, and the API calls FMP. Financial amounts cross the boundary as exact decimal strings with explicit currency. The current application supports USD only.
 
@@ -25,13 +25,15 @@ Durable PostgreSQL quota reservations, quota-day configuration, quote-cache pers
 
 ## Ledger persistence and wallet ownership
 
-The server checks wallet ownership before contacting FMP and verifies it again under a database lock before inserting. Missing and foreign wallets both return `404` without provider dispatch. Concurrent BUYs are serialized by a wallet row lock, which also coordinates with wallet deletion. Provider calls happen before the database transaction, so a wallet deleted during verification returns `404` without ledger or instrument writes; an already dispatched profile request still consumes its reserved quota unit.
+The server checks wallet ownership before contacting FMP and verifies it again under a database lock before inserting. Missing and foreign wallets both return `404` without provider dispatch. Concurrent BUYs and SELLs share a wallet row lock, which also coordinates with wallet deletion. BUY provider calls happen before the database transaction, so a wallet deleted during verification returns `404` without ledger or instrument writes; an already dispatched profile request still consumes its reserved quota unit. SELL uses persisted instrument metadata without contacting FMP.
+
+The write transaction explicitly uses `ReadCommitted` isolation. It acquires the owned wallet with `SELECT ... FOR UPDATE`, inserts the candidate, reads the affected symbol's complete ledger, and runs FIFO replay using persisted IDs and timestamps. Ledger reads after the lock see the preceding writer's commit. If any historical sale oversells, a private rollback exception rejects the Prisma transaction; the repository catches it after rollback and returns `INSUFFICIENT_HOLDING` as a normal `Result` failure. Returning a failure object from inside Prisma's transaction callback would commit the inserted row, so that rollback exception stays confined to this boundary. This follows PostgreSQL's [locking and consistency guidance](https://www.postgresql.org/docs/17/applevel-consistency.html). Locks serialize all symbols within a wallet; separate wallets can write independently.
 
 The database stores shared instrument records and wallet-owned transactions. Deleting a wallet cascades only its transactions; shared instruments survive even when their last wallet is deleted, and other wallets retain their transactions. Referenced instruments cannot be deleted. PostgreSQL integration tests cover these guarantees, numeric boundaries, exact concurrent totals, ownership, immutable rows, rollback, and deletion during profile verification. Shared prices, quota persistence, and refresh subscriptions still require their follow-through checks in 7A–7C.
 
 When pricing persistence is introduced, wallet-specific materialized summaries and refresh subscriptions must also reference the wallet with cascading cleanup. Global price snapshots, quota accounting, and symbol-level refresh work must remain independent of wallet ownership. Deleting a refresh subscription must preserve work needed by another wallet. Real PostgreSQL deletion regression tests remain required with those models in 7A–7C; the current suite cannot verify cleanup or preservation of tables that do not yet exist.
 
-The pure [accounting core](accounting.md) replays one wallet/instrument ledger in deterministic order, consumes original acquisition lots using FIFO, and calculates remaining cost basis, weighted-average unit cost, and realized P/L with exact decimal arithmetic. It is independent of persistence and HTTP. SELL persistence and its locking, latest-delete/replay, and accounting read endpoints remain in slices 6B–6D.
+The pure [accounting core](accounting.md) replays one wallet/instrument ledger in deterministic order, consumes original acquisition lots using FIFO, and calculates remaining cost basis, weighted-average unit cost, and realized P/L with exact decimal arithmetic. It is independent of persistence and HTTP. Latest-delete/replay and accounting read endpoints remain in slices 6C–6D.
 
 Endpoint behavior and provider request costs are documented in [API behavior](api.md). Price persistence and refresh coordination remain in the [delivery slice map](../IMPLEMENTATION_PLAN.md#delivery-slice-map).
 

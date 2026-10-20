@@ -4,7 +4,7 @@ My Wallet is an application for managing separate USD investment wallets and rec
 
 ## Development status
 
-Authentication, wallet lifecycle, instrument search, historical quotes, the BUY ledger/purchase flow, and the pure FIFO accounting core are implemented. Normal provider dispatch currently returns an unavailable state until the durable shared quota store is connected; see [provider availability](docs/api.md#provider-availability). SELL persistence, accounting/history endpoints and UI, and valuation/refresh features follow the [implementation plan](IMPLEMENTATION_PLAN.md#delivery-slice-map).
+Authentication, wallet lifecycle, instrument search, historical quotes, the BUY purchase flow, FIFO accounting, and the SELL API with atomic oversell protection are implemented. Normal provider dispatch currently returns an unavailable state until the durable shared quota store is connected; see [provider availability](docs/api.md#provider-availability). Latest-transaction deletion, accounting/history endpoints, the SELL UI, and valuation/refresh features follow the [implementation plan](IMPLEMENTATION_PLAN.md#delivery-slice-map).
 
 ## Quick start
 

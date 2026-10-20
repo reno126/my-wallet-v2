@@ -48,22 +48,24 @@ export async function createBuyLedgerFixture(
     url,
     input,
     createWallet,
-    async buy(
-      changes: Record<string, unknown> = {},
-      request: { url?: string; headers?: Record<string, string> } = {},
-    ) {
-      const response = await fixture.server.inject({
-        method: 'POST',
-        url,
-        headers,
-        payload: { ...input, ...changes },
-        ...request,
-      });
-      fixture.contract.assertResponse('post', request.url ?? url, response);
-      expect(response.headers['cache-control']).toBe('no-store');
-      return response;
+    buy: createTrade,
+    sell(changes: Record<string, unknown> = {}, request: TradeRequest = {}) {
+      return createTrade({ side: 'SELL', ...changes }, request);
     },
   };
+
+  async function createTrade(changes: Record<string, unknown> = {}, request: TradeRequest = {}) {
+    const response = await fixture.server.inject({
+      method: 'POST',
+      url,
+      headers,
+      payload: { ...input, ...changes },
+      ...request,
+    });
+    fixture.contract.assertResponse('post', request.url ?? url, response);
+    expect(response.headers['cache-control']).toBe('no-store');
+    return response;
+  }
 
   async function createWallet(walletHeaders: Record<string, string>) {
     const response = await fixture.server.inject({
@@ -76,4 +78,9 @@ export async function createBuyLedgerFixture(
     expect(response.statusCode).toBe(201);
     return walletSummarySchema.parse(response.json());
   }
+}
+
+interface TradeRequest {
+  url?: string;
+  headers?: Record<string, string>;
 }

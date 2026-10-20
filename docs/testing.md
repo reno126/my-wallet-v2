@@ -27,6 +27,14 @@ The commands composing this pipeline are defined in the root [`package.json`](..
 
 Contract tests run from `src`, and the contracts build excludes test files so compiled copies are not counted as additional tests. The API Vitest runner uses at most four workers to bound database and Fastify/Swagger initialization work when the workspace suites run together. Run checks that generate Prisma (typecheck, API tests, builds, and contract generation) sequentially to avoid concurrent writes to the generated client.
 
+BUY/SELL integration tests use the real PostgreSQL test database and controlled provider responses. Concurrency tests hold a wallet lock, confirm competing writes are queued through PostgreSQL's blocking graph, then release the lock and verify commit/rollback outcomes. They cover competing oversells, valid concurrent sales, and BUY/SELL serialization. If local concurrent checks cause server-startup timeouts, run the API suite on its own with one worker:
+
+```sh
+pnpm exec dotenv -e .env.ci.local -- pnpm --filter @my-wallets/api exec vitest run --maxWorkers=1
+```
+
+Apply migrations and generate Prisma/build contracts first when running Vitest directly rather than the package's `test` script.
+
 To run frontend tests alone with bounded worker startup:
 
 ```sh

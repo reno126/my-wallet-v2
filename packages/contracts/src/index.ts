@@ -23,6 +23,7 @@ export {
   createBuyTransactionSchema,
   createTransactionSchema,
   transactionListSchema,
+  transactionResultSchema,
   transactionSchema,
   transactionSideSchema,
 } from './schemas/transaction.js';

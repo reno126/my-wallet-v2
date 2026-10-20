@@ -1,24 +1,24 @@
 import type { z as zod } from 'zod';
 
-import { type buyTransactionResultSchema, createBuyTransactionSchema } from '@my-wallets/contracts';
+import { createTransactionSchema, type transactionResultSchema } from '@my-wallets/contracts';
 
 import type { ApiFailure } from '../http/api-failure.ts';
 import type {
-  BuyTransactionRepository,
-  CreateBuyInput,
-  PersistedBuy,
-} from '../repositories/buy-transactions.ts';
+  CreateTransactionInput,
+  PersistedTransaction,
+  TransactionRepository,
+} from '../repositories/transactions.ts';
 import type { WalletRepository } from '../repositories/wallets.ts';
 import { failure, type Result, success } from '../result.ts';
 import type { InstrumentVerifier, VerifiedInstrument } from './instrument-verifier.ts';
 import { currentMarketDate } from './market-date.ts';
 
-type BuyResult = zod.infer<typeof buyTransactionResultSchema>;
+type TransactionResult = zod.infer<typeof transactionResultSchema>;
 
-export function createBuyTransactionService(
+export function createTransactionService(
   dependencies: {
     wallets: Pick<WalletRepository, 'findForUser'>;
-    transactions: BuyTransactionRepository;
+    transactions: TransactionRepository;
     instruments: InstrumentVerifier;
   },
   now: () => Date = () => new Date(),
@@ -27,9 +27,9 @@ export function createBuyTransactionService(
     async create(
       userId: string,
       walletId: string,
-      input: CreateBuyInput,
-    ): Promise<Result<BuyResult, ApiFailure>> {
-      const parsed = createBuyTransactionSchema.safeParse(input);
+      input: CreateTransactionInput,
+    ): Promise<Result<TransactionResult, ApiFailure>> {
+      const parsed = createTransactionSchema.safeParse(input);
       if (!parsed.success || parsed.data.transactionDate > currentMarketDate(now())) {
         return failure({ code: 'VALIDATION_FAILED' });
       }
@@ -39,28 +39,33 @@ export function createBuyTransactionService(
         return failure({ code: 'NOT_FOUND' });
       }
       const normalizedInput = { ...parsed.data, symbol: parsed.data.symbol.toUpperCase() };
-      const verified = await dependencies.instruments.verify(normalizedInput.symbol);
-      if (!verified.ok) {
-        return verified;
+      let instrument: VerifiedInstrument | undefined;
+      if (normalizedInput.side === 'BUY') {
+        const verified = await dependencies.instruments.verify(normalizedInput.symbol);
+        if (!verified.ok) {
+          return verified;
+        }
+        instrument = verified.value;
       }
       const result = await dependencies.transactions.createForUser(
         userId,
         walletId,
         normalizedInput,
-        verified.value,
+        instrument,
       );
       if (!result.ok) {
         return result;
       }
-      return success(toBuyResult(result.value, verified.value.quoteCurrency));
+      return success(toTransactionResult(result.value));
     },
   };
 }
 
-function toBuyResult(
-  { transaction, holdingQuantity }: PersistedBuy,
-  quoteCurrency: VerifiedInstrument['quoteCurrency'],
-): BuyResult {
+function toTransactionResult({
+  transaction,
+  holdingQuantity,
+  quoteCurrency,
+}: PersistedTransaction): TransactionResult {
   return {
     transaction: {
       id: transaction.id,

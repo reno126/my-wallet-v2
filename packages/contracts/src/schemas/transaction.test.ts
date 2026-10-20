@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBuyTransactionSchema } from './transaction.js';
+import {
+  buyTransactionResultSchema,
+  createBuyTransactionSchema,
+  createTransactionSchema,
+  transactionResultSchema,
+} from './transaction.js';
 
 const purchase = {
   symbol: 'AAPL',
@@ -47,5 +52,50 @@ describe('when validating a BUY request', () => {
     const result = createBuyTransactionSchema.safeParse(input);
     // Assert
     expect(result.success).toBe(false);
+  });
+});
+
+describe('when validating trade creation and its resulting inventory', () => {
+  it('should accept SELL with exact decimal inputs', () => {
+    // Arrange
+    const input = { ...purchase, side: 'SELL' };
+    // Act
+    const result = createTransactionSchema.parse(input);
+    // Assert
+    expect(result).toEqual(input);
+  });
+
+  it('should support fully closed holdings without weakening BUY result validation', () => {
+    // Arrange
+    const result = {
+      transaction: {
+        ...purchase,
+        side: 'SELL',
+        id: 'e83cb076-e510-4ae7-aeb4-fba948d650e0',
+        walletId: 'e10c1c99-341d-4e4f-bb56-d5b646f748d9',
+        createdAt: '2026-10-19T12:00:00.000Z',
+      },
+      holding: {
+        walletId: 'e10c1c99-341d-4e4f-bb56-d5b646f748d9',
+        symbol: 'AAPL',
+        quantity: '0',
+        quoteCurrency: 'USD',
+      },
+    };
+    // Assert
+    expect(transactionResultSchema.safeParse(result).success).toBe(true);
+    expect(buyTransactionResultSchema.safeParse(result).success).toBe(false);
+    expect(
+      transactionResultSchema.safeParse({
+        ...result,
+        holding: { ...result.holding, quantity: '-0.1' },
+      }).success,
+    ).toBe(false);
+    expect(
+      transactionResultSchema.safeParse({
+        ...result,
+        holding: { ...result.holding, quantity: '19999999999999999999999.99999998' },
+      }).success,
+    ).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
 
 [Project overview](../README.md)
 
-Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. SELL persistence and concurrency protection arrive in 6B, atomic latest-delete/replay in 6C, ledger read endpoints in 6D, and the UI in 6E. These functions do not yet change the existing BUY endpoint.
+Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence: the repository locks the owned wallet, inserts the candidate trade, then replays its complete symbol ledger before committing. Oversells trigger transaction rollback and return a safe conflict result. Atomic latest-delete/replay follows in 6C, ledger read endpoints in 6D, and the UI in 6E.
 
 ## Position replay
 
@@ -20,7 +20,7 @@ Each BUY opens a lot at its original acquisition unit price. Each SELL consumes 
 
 The average describes the original acquisition cost of the remaining inventory. It never determines FIFO matching or realized profit/loss. Realized results accumulate across closing and reopening a position. The result includes remaining lots and each sale's accounting, with explicit USD currency and plain decimal strings. No current-price valuation is performed.
 
-A SELL exceeding inventory at its chronological position returns `INSUFFICIENT_HOLDING`, even if a later BUY would cover it. Other expected failures use `UNSUPPORTED_CURRENCY`, `LEDGER_SCOPE_MISMATCH`, or `INVALID_LEDGER_ENTRY` through the shared `Result` type. Ownership checks, database locks, atomic writes, and HTTP error mapping belong to callers in subsequent slices. Replaying a supplied ledger does not itself authorize deletion or enforce latest-only deletion.
+A SELL exceeding inventory at its chronological position returns `INSUFFICIENT_HOLDING`, even if a later BUY would cover it. Other expected failures use `UNSUPPORTED_CURRENCY`, `LEDGER_SCOPE_MISMATCH`, or `INVALID_LEDGER_ENTRY` through the shared `Result` type. The repository and service own authorization, database locking, atomic writes, and the HTTP conflict mapping; the calculation remains independent of those concerns. Replaying a supplied ledger does not itself authorize deletion or enforce latest-only deletion.
 
 ## Decimal precision and presentation
 

@@ -13,6 +13,7 @@ enum CurrencyCode {
 
 enum TransactionSide {
   BUY
+  SELL
 }
 
 model User {

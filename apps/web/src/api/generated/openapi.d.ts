@@ -210,10 +210,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Record an immutable USD stock purchase and return its resulting share quantity
-         * @description Preserves the entered date, quantity and unit price. Verifies stock classification and USD quote currency with one charged profile request before persistence. SELL, editing, transaction deletion and history are not available yet.
+         * Record an immutable USD stock trade and return its resulting share quantity
+         * @description Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes ledger writes and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated sales that invalidate later sales. Editing, transaction deletion and history are not available yet.
          */
-        post: operations["createBuyTransaction"];
+        post: operations["createTransaction"];
         delete?: never;
         options?: never;
         head?: never;
@@ -227,7 +227,7 @@ export interface components {
         ApiErrorInput: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "INSUFFICIENT_HOLDING" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceIdInput"];
             };
@@ -262,6 +262,15 @@ export interface components {
             description?: string;
         };
         BuyTransactionResultInput: {
+            transaction: components["schemas"]["TransactionInput"];
+            holding: {
+                walletId: components["schemas"]["ResourceIdInput"];
+                symbol: string;
+                quantity: string;
+                quoteCurrency: components["schemas"]["CurrencyCodeInput"];
+            };
+        };
+        TransactionResultInput: {
             transaction: components["schemas"]["TransactionInput"];
             holding: {
                 walletId: components["schemas"]["ResourceIdInput"];
@@ -350,7 +359,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
+                code: "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "INSUFFICIENT_HOLDING" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR";
                 message: string;
                 requestId: components["schemas"]["ResourceId"];
             };
@@ -385,6 +394,15 @@ export interface components {
             description?: string;
         };
         BuyTransactionResult: {
+            transaction: components["schemas"]["Transaction"];
+            holding: {
+                walletId: components["schemas"]["ResourceId"];
+                symbol: string;
+                quantity: string;
+                quoteCurrency: components["schemas"]["CurrencyCode"];
+            };
+        };
+        TransactionResult: {
             transaction: components["schemas"]["Transaction"];
             holding: {
                 walletId: components["schemas"]["ResourceId"];
@@ -1364,7 +1382,7 @@ export interface operations {
             };
         };
     };
-    createBuyTransaction: {
+    createTransaction: {
         parameters: {
             query?: never;
             header?: never;
@@ -1375,7 +1393,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateBuyTransactionInput"];
+                "application/json": components["schemas"]["CreateTransactionInput"];
             };
         };
         responses: {
@@ -1385,7 +1403,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BuyTransactionResult"];
+                    "application/json": components["schemas"]["TransactionResult"];
                 };
             };
             /** @description Default Response */
@@ -1417,6 +1435,15 @@ export interface operations {
             };
             /** @description Default Response */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

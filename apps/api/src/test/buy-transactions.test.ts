@@ -10,7 +10,7 @@ import {
 
 import { createAuthenticatedUser } from '../../test-support/authenticated-user.js';
 import { createBuyLedgerFixture } from '../../test-support/buy-ledger.js';
-import { createBuyTransactionRepository } from '../repositories/buy-transactions.js';
+import { createTransactionRepository } from '../repositories/transactions.ts';
 
 describe('when recording immutable stock purchases', () => {
   it('should persist exact values and the selected date, returning scoped holdings from the ledger', async () => {
@@ -231,7 +231,7 @@ describe('when recording immutable stock purchases', () => {
       const wallet = await fixture.server.prisma.wallet.findUniqueOrThrow({
         where: { id: fixture.wallet.id },
       });
-      const repository = createBuyTransactionRepository(fixture.server.prisma);
+      const repository = createTransactionRepository(fixture.server.prisma);
       const input = { ...createBuyTransactionSchema.parse(fixture.input), ...changes };
       // Act
       const operation = repository.createForUser(wallet.userId, wallet.id, input, {
@@ -306,7 +306,7 @@ describe('when recording immutable stock purchases', () => {
     const invalid = await fixture.buy({ quantity: '0.123456789' });
     const numeric = await fixture.buy({ unitPrice: 190.1 });
     const future = await fixture.buy({ transactionDate: '2999-01-01' });
-    const sell = await fixture.buy({ side: 'SELL' });
+    const unsupportedSide = await fixture.buy({ side: 'SHORT' });
     const currency = await fixture.buy({ currency: 'EUR' });
     const spoofed = await fixture.buy({ userId: 'attacker', quoteCurrency: 'USD' });
     const invalidWallet = await fixture.buy({}, { url: '/api/wallets/invalid/transactions' });
@@ -316,7 +316,15 @@ describe('when recording immutable stock purchases', () => {
       { headers: { cookie: 'cookie' in fixture.headers ? fixture.headers.cookie : '' } },
     );
     // Assert
-    for (const response of [invalid, numeric, future, sell, currency, spoofed, invalidWallet]) {
+    for (const response of [
+      invalid,
+      numeric,
+      future,
+      unsupportedSide,
+      currency,
+      spoofed,
+      invalidWallet,
+    ]) {
       expect(response.statusCode).toBe(400);
     }
     expect(unauthenticated.statusCode).toBe(401);

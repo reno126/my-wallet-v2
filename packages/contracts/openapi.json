@@ -20,6 +20,7 @@
                   "FORBIDDEN",
                   "NOT_FOUND",
                   "CONFLICT",
+                  "INSUFFICIENT_HOLDING",
                   "VALIDATION_FAILED",
                   "PAYLOAD_TOO_LARGE",
                   "UNSUPPORTED_MEDIA_TYPE",
@@ -216,6 +217,45 @@
               "quantity": {
                 "type": "string",
                 "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$"
+              },
+              "quoteCurrency": {
+                "$ref": "#/components/schemas/CurrencyCodeInput"
+              }
+            },
+            "required": [
+              "walletId",
+              "symbol",
+              "quantity",
+              "quoteCurrency"
+            ]
+          }
+        },
+        "required": [
+          "transaction",
+          "holding"
+        ]
+      },
+      "TransactionResultInput": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "$ref": "#/components/schemas/TransactionInput"
+          },
+          "holding": {
+            "type": "object",
+            "properties": {
+              "walletId": {
+                "$ref": "#/components/schemas/ResourceIdInput"
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[A-Za-z0-9.^=-]+$"
+              },
+              "quantity": {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$"
               },
               "quoteCurrency": {
                 "$ref": "#/components/schemas/CurrencyCodeInput"
@@ -592,6 +632,7 @@
                   "FORBIDDEN",
                   "NOT_FOUND",
                   "CONFLICT",
+                  "INSUFFICIENT_HOLDING",
                   "VALIDATION_FAILED",
                   "PAYLOAD_TOO_LARGE",
                   "UNSUPPORTED_MEDIA_TYPE",
@@ -792,6 +833,47 @@
               "quantity": {
                 "type": "string",
                 "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$"
+              },
+              "quoteCurrency": {
+                "$ref": "#/components/schemas/CurrencyCode"
+              }
+            },
+            "required": [
+              "walletId",
+              "symbol",
+              "quantity",
+              "quoteCurrency"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "transaction",
+          "holding"
+        ],
+        "additionalProperties": false
+      },
+      "TransactionResult": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "$ref": "#/components/schemas/Transaction"
+          },
+          "holding": {
+            "type": "object",
+            "properties": {
+              "walletId": {
+                "$ref": "#/components/schemas/ResourceId"
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[A-Za-z0-9.^=-]+$"
+              },
+              "quantity": {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$"
               },
               "quoteCurrency": {
                 "$ref": "#/components/schemas/CurrencyCode"
@@ -2342,18 +2424,18 @@
     },
     "/wallets/{walletId}/transactions": {
       "post": {
-        "operationId": "createBuyTransaction",
-        "summary": "Record an immutable USD stock purchase and return its resulting share quantity",
+        "operationId": "createTransaction",
+        "summary": "Record an immutable USD stock trade and return its resulting share quantity",
         "tags": [
           "Transactions"
         ],
-        "description": "Preserves the entered date, quantity and unit price. Verifies stock classification and USD quote currency with one charged profile request before persistence. SELL, editing, transaction deletion and history are not available yet.",
+        "description": "Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes ledger writes and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated sales that invalidate later sales. Editing, transaction deletion and history are not available yet.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBuyTransactionInput"
+                "$ref": "#/components/schemas/CreateTransactionInput"
               }
             }
           }
@@ -2376,7 +2458,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuyTransactionResult"
+                  "$ref": "#/components/schemas/TransactionResult"
                 }
               }
             }
@@ -2412,6 +2494,16 @@
             }
           },
           "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -2506,7 +2598,7 @@
   "tags": [
     {
       "name": "Transactions",
-      "description": "Authenticated immutable USD stock purchases."
+      "description": "Authenticated immutable USD stock purchases and sales."
     },
     {
       "name": "Health",
