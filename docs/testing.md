@@ -39,6 +39,8 @@ Ledger read integration tests validate the actual OpenAPI response/status/media/
 
 Market-data persistence tests use independent Prisma clients and test-owned provider/symbol keys. They race quota reservations and refresh lease claims, verify exact snapshots and stale-worker fencing, preserve retry deadlines and stale data, and check wallet-subscription cascades without deleting shared quotes/work/counters. Deterministic calendar tests cover local midnight and daylight-saving boundaries. The default-provider-wiring historical API test owns and cleans the dedicated test database's `FMP` policy/counter rows; other provider tests use isolated keys or explicit controlled reservations. See [market-data persistence](market-data.md).
 
+Scheduler unit tests verify symbol deduplication while queued, running and waiting for retry, concurrency limits, cache reuse and bounded backoff using fake timers. PostgreSQL scheduler tests use controlled FMP responses and real leases/counters to verify competing wallet refreshes dispatch only once, retries retain their charges, exhausted quota blocks dispatch, and old snapshots survive failures. Refresh ownership and persisted cooldowns are exercised at the service/database boundary; public wallet-open triggers arrive in 7D.
+
 To run frontend tests alone with bounded worker startup:
 
 ```sh

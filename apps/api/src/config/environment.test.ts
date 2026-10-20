@@ -53,6 +53,7 @@ describe('API environment validation', () => {
       FMP_BASE_URL: 'https://financialmodelingprep.com/stable/',
       FMP_DAILY_REQUEST_LIMIT: 250,
       FMP_QUOTA_TIMEZONE: 'America/New_York',
+      FMP_REFRESH_CONCURRENCY: 3,
       DATABASE_URL:
         'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public',
       DATABASE_POOL_MAX: 10,
@@ -251,6 +252,29 @@ describe('API environment validation', () => {
 });
 
 describe('when configuring the API-only FMP adapter', () => {
+  it.each(['0', '6', '1.5', 'invalid', ''])(
+    'should reject invalid refresh concurrency: %s',
+    (concurrency) => {
+      // Arrange
+      const environment = { ...validTestEnvironment, FMP_REFRESH_CONCURRENCY: concurrency };
+
+      // Act
+      // Assert
+      expectValidationIssue(environment, 'FMP_REFRESH_CONCURRENCY');
+    },
+  );
+
+  it.each(['1', '5'])('should accept supported refresh concurrency: %s', (concurrency) => {
+    // Arrange
+    const input = { ...validTestEnvironment, FMP_REFRESH_CONCURRENCY: concurrency };
+
+    // Act
+    const environment = apiEnvironmentSchema.parse(input);
+
+    // Assert
+    expect(environment.FMP_REFRESH_CONCURRENCY).toBe(Number(concurrency));
+  });
+
   it('should accept an absent key so controlled-provider tests need no live credentials', () => {
     // Arrange
     // Act

@@ -1,8 +1,8 @@
-# Shared market-data persistence
+# Shared market data and refresh scheduling
 
 [Project overview](../README.md) · [API behavior](api.md#provider-availability)
 
-Slice 7A supplies PostgreSQL quota accounting, shared quote snapshots, durable refresh intent, wallet subscriptions and fenced lease operations. Normal search, historical lookup and BUY verification use the durable budget. The queue and retry policy arrive in 7B, startup/shutdown recovery in 7C, public valuation/status endpoints in 7D, and freshness UI in 7E. No background refresh runs in 7A.
+Slices 7A–7B supply PostgreSQL quota accounting, shared quote snapshots, durable refresh intent, wallet subscriptions, fenced leases and an internal refresh scheduler. Normal search, historical lookup and BUY verification use the durable budget. Startup/shutdown recovery arrives in 7C, public valuation/status endpoints and wallet-open triggers in 7D, and freshness UI in 7E. Existing browser routes do not yet enqueue refresh work.
 
 ## Quota configuration
 
@@ -10,6 +10,7 @@ Slice 7A supplies PostgreSQL quota accounting, shared quote snapshots, durable r
 | ------------------------- | ------------------------ | --------------------------------------------------------- |
 | `FMP_DAILY_REQUEST_LIMIT` | `250`                    | Maximum tracked outbound reservations per quota day       |
 | `FMP_QUOTA_TIMEZONE`      | `America/New_York`       | IANA timezone defining local midnight and quote freshness |
+| `FMP_REFRESH_CONCURRENCY` | `3`                      | Maximum concurrent refresh tasks; integer from 1 to 5     |
 
 Production with an FMP key requires both variables explicitly. `US` is ambiguous and is rejected; the deployed reset timezone must be confirmed for the target environment. The approved operational limit is 250. No provider key is needed for automated tests.
 
@@ -33,10 +34,22 @@ An atomic claim permits one worker to acquire eligible pending/failed work or an
 
 Wallet deletion cascades its subscriptions. It preserves shared quotes, quota accounting and symbol work, including work still needed by other wallets. An already running request can finish and retain a useful shared snapshot after its original wallet is deleted. Retained orphan work cannot acquire a new lease.
 
-These repository operations are persistence primitives. They do not yet enqueue tasks, select held symbols on wallet open, schedule retries, recover a worker, or expose prices/status to the browser. Those behaviors keep their own delivery gates.
+## Demand-driven scheduler
+
+The FMP plugin creates one `priceRefresh` scheduler per API process. `requestForWallet(userId, walletId, symbol)` persists ownership-checked interest before enqueueing and returns without awaiting provider work. Internal `enqueue(symbol)` joins or starts work for an already persisted symbol and returns its completion promise. It does not create subscriptions or authorize browser requests. Slice 7D will select held symbols and call this boundary from authenticated routes.
+
+A process-local map deduplicates normalized symbols while queued, running or waiting for retry. `p-limit` bounds active refresh tasks to the configured concurrency. Each task claims a PostgreSQL lease before accessing the cache/provider; competing schedulers cannot dispatch under the same active lease. The task checks freshness after claiming, so a quote obtained while it waited in the queue is reused at zero provider cost. Cached completions also settle the work status. Successful provider results and status updates commit together.
+
+The quote adapter first verifies the symbol's USD currency through `profile`, then requests `quote`; each HTTP dispatch reserves its own unit. A normal uncached refresh costs two units. If the profile consumes the final unit, the quote is not dispatched. Each retry repeats this validation and reserves every dispatched call. Exact price parsing is shared with historical quotes and preserves the original JSON numeric token. Market dates come from the quote timestamp in `America/New_York`; freshness and quota resets use the separately configured quota timezone. Empty, mismatched, future-dated, unsupported-currency and malformed responses do not update the cache.
+
+Transport failures, timeouts, HTTP 429 and HTTP 5xx receive at most two automatic retries, after 1 and 2 seconds. Waiting releases the concurrency slot while keeping the symbol deduplicated. Each attempt obtains a new 180-second lease; this exceeds two maximum 60-second provider calls. Failed attempts persist a safe failure code and next eligible time. After three transient attempts, or a non-retryable failure, a five-minute cooldown prevents immediate repeat requests from dispatching again. Quota exhaustion defers eligibility until the next configured midnight, with no timer automatically scheduling a new day's work. Failure leaves the previous price and retrieval timestamp intact. Unexpected storage/execution errors are observed and logged with a fixed message, without logging provider bodies, URLs or credentials.
+
+Refreshes are demand-driven: the scheduler does not periodically refresh every saved wallet. An already requested task or its bounded retries can finish after the browser closes. A stored wallet subscription represents interest in shared work, not a daily refresh schedule. No startup reconstruction, shutdown drain, or recurring scanning is implemented in 7B; those lifecycle guarantees belong to 7C. Keep the initial deployment to one API process and introduce a shared durable queue before horizontal scaling.
 
 ## Migration and checks
 
 Apply `20261020170000_cache_quota_persistence` before using durable provider dispatch. For local development, run the documented [migration workflow](local-development.md#apply-migrations-and-generate-the-client), then restart the API. Set the API-only FMP key in the ignored local environment or hosted secret manager; never use a `VITE_` key or send credentials in chat.
 
 Tests use a disposable PostgreSQL database and controlled providers. They cover independent-client quota races, the final unit at the 250-request limit, quota-day boundaries, configuration disagreement, cache precision/uniqueness, lease races/fencing, rollback, retry deadlines, ownership and wallet cascade preservation. The authenticated historical API test also exercises the default durable-budget wiring without a live provider.
+
+Scheduler unit tests use controlled promises and fake timers for queued/running/retry deduplication, default/maximum concurrency, bounded backoff, cooldowns and safe background failures. PostgreSQL scheduler tests exercise competing wallet requests, fresh-cache reuse, per-dispatch retry charges, exhaustion and stale-price preservation with a controlled FMP adapter. No live provider calls are made.

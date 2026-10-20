@@ -103,6 +103,7 @@ export const apiEnvironmentSchema = zod
     FMP_BASE_URL: fmpBaseUrlSchema,
     FMP_DAILY_REQUEST_LIMIT: fmpDailyRequestLimitSchema.optional(),
     FMP_QUOTA_TIMEZONE: fmpQuotaTimezoneSchema.optional(),
+    FMP_REFRESH_CONCURRENCY: zod.coerce.number().int().min(1).max(5).default(3),
     DATABASE_URL: zod
       .url()
       .refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol), {
