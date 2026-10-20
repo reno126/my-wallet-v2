@@ -35,7 +35,9 @@ The database stores shared instrument records and wallet-owned transactions. Del
 
 When pricing persistence is introduced, wallet-specific materialized summaries and refresh subscriptions must also reference the wallet with cascading cleanup. Global price snapshots, quota accounting, and symbol-level refresh work must remain independent of wallet ownership. Deleting a refresh subscription must preserve work needed by another wallet. Real PostgreSQL deletion regression tests remain required with those models in 7A–7C; the current suite cannot verify cleanup or preservation of tables that do not yet exist.
 
-The pure [accounting core](accounting.md) replays one wallet/instrument ledger in deterministic order, consumes original acquisition lots using FIFO, and calculates remaining cost basis, weighted-average unit cost, and realized P/L with exact decimal arithmetic. It is independent of persistence and HTTP. Latest-delete/replay and accounting read endpoints remain in slices 6C–6D.
+The pure [accounting core](accounting.md) replays one wallet/instrument ledger in deterministic order, consumes original acquisition lots using FIFO, and calculates remaining cost basis, weighted-average unit cost, and realized P/L with exact decimal arithmetic. It is independent of persistence and HTTP. Accounting read endpoints remain in 6D.
+
+Transaction creation and latest-only deletion use the repository's shared `withLockedWallet` transaction boundary, including the ownership check, `ReadCommitted` isolation, wallet row lock, and rollback mapping. Deletion scopes the target to that wallet, checks it against all entries for its instrument with the same comparator as FIFO, and hard-deletes only when it is latest. The remaining immutable entries are replayed from the locked snapshot before commit. Conflicts preserve all rows; no deleted-row audit copy is kept. See [the deletion API](api.md#latest-transaction-deletion).
 
 Endpoint behavior and provider request costs are documented in [API behavior](api.md). Price persistence and refresh coordination remain in the [delivery slice map](../IMPLEMENTATION_PLAN.md#delivery-slice-map).
 

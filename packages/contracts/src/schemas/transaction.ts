@@ -11,6 +11,11 @@ import { instrumentSymbolSchema } from './instrument.js';
 
 export const transactionSideSchema = zod.enum(['BUY', 'SELL']);
 
+export const transactionIdParamsSchema = zod.object({
+  walletId: resourceIdSchema,
+  transactionId: resourceIdSchema,
+});
+
 export const createTransactionSchema = zod.strictObject({
   symbol: instrumentSymbolSchema,
   side: transactionSideSchema,

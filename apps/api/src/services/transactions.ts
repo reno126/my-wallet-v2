@@ -50,6 +50,9 @@ export function createTransactionService(
       }
       return success(toTransactionResult(result.value));
     },
+    delete(userId: string, walletId: string, transactionId: string) {
+      return dependencies.transactions.deleteForUser(userId, walletId, transactionId);
+    },
   };
 }
 

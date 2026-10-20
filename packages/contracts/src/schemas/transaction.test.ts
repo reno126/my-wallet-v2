@@ -4,6 +4,7 @@ import {
   buyTransactionResultSchema,
   createBuyTransactionSchema,
   createTransactionSchema,
+  transactionIdParamsSchema,
   transactionResultSchema,
 } from './transaction.js';
 
@@ -56,6 +57,28 @@ describe('when validating a BUY request', () => {
 });
 
 describe('when validating trade creation and its resulting inventory', () => {
+  it('should validate both transaction deletion identifiers', () => {
+    // Arrange
+    const params = {
+      walletId: 'e10c1c99-341d-4e4f-bb56-d5b646f748d9',
+      transactionId: 'e83cb076-e510-4ae7-aeb4-fba948d650e0',
+    };
+    // Assert
+    expect(transactionIdParamsSchema.safeParse(params).success).toBe(true);
+    expect(
+      transactionIdParamsSchema.safeParse({
+        ...params,
+        transactionId: params.transactionId.toUpperCase(),
+      }).success,
+    ).toBe(true);
+    expect(transactionIdParamsSchema.safeParse({ ...params, walletId: 'invalid' }).success).toBe(
+      false,
+    );
+    expect(
+      transactionIdParamsSchema.safeParse({ ...params, transactionId: 'invalid' }).success,
+    ).toBe(false);
+  });
+
   it('should accept SELL with exact decimal inputs', () => {
     // Arrange
     const input = { ...purchase, side: 'SELL' };

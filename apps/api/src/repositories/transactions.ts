@@ -4,9 +4,15 @@ import type {
   Prisma,
   PrismaClient,
 } from '../../generated/prisma/client.js';
-import { calculatePosition, type PositionScope } from '../domain/accounting/position.ts';
+import {
+  calculatePosition,
+  type LedgerEntry,
+  type PositionAccounting,
+  type PositionScope,
+} from '../domain/accounting/position.ts';
 import type { VerifiedInstrument } from '../domain/instrument.ts';
 import type { CreateTransactionCommand } from '../domain/transaction.ts';
+import { compareTransactions } from '../domain/transaction-order.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
 
@@ -22,65 +28,105 @@ class InsufficientHoldingError extends Error {}
 
 export function createTransactionRepository(prisma: PrismaClient) {
   return {
-    async createForUser(
+    createForUser(
       userId: string,
       walletId: string,
       input: CreateTransactionCommand,
     ): Promise<Result<PersistedTransaction, ApiFailure>> {
-      try {
-        return await prisma.$transaction(
-          async (database) => {
-            // All ledger writes share this lock, including BUYs and wallet deletion.
-            const [wallet] = await database.$queryRaw<{ reportingCurrency: CurrencyCode }[]>`
-              SELECT "reportingCurrency" FROM "wallet"
-              WHERE "id" = ${walletId}::uuid AND "userId" = ${userId}
-              FOR UPDATE
-            `;
-            if (!wallet) {
-              return failure({ code: 'NOT_FOUND' });
-            }
-            const prepared = await prepareInstrumentForWrite(
-              database,
-              input,
-              wallet.reportingCurrency,
-            );
-            if (!prepared.ok) {
-              return prepared;
-            }
-            const instrument = prepared.value;
-            const transaction = await database.ledgerTransaction.create({
-              data: {
-                walletId,
-                symbol: instrument.symbol,
-                side: input.side,
-                transactionDate: new Date(`${input.transactionDate}T00:00:00.000Z`),
-                quantity: input.quantity,
-                unitPrice: input.unitPrice,
-                currency: input.currency,
-                description: input.description ?? null,
-              },
-            });
-            const holdingQuantity = await calculatePersistedHolding(database, {
-              walletId,
-              symbol: instrument.symbol,
-              currency: wallet.reportingCurrency,
-            });
-            return success({
-              transaction,
-              holdingQuantity,
-              quoteCurrency: instrument.quoteCurrency,
-            });
-          },
-          { isolationLevel: 'ReadCommitted' },
-        );
-      } catch (error) {
-        if (error instanceof InsufficientHoldingError) {
-          return failure({ code: 'INSUFFICIENT_HOLDING' });
+      return withLockedWallet(userId, walletId, async (database, reportingCurrency) => {
+        const prepared = await prepareInstrumentForWrite(database, input, reportingCurrency);
+        if (!prepared.ok) {
+          return prepared;
         }
-        throw error;
-      }
+        const instrument = prepared.value;
+        const transaction = await database.ledgerTransaction.create({
+          data: {
+            walletId,
+            symbol: instrument.symbol,
+            side: input.side,
+            transactionDate: new Date(`${input.transactionDate}T00:00:00.000Z`),
+            quantity: input.quantity,
+            unitPrice: input.unitPrice,
+            currency: input.currency,
+            description: input.description ?? null,
+          },
+        });
+        const scope = {
+          walletId: transaction.walletId,
+          symbol: instrument.symbol,
+          currency: reportingCurrency,
+        };
+        const position = replayPosition(scope, await readLedger(database, scope));
+        return success({
+          transaction,
+          holdingQuantity: position.quantity,
+          quoteCurrency: instrument.quoteCurrency,
+        });
+      });
+    },
+    deleteForUser(
+      userId: string,
+      walletId: string,
+      transactionId: string,
+    ): Promise<Result<undefined, ApiFailure>> {
+      return withLockedWallet(userId, walletId, async (database, reportingCurrency) => {
+        const target = await database.ledgerTransaction.findFirst({
+          where: { id: transactionId, walletId },
+        });
+        if (!target) {
+          return failure({ code: 'NOT_FOUND' });
+        }
+        const scope = {
+          walletId: target.walletId,
+          symbol: target.symbol,
+          currency: reportingCurrency,
+        };
+        const ledger = await readLedger(database, scope);
+        const targetEntry = toLedgerEntry(target);
+        if (ledger.some((entry) => compareTransactions(entry, targetEntry) > 0)) {
+          return failure({ code: 'CONFLICT' });
+        }
+        await database.ledgerTransaction.delete({ where: { id: target.id, walletId } });
+        // The shared wallet lock keeps this immutable snapshot stable until commit.
+        replayPosition(
+          scope,
+          ledger.filter((entry) => entry.id !== target.id),
+        );
+        return success(undefined);
+      });
     },
   };
+
+  async function withLockedWallet<Value>(
+    userId: string,
+    walletId: string,
+    write: (
+      database: Prisma.TransactionClient,
+      reportingCurrency: CurrencyCode,
+    ) => Promise<Result<Value, ApiFailure>>,
+  ): Promise<Result<Value, ApiFailure>> {
+    try {
+      return await prisma.$transaction(
+        async (database) => {
+          const [wallet] = await database.$queryRaw<{ reportingCurrency: CurrencyCode }[]>`
+            SELECT "reportingCurrency" FROM "wallet"
+            WHERE "id" = ${walletId}::uuid AND "userId" = ${userId}
+            FOR UPDATE
+          `;
+          if (!wallet) {
+            return failure({ code: 'NOT_FOUND' });
+          }
+          return write(database, wallet.reportingCurrency);
+        },
+        { isolationLevel: 'ReadCommitted' },
+      );
+    } catch (error) {
+      if (error instanceof InsufficientHoldingError) {
+        return failure({ code: 'INSUFFICIENT_HOLDING' });
+      }
+      throw error;
+    }
+  }
 }
 
 export type TransactionRepository = ReturnType<typeof createTransactionRepository>;
@@ -113,28 +159,38 @@ async function prepareInstrumentForWrite(
   return success(instrument);
 }
 
-async function calculatePersistedHolding(
+async function readLedger(
   database: Prisma.TransactionClient,
   scope: PositionScope,
-): Promise<string> {
+): Promise<LedgerEntry[]> {
   const ledger = await database.ledgerTransaction.findMany({
     where: { walletId: scope.walletId, symbol: scope.symbol },
     omit: { description: true },
   });
-  const position = calculatePosition(
-    scope,
-    ledger.map((entry) => ({
-      ...entry,
-      transactionDate: entry.transactionDate.toISOString().slice(0, 10),
-      quantity: entry.quantity.toFixed(),
-      unitPrice: entry.unitPrice.toFixed(),
-    })),
-  );
+  return ledger.map(toLedgerEntry);
+}
+
+function toLedgerEntry(entry: Omit<LedgerTransaction, 'description'>): LedgerEntry {
+  return {
+    id: entry.id,
+    walletId: entry.walletId,
+    symbol: entry.symbol,
+    side: entry.side,
+    currency: entry.currency,
+    transactionDate: entry.transactionDate.toISOString().slice(0, 10),
+    createdAt: entry.createdAt,
+    quantity: entry.quantity.toFixed(),
+    unitPrice: entry.unitPrice.toFixed(),
+  };
+}
+
+function replayPosition(scope: PositionScope, ledger: readonly LedgerEntry[]): PositionAccounting {
+  const position = calculatePosition(scope, ledger);
   if (!position.ok) {
     if (position.error.code === 'INSUFFICIENT_HOLDING') {
       throw new InsufficientHoldingError();
     }
     throw new Error('The persisted ledger is invalid for accounting.');
   }
-  return position.value.quantity;
+  return position.value;
 }

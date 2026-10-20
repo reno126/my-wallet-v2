@@ -2429,7 +2429,7 @@
         "tags": [
           "Transactions"
         ],
-        "description": "Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes ledger writes and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated sales that invalidate later sales. Editing, transaction deletion and history are not available yet.",
+        "description": "Preserves the entered date, quantity and unit price. BUY verifies stock classification and USD quote currency with one charged profile request. SELL uses stored instrument metadata without provider calls. Serializes creation and latest-only deletion and rejects chronological oversells with 409 INSUFFICIENT_HOLDING, including backdated re-entry that invalidates later sales. Editing and history are not available yet.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2577,6 +2577,122 @@
             }
           },
           "504": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{walletId}/transactions/{transactionId}": {
+      "delete": {
+        "operationId": "deleteLatestTransaction",
+        "summary": "Permanently delete the latest transaction for its wallet and instrument",
+        "tags": [
+          "Transactions"
+        ],
+        "description": "Locks the owned wallet using the same protocol as creation, verifies latest eligibility by transaction date, creation timestamp and id, then hard-deletes and replays the remaining FIFO ledger atomically. Older entries return 409 CONFLICT without mutation. Missing or inaccessible resources return 404. Replay conflicts roll back deletion with 409 INSUFFICIENT_HOLDING. No audit copy is retained and no provider requests are made. Corrections use normal BUY/SELL creation after deletion.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ResourceIdInput"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ResourceIdInput"
+            },
+            "in": "path",
+            "name": "transactionId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The latest transaction was permanently deleted and the remaining ledger was replayed."
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
             "description": "Default Response",
             "content": {
               "application/json": {

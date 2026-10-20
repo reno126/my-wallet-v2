@@ -2,13 +2,13 @@
 
 [Project overview](../README.md)
 
-Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence: the repository locks the owned wallet, inserts the candidate trade, then replays its complete symbol ledger before committing. Oversells trigger transaction rollback and return a safe conflict result. Atomic latest-delete/replay follows in 6C, ledger read endpoints in 6D, and the UI in 6E.
+Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence, and 6C adds latest-only deletion. Both operations lock the owned wallet and replay the resulting symbol ledger before committing; failures roll back the mutation. Ledger read endpoints follow in 6D and the UI in 6E.
 
 ## Position replay
 
 `calculatePosition(scope, entries)` accepts one wallet/instrument scope with explicit currency and the complete ledger for that position. Each entry carries its identifier, BUY/SELL side, date-only transaction date, UTC creation timestamp as a `Date`, quantity, and unit price. Quantities and prices are decimal strings with the same bounds as transaction inputs: positive, at most 22 integer digits and 8 fractional digits. Only USD is supported. Entries from another wallet or instrument, duplicate identifiers, malformed dates, and unsupported decimal inputs are rejected.
 
-Replay sorts a copy of the ledger by transaction date, creation timestamp, then identifier in ascending order. Identifier comparison uses lexical ordering without locale rules; persisted UUIDs must retain their canonical representation. There is no BUY-before-SELL preference for tied dates/timestamps. Later slices must use this same total ordering for latest-entry eligibility.
+Replay sorts a copy of the ledger by transaction date, creation timestamp, then identifier in ascending order. Identifier comparison uses lexical ordering without locale rules; persisted UUIDs must retain their canonical representation. There is no BUY-before-SELL preference for tied dates/timestamps. FIFO and deletion eligibility share [`compareTransactions`](../apps/api/src/domain/transaction-order.ts), so an entry is latest only when no other entry for that wallet/instrument sorts after it.
 
 Each BUY opens a lot at its original acquisition unit price. Each SELL consumes the oldest remaining lots and calculates:
 
@@ -31,3 +31,11 @@ Division is confined to weighted-average unit cost. Non-terminating averages are
 Presentation helpers apply the canonical display policy: `formatUsdAmount` uses 2 decimal places, `formatUsdUnitPrice` uses 4, and `formatShareQuantity` uses at most 6 with trailing zeros trimmed. Ties round away from zero, including negative profit/loss; rounded zero has no negative sign. Monetary helper inputs carry `currency: 'USD'`. Invalid plain-decimal strings and negative share quantities throw `RangeError`. These helpers return numeric text without currency symbols or grouping. Formatting is a separate step and never feeds back into accounting; future API read models must preserve their full decimal-string values.
 
 Unit tests cover multiple and fractional lots, maximum-sized exact multiplication and sums, repeating division, chronological oversells, deterministic ordering, removal/re-entry replay, input immutability and validation, isolated Decimal settings, and positive/negative half-way display rounding. See [testing](testing.md) for the verification workflow.
+
+## Latest deletion and correction
+
+The repository checks ownership, locates the transaction within the selected wallet, and tests latest eligibility under the same wallet lock used by creation. An older entry returns `409 CONFLICT` before any mutation. Only the selected latest entry is hard-deleted; newer trades are never cascade-deleted. Shared instruments remain stored. Deletion leaves no audit copy in this release.
+
+While holding the lock, the repository replays the remaining entries from its ledger snapshot after excluding the deleted row. Rows are immutable and application writers share the lock, so this snapshot represents the remaining ledger without an additional database read. Replay rebuilds remaining lots, exact acquisition cost, weighted-average cost, and realized P/L. Any replay failure rejects the transaction and restores the deleted row. There are no materialized holdings or accounting tables to update in the current schema.
+
+A correction is a normal BUY or SELL after deletion, with a new server-generated ID and creation timestamp. The original transaction date can be re-entered or changed. Creation replays the complete affected ledger and rejects any sale that oversells at its chronological position or leaves a later sale without enough shares. See [the deletion API](api.md#latest-transaction-deletion) for response behavior; UI confirmation and summary revalidation arrive in 6E.

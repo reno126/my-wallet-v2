@@ -4,6 +4,8 @@ import { expect } from 'vitest';
 
 import { walletSummarySchema } from '@my-wallets/contracts';
 
+import type { Prisma } from '../generated/prisma/client.js';
+import { calculatePosition } from '../src/domain/accounting/position.ts';
 import {
   createInstrumentApiFixture,
   type FakeProviderResponse,
@@ -51,6 +53,63 @@ export async function createBuyLedgerFixture(
     buy: createTrade,
     sell(changes: Record<string, unknown> = {}, request: TradeRequest = {}) {
       return createTrade({ side: 'SELL', ...changes }, request);
+    },
+    async deleteTransaction(transactionId: string, request: TradeRequest = {}) {
+      const path = request.url ?? `${url}/${transactionId}`;
+      const response = await fixture.server.inject({
+        method: 'DELETE',
+        url: path,
+        headers,
+        ...request,
+      });
+      fixture.contract.assertResponse('delete', path, response);
+      expect(response.headers['cache-control']).toBe('no-store');
+      return response;
+    },
+    async seedTransaction(overrides: Partial<Prisma.LedgerTransactionCreateManyInput> = {}) {
+      const data = {
+        walletId: wallet.id,
+        symbol,
+        side: 'BUY',
+        quantity: '1',
+        unitPrice: '10',
+        currency: 'USD',
+        transactionDate: new Date('2026-10-18T00:00:00.000Z'),
+        createdAt: new Date('2026-10-19T12:00:00.000Z'),
+        ...overrides,
+      } satisfies Prisma.LedgerTransactionCreateManyInput;
+      if (!fixture.registeredSymbols.includes(data.symbol)) {
+        fixture.registeredSymbols.push(data.symbol);
+      }
+      await fixture.server.prisma.instrument.upsert({
+        where: { symbol: data.symbol },
+        create: {
+          symbol: data.symbol,
+          name: 'Verified stock',
+          exchange: 'NASDAQ',
+          quoteCurrency: 'USD',
+        },
+        update: {},
+      });
+      return fixture.server.prisma.ledgerTransaction.create({ data });
+    },
+    async readPosition(walletId = wallet.id, instrumentSymbol = symbol) {
+      const ledger = await fixture.server.prisma.ledgerTransaction.findMany({
+        where: { walletId, symbol: instrumentSymbol },
+      });
+      const result = calculatePosition(
+        { walletId, symbol: instrumentSymbol, currency: 'USD' },
+        ledger.map((entry) => ({
+          ...entry,
+          transactionDate: entry.transactionDate.toISOString().slice(0, 10),
+          quantity: entry.quantity.toFixed(),
+          unitPrice: entry.unitPrice.toFixed(),
+        })),
+      );
+      if (!result.ok) {
+        throw new Error(JSON.stringify(result.error));
+      }
+      return result.value;
     },
   };
 

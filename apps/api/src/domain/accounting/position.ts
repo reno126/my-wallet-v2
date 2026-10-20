@@ -3,6 +3,7 @@ import type { Decimal } from '@prisma/client/runtime/client';
 import { dateOnlySchema, positiveDecimalStringSchema } from '@my-wallets/contracts';
 
 import { failure, type Result, success } from '../../result.ts';
+import { compareTransactions, type TransactionOrderKey } from '../transaction-order.ts';
 import { financialDecimal } from './decimal.ts';
 
 export interface PositionScope {
@@ -11,11 +12,8 @@ export interface PositionScope {
   readonly currency: string;
 }
 
-export interface LedgerEntry extends PositionScope {
-  readonly id: string;
+export interface LedgerEntry extends PositionScope, TransactionOrderKey {
   readonly side: 'BUY' | 'SELL';
-  readonly transactionDate: string;
-  readonly createdAt: Date;
   readonly quantity: string;
   readonly unitPrice: string;
 }
@@ -98,17 +96,6 @@ function validateLedger(
   return null;
 }
 
-function compareEntries(left: LedgerEntry, right: LedgerEntry): number {
-  if (left.transactionDate !== right.transactionDate) {
-    return left.transactionDate < right.transactionDate ? -1 : 1;
-  }
-  const creationDifference = left.createdAt.getTime() - right.createdAt.getTime();
-  if (creationDifference !== 0) {
-    return creationDifference;
-  }
-  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
-}
-
 export function calculatePosition(
   scope: PositionScope,
   entries: readonly LedgerEntry[],
@@ -125,7 +112,7 @@ export function calculatePosition(
   const sales: SaleAccounting[] = [];
   let oldestLotIndex = 0;
 
-  for (const entry of [...entries].sort(compareEntries)) {
+  for (const entry of [...entries].sort(compareTransactions)) {
     const entryQuantity = financialDecimal(entry.quantity);
     const unitPrice = financialDecimal(entry.unitPrice);
     if (entry.side === 'BUY') {

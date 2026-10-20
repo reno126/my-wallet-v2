@@ -6,7 +6,7 @@ export async function runQueuedLedgerWrites<Value>(
   prisma: PrismaClient,
   walletId: string,
   queuedCount: number,
-  startWrites: () => Promise<Value>,
+  startWrites: (waitForQueued: (count: number) => Promise<void>) => Promise<Value>,
 ): Promise<Value> {
   let notifyLocked: (backendPid: number) => void = () => {};
   let releaseLock = () => {};
@@ -36,10 +36,29 @@ export async function runQueuedLedgerWrites<Value>(
       throw new Error('The wallet lock ended before acquisition.');
     }),
   ]);
-  const writes = Promise.resolve().then(startWrites);
+  let checkingQueue = true;
+  const writes = Promise.resolve().then(() => startWrites(waitForQueued));
   try {
+    await Promise.race([
+      waitForQueued(queuedCount),
+      writes.then(() => {
+        throw new Error('Ledger writes finished before all requests were queued.');
+      }),
+    ]);
+  } finally {
+    checkingQueue = false;
+    releaseLock();
+    await lockTransaction;
+    await writes;
+  }
+  return writes;
+
+  async function waitForQueued(count: number): Promise<void> {
     await vi.waitFor(
       async () => {
+        if (!checkingQueue) {
+          return;
+        }
         const [waiting] = await prisma.$queryRaw<{ count: number }[]>`
         WITH RECURSIVE blocked AS (
           SELECT pid FROM pg_stat_activity WHERE ${backendPid} = ANY(pg_blocking_pids(pid))
@@ -49,14 +68,9 @@ export async function runQueuedLedgerWrites<Value>(
         )
         SELECT COUNT(*)::int AS count FROM blocked
       `;
-        expect(waiting?.count).toBeGreaterThanOrEqual(queuedCount);
+        expect(waiting?.count).toBeGreaterThanOrEqual(count);
       },
       { timeout: 3_000, interval: 25 },
     );
-  } finally {
-    releaseLock();
-    await lockTransaction;
-    await writes;
   }
-  return writes;
 }

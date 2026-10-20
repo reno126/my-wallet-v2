@@ -219,8 +219,11 @@ describe('when recording immutable stock purchases', () => {
       fixture.server.prisma.instrument.delete({ where: { symbol: fixture.symbol } }),
     ).rejects.toThrow();
     expect(await fixture.server.prisma.ledgerTransaction.findUnique({ where })).toEqual(original);
-    const unsupportedPath = `/wallets/{walletId}/transactions/{transactionId}`;
-    expect(fixture.contract.document.paths).not.toHaveProperty(unsupportedPath);
+    const transactionPath =
+      fixture.contract.document.paths?.['/wallets/{walletId}/transactions/{transactionId}'];
+    expect(transactionPath).toHaveProperty('delete');
+    expect(transactionPath).not.toHaveProperty('patch');
+    expect(transactionPath).not.toHaveProperty('put');
   });
 
   it.each([{ quantity: '0' }, { unitPrice: '-1' }, { description: 'a'.repeat(501) }])(

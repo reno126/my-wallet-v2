@@ -22,6 +22,7 @@ export {
   buyTransactionResultSchema,
   createBuyTransactionSchema,
   createTransactionSchema,
+  transactionIdParamsSchema,
   transactionListSchema,
   transactionResultSchema,
   transactionSchema,
