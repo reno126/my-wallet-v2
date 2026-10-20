@@ -1,0 +1,65 @@
+# API behavior
+
+[Project overview](../README.md)
+
+The generated contract is authoritative for request/response schemas, required fields, and documented statuses. This guide explains behavior and operational constraints; update schemas and regenerate OpenAPI when endpoint contracts change.
+
+## Contracts and Swagger
+
+- [OpenAPI document](../packages/contracts/openapi.json)
+- [Shared contract schemas](../packages/contracts/src/schemas)
+- [Generated browser types](../apps/web/src/api/generated/openapi.d.ts)
+
+With the API running locally, open Swagger UI at `http://127.0.0.1:3000/documentation/`. The page loads the registered API contract and can send requests to its `/api` endpoints. Swagger UI serves its scripts and styles from the API origin under a static Content Security Policy; keep inline scripts and styles disabled rather than weakening Helmet's policy.
+
+## Common response behavior
+
+Private API responses use `Cache-Control: no-store`, including successful requests and errors. Wallet writes return sanitized errors for invalid JSON or content length (`400`), bodies exceeding the size limit (`413`), and unsupported content types (`415`). Unexpected failures return a sanitized `500` response.
+
+Authentication, request limits, mutation-origin checks, and cookies are described in [security and deployment](security-and-deployment.md). Browser handling of page failures and cancellation is described in [architecture](architecture.md#route-configuration).
+
+## Wallet lifecycle
+
+Wallet metadata updates return the values written by that request atomically. Wallet lists use independent queries for page rows and total counts; concurrent writes may briefly make those results disagree. Snapshot-consistent pagination is not required for the initial dashboard.
+
+`DELETE /api/wallets/:walletId` permanently removes the authenticated user's selected wallet and returns `204` with no response body. Missing, previously deleted, and foreign-owned wallets all return `404`. Ownership is part of the delete query, so concurrent deletion requests produce one success and subsequent `404` responses. Authentication, mutation-origin checks, private rate limits, and `Cache-Control: no-store` apply to deletion as well.
+
+## Provider availability
+
+Normal API startup deliberately disables uncached FMP dispatch until the durable shared quota reservation store is connected in Slice 7A. Search, historical quote, and BUY verification calls can return `503 PROVIDER_UNAVAILABLE` even with an FMP key configured. There is no production in-memory quota fallback. See [the provider boundary](architecture.md#fmp-provider-boundary) for controlled injection and request accounting, and [testing](testing.md#browser-journeys) for fake-provider coverage.
+
+## Instrument search
+
+`GET /api/instruments/search?q=AAPL` searches by symbol; `GET /api/instruments/search?q=Apple&mode=name` searches by company name. Authentication and the existing per-IP/per-user limits apply, and responses use `Cache-Control: no-store`. The query must contain 1–100 characters with at least one non-whitespace character. Unknown parameters, repeated query values, and unsupported modes are rejected before provider dispatch. Search text is trimmed before sending it as an encoded query value to FMP's [symbol](https://site.financialmodelingprep.com/developer/docs/stable/search-symbol) or [name](https://site.financialmodelingprep.com/developer/docs/stable/search-name) endpoint.
+
+The API requests at most ten candidates and processes no more than ten returned rows. It deduplicates symbols and requests a company profile sequentially only when a candidate lacks a name or currency; missing exchange alone is represented as `null`. Every dispatched search/profile costs one reserved unit, including failures. A fully populated search costs one unit; a search requiring one profile costs two. Ten missing profiles can cost eleven total requests, with each reserved only when needed. There are no automatic retries or symbol-to-name fallback calls; an explicit retry after failure starts a new search and charges each dispatched attempt.
+
+The response contains `results` with explicit USD `quoteCurrency`, and `excluded` entries with `NON_USD`, `CURRENCY_MISMATCH`, `UNSUPPORTED_INSTRUMENT`, or `DETAILS_UNAVAILABLE` reasons. Missing currency is never assumed to be USD. Known fund/ETF flags and crypto/forex/commodity/index exchanges are excluded. Complete search candidates are discovery metadata and do not prove stock eligibility when FMP omits classification flags. [BUY validation](#buy-transactions) verifies eligibility before instrument and transaction persistence. Raw provider fields and provider error bodies are not exposed.
+
+Successful responses, including empty results and explicit exclusions, are cached for 60 seconds in the API process with at most 100 query/mode entries. Exact trimmed text and mode form the key. Cache hits consume zero provider units and remain usable while the request budget is exhausted; failures are not cached. This bounded discovery cache is disposable and separate from the durable per-symbol quote cache planned for 7A. Concurrent cache misses each reserve their own dispatched requests; the process-local cache provides no cross-process deduplication.
+
+Provider failures use the common error DTO: `502 PROVIDER_ERROR` for failed/invalid provider responses, `503 PROVIDER_UNAVAILABLE` for missing configuration/reservation storage, `503 PROVIDER_QUOTA_EXHAUSTED` for a rejected budget reservation, and `504 PROVIDER_TIMEOUT` for a timed-out request. Provider-side HTTP 429 is treated as a provider failure rather than claiming that a measured daily budget is exhausted. Only application request throttles use HTTP 429 with `Retry-After`.
+
+## Historical quotes
+
+`GET /api/instruments/AAPL/price?date=2026-10-18` returns the latest available closing price on or before the selected trade date. The response preserves `requestedDate` and includes `effectiveDate`, exact-decimal `unitPrice`, explicit USD `currency`, `source: "FMP"`, UTC `retrievedAt`, and `usedPreviousTradingDay`. Selection uses actual provider records, rather than a weekday calendar, so weekends, holidays, long suspensions, unordered records, and unpublished closes can fall back to the most recent earlier quote. Future records are never selected. Future requested dates are rejected before dispatch using the initial `America/New_York` market day, independently of the server timezone; environment-configurable market settings remain in 7A.
+
+The service first requests the company profile to verify the requested symbol and source quote currency. Non-USD profiles return `422 UNSUPPORTED_CURRENCY`; missing currency returns `422 CURRENCY_UNAVAILABLE`. The FMP [full historical EOD endpoint](https://site.financialmodelingprep.com/developer/docs/stable/historical-price-eod-full) normally omits currency, so its price uses the verified profile's quote currency. An explicit conflicting currency in a historical row returns `422 CURRENCY_MISMATCH`. Invalid symbols, invalid dates, conflicting closes for the same day, malformed provider data, and prices outside the supported decimal range are rejected. This is quote lookup; BUY validation separately checks stock eligibility and persisted instrument/transaction currency.
+
+History is requested in consecutive, non-overlapping windows of at most five years, following FMP's [documented history-range limit](https://site.financialmodelingprep.com/faqs?code=platform). Each window ends at or before the requested date. An empty window advances the lookup backward, stopping at the profile's IPO date when provided. A lookup sends at most five historical requests plus one profile request. Reaching the request cap before earlier history is covered returns `503 PRICE_LOOKUP_INCOMPLETE`, not a claim that no earlier price exists. `404 PRICE_NOT_AVAILABLE` means the selected date precedes the known IPO date or the available history boundary was reached without finding a quote; an absent profile returns the normal `404 NOT_FOUND`. Provider plan access can still prevent historical coverage; failures use the sanitized provider error responses.
+
+Provider numeric `close` fields are decoded using JSON source text access supported by the repository's Node.js 22.22+/24+ runtimes. Prices are validated and normalized through the existing Prisma Decimal runtime without binary-number conversion, intermediate rounding, or a new dependency. Scientific notation is expanded exactly. Returned values must fit the same positive decimal range as trade inputs: up to 22 integer and 8 fractional digits. Excess nonzero fractional precision is rejected, and insignificant trailing zeros are removed without changing the value. Historical closes reflect FMP's full-EOD data; no split, dividend, FX, or other corporate-action calculations are added.
+
+Profile requests, historical requests, empty-window follow-ups, dispatched failures/timeouts, and explicit retries each consume their own reservation. A normal cache miss costs two requests; a missing-history lookup can cost up to six. Successful quotes are cached for 60 seconds in a bounded 100-entry process-local cache keyed by symbol and requested date. Cache hits consume zero units even if the budget is exhausted; failures are not cached. This cache is disposable. Durable quote persistence, quota configuration, concurrent dispatch coordination, and shared cache guarantees remain assigned to 7A. Normal API startup keeps both search and quote dispatch disabled until the shared quota reservation store is connected, returning `503 PROVIDER_UNAVAILABLE` without a live call.
+
+Before live verification, obtain an FMP API key from the account dashboard, enter it into ignored `.env.local` or the API secret manager, and confirm the plan's permitted request budget and endpoint access. Report only that configuration is ready; never paste the key into chat. Automated tests use controlled providers with dummy keys and consume no live quota.
+
+## BUY transactions
+
+`POST /api/wallets/:walletId/transactions` records an immutable purchase. Send `symbol`, `side: "BUY"`, `transactionDate` (`YYYY-MM-DD`), positive decimal-string `quantity` and `unitPrice`, `currency: "USD"`, and an optional description of at most 500 characters. Unknown fields, SELL requests, zero/negative values, numeric JSON amounts, exponent notation, more than 22 integer digits, and more than eight fractional digits are rejected. Future transaction dates use the same New York market-day boundary as historical lookup. The entered date and exact accepted values are preserved; a weekend quote's effective date does not replace the entered trade date. Unit price is the entered execution price and is not overwritten by a new quote lookup.
+
+The response contains `transaction` with a server-generated ID and UTC creation timestamp, plus `holding` with the resulting exact share quantity for that wallet/symbol and explicit quote currency. Holdings are derived from the BUY ledger using PostgreSQL exact numeric summation inside the write transaction; totals can exceed a single input's maximum. Cost basis, FIFO, SELL validation, transaction history, and valuation remain assigned to Phase 6 and Phase 7. There is currently no transaction update or deletion endpoint. A database trigger also rejects updates to ledger rows.
+
+Each BUY requests the [FMP company profile](https://site.financialmodelingprep.com/developer/docs/stable/profile-symbol) once to verify the symbol, company name, exchange, explicit USD currency, and explicit `isEtf: false` / `isFund: false` classification. Missing classification/exchange and known unsupported exchanges fail closed with `422 UNSUPPORTED_INSTRUMENT`; non-USD and missing currency use the existing currency failures. Client-supplied discovery metadata cannot establish eligibility. Verification is not cached, makes no automatic retries, and does not repeat historical lookup. Every dispatched attempt costs one reserved request, including failed attempts. Normal startup still fails closed with `503 PROVIDER_UNAVAILABLE` until the durable shared quota store is connected in 7A; controlled-provider tests exercise successful BUYs without live credentials.
+
+For locking, ownership rechecks, deletion races, and shared-instrument preservation, see [ledger persistence](architecture.md#ledger-persistence-and-wallet-ownership). For applying the required migrations, see [local development](local-development.md#apply-migrations-and-generate-the-client).
