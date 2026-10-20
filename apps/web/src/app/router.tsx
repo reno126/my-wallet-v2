@@ -103,6 +103,24 @@ export const routeObjects = [
                 },
               },
               {
+                path: 'wallets/:walletId/transactions',
+                lazy: async () => {
+                  const routeModule = await import('./routes/wallets/transactionAction');
+                  return { action: routeModule.transactionAction };
+                },
+              },
+              {
+                path: 'wallets/:walletId/instruments/:symbol',
+                lazy: async () => {
+                  const routeModule =
+                    await import('./routes/wallets/instrument/InstrumentDetailModule');
+                  return {
+                    Component: routeModule.InstrumentDetailComponent,
+                    loader: routeModule.instrumentDetailLoader,
+                  };
+                },
+              },
+              {
                 path: 'wallets/:walletId',
                 lazy: async () => {
                   const [routeModule, deleteModule] = await Promise.all([

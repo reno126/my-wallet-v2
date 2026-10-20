@@ -12,17 +12,32 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { createRequestClient } from '@/lib/api/createRequestClient';
+import { createLedgerApi } from '@/lib/api/ledger';
 
+import { requirePageData } from '../../_utils/requirePageData';
+import { HoldingList } from '../_components/HoldingList';
+import { LedgerSummary } from '../_components/LedgerSummary';
+import { TransactionHistory } from '../_components/TransactionHistory';
+import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
 import { loadWallet } from '../_utils/loadWallet';
+import { ledgerDictionary as ledgerText } from '../ledgerDictionary';
 import { walletDictionary as walletMsg } from '../walletDictionary';
 import { DeleteWalletDialog } from './_components/DeleteWalletDialog';
 
 export async function walletDetailLoader(args: LoaderFunctionArgs) {
-  return { wallet: await loadWallet(args) };
+  const client = createRequestClient(args.request.signal);
+  const wallet = await loadWallet(args, client);
+  const api = createLedgerApi(client);
+  const [summary, history] = await Promise.all([
+    api.holdings(wallet.id),
+    loadHistory(api, args.request, wallet.id),
+  ]);
+  return { wallet, summary: requirePageData(summary, ledgerPageOptions), history };
 }
 
 export function WalletDetailComponent() {
-  const { wallet } = useLoaderData<typeof walletDetailLoader>();
+  const { wallet, summary, history } = useLoaderData<typeof walletDetailLoader>();
   const navigation = useNavigation();
   return (
     <section
@@ -62,6 +77,10 @@ export function WalletDetailComponent() {
           <DeleteWalletDialog key={wallet.id} wallet={wallet} />
         </CardFooter>
       </Card>
+      <p className="text-sm text-muted-foreground">{ledgerText.ledgerOnly}</p>
+      <LedgerSummary summary={summary} />
+      <HoldingList holdings={summary.holdings} />
+      <TransactionHistory history={history} />
     </section>
   );
 }

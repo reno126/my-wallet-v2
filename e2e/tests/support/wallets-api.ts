@@ -25,6 +25,29 @@ export async function mockWalletsApi(page: Page): Promise<WalletsApiMock> {
     const request = route.request();
     const requestPath = new URL(request.url()).pathname;
 
+    if (request.method() === 'GET' && requestPath.endsWith('/holdings')) {
+      await route.fulfill({
+        json: {
+          walletId: requestPath.split('/')[3],
+          reportingCurrency: 'USD',
+          remainingCostBasis: '0',
+          realizedProfitLoss: '0',
+          lastTransactionDate: null,
+          holdings: [],
+        },
+      });
+      return;
+    }
+    if (request.method() === 'GET' && requestPath.endsWith('/transactions')) {
+      await route.fulfill({
+        json: {
+          transactions: [],
+          pagination: { page: 1, pageSize: 25, totalCount: 0, totalPages: 0 },
+        },
+      });
+      return;
+    }
+
     if (requestPath.startsWith('/api/wallets/') && request.method() === 'DELETE') {
       deleteRequests.push(requestPath);
       const walletIndex = wallets.findIndex(

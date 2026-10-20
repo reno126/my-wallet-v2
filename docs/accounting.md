@@ -2,7 +2,7 @@
 
 [Project overview](../README.md)
 
-Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence, and 6C adds latest-only deletion. Both operations lock the owned wallet and replay the resulting symbol ledger before committing; failures roll back the mutation. Slice 6D exposes ledger-only history and accounting snapshots; the UI follows in 6E.
+Slice 6A provides pure API-side accounting functions in [`apps/api/src/domain/accounting`](../apps/api/src/domain/accounting). They do not read the database, call providers, use the clock, or mutate the supplied ledger. Slice 6B integrates them into BUY/SELL persistence, and 6C adds latest-only deletion. Both operations lock the owned wallet and replay the resulting symbol ledger before committing; failures roll back the mutation. Slice 6D exposes ledger-only history and accounting snapshots; slice 6E adds the wallet/instrument history, sale and confirmation UI.
 
 ## Position replay
 
@@ -44,4 +44,4 @@ The repository checks ownership, locates the transaction within the selected wal
 
 While holding the lock, the repository replays the remaining entries from its ledger snapshot after excluding the deleted row. Rows are immutable and application writers share the lock, so this snapshot represents the remaining ledger without an additional database read. Replay rebuilds remaining lots, exact acquisition cost, weighted-average cost, and realized P/L. Any replay failure rejects the transaction and restores the deleted row. There are no materialized holdings or accounting tables to update in the current schema.
 
-A correction is a normal BUY or SELL after deletion, with a new server-generated ID and creation timestamp. The original transaction date can be re-entered or changed. Creation replays the complete affected ledger and rejects any sale that oversells at its chronological position or leaves a later sale without enough shares. See [the deletion API](api.md#latest-transaction-deletion) for response behavior; UI confirmation and summary revalidation arrive in 6E.
+A correction is a normal BUY or SELL after deletion, with a new server-generated ID and creation timestamp. The original transaction date can be re-entered or changed. Creation replays the complete affected ledger and rejects any sale that oversells at its chronological position or leaves a later sale without enough shares. See [the deletion API](api.md#latest-transaction-deletion) for response behavior; the browser confirms deletion and revalidates the active wallet or instrument summary after a successful mutation.

@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { emptyLedgerHandlers } from '@/test/ledger-api';
 import { walletPage, walletSummary } from '@/test/wallet-api';
 
 import { routeObjects } from '../../../router';
@@ -25,7 +26,7 @@ vi.mock('@/api/client', async (importOriginal) => {
 });
 const endpoint = 'http://wallet-api.test/api/wallets';
 const detailPath = `/wallets/${walletSummary.id}`;
-const mockApiServer = setupServer();
+const mockApiServer = setupServer(...emptyLedgerHandlers(endpoint));
 let deletes = 0;
 beforeAll(() => mockApiServer.listen());
 afterAll(() => mockApiServer.close());

@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterContextProvider, RouterProvider } from 'react
 import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { emptyLedgerHandlers } from '@/test/ledger-api';
 import { walletPage, walletSummary } from '@/test/wallet-api';
 
 import { appDictionary } from '../../appDictionary';
@@ -27,7 +28,7 @@ vi.mock('@/api/client', async (importOriginal) => {
   };
 });
 const endpoint = 'https://wallet-api.test/api/wallets';
-const mockApiServer = setupServer();
+const mockApiServer = setupServer(...emptyLedgerHandlers(endpoint));
 beforeAll(() => mockApiServer.listen());
 afterEach(() => {
   mockApiServer.resetHandlers();

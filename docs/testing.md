@@ -49,7 +49,7 @@ pnpm --filter @my-wallets/web exec vitest run --maxWorkers=1
 
 Browser journey tests run in Chromium. The PostgreSQL purchase journey requires `NODE_ENV=test` and an explicit loopback `wallet_test` database URL, with migrations already applied. Without the test environment this one database journey is explicitly skipped; the other browser tests use controlled API responses.
 
-The database journey forwards browser API requests to a real Fastify application, exercises registration, wallet creation, search, historical lookup, and BUY persistence, and verifies the saved date, exact decimals, and four provider request reservations. Only FMP is replaced with a controlled fake. Test-owned users, wallets, transactions, and instruments are cleaned up.
+The database journey forwards browser API requests to a real Fastify application, exercises registration, wallet creation, search, historical lookup, BUY, SELL, deletion cancellation, confirmed deletion, and corrected SELL re-entry. It verifies exact persisted decimals, FIFO results rendered in the browser, new transaction identity after correction, and four provider request reservations across the entire journey; SELL, deletion and ledger reads add none. Only FMP is replaced with a controlled fake. Test-owned users, wallets, transactions, and instruments are cleaned up.
 
 Install Chromium and run controlled browser checks:
 
@@ -64,7 +64,7 @@ After preparing the test database, include the PostgreSQL purchase journey with:
 pnpm exec dotenv -e .env.ci.local -- pnpm test:e2e
 ```
 
-The browser suite covers authentication, wallet creation/deletion, purchase interactions, page-failure recovery, and responsive states. Provider behavior is controlled, so automated checks do not consume live FMP quota.
+The browser suite covers authentication, wallet creation/deletion, purchase interactions, ledger history and summaries, sale validation, deletion confirmation/conflicts, page-failure recovery, and responsive states. Ledger viewport checks cover 320, 375, 768, 1024 and 1440 pixels, including full-viewport mobile dialogs, keyboard focus, long names, empty/closed positions, and recoverable load failures. Provider behavior is controlled, so automated checks do not consume live FMP quota.
 
 ## Contract ownership
 

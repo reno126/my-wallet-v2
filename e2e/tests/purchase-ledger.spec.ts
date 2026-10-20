@@ -4,16 +4,17 @@ import { expect, test } from '@playwright/test';
 
 import type {} from '../../apps/api/src/plugins/prisma';
 import { purchaseDictionary as text } from '../../apps/web/src/app/routes/wallets/buy/purchaseDictionary';
+import { ledgerDictionary as ledgerText } from '../../apps/web/src/app/routes/wallets/ledgerDictionary';
 import { historicalPrice, purchaseInput } from '../../apps/web/src/test/purchase-api';
 
-test('a browser purchase persists the original date and exact decimals in PostgreSQL', async ({
+test('a browser buy, sell, delete and corrected re-entry persist exact FIFO results in PostgreSQL', async ({
   page,
 }) => {
   test.skip(
     process.env['NODE_ENV'] !== 'test',
     'Load the dedicated test environment to run the PostgreSQL browser journey.',
   );
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) {
     throw new Error('The purchase journey requires an explicit local wallet_test DATABASE_URL.');
@@ -135,6 +136,51 @@ test('a browser purchase persists the original date and exact decimals in Postgr
       page.getByRole('heading', { name: 'Purchase browser journey', exact: true }),
     ).toBeVisible();
     expect(await server.prisma.ledgerTransaction.count({ where: { symbol } })).toBe(1);
+
+    await page.getByRole('link', { name: ledgerText.details(symbol), exact: true }).click();
+    await expect(page.getByRole('heading', { name: ledgerText.positionSummary })).toBeVisible();
+    async function sell(quantity: string, price: string) {
+      await page.getByRole('button', { name: ledgerText.sell.open(symbol), exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('textbox', { name: ledgerText.sell.quantity }).fill(quantity);
+      await dialog.getByRole('textbox', { name: ledgerText.sell.price }).fill(price);
+      await dialog.getByLabel(ledgerText.sell.date, { exact: true }).fill('2026-01-19');
+      await dialog.getByRole('button', { name: ledgerText.sell.submit, exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+    }
+    await sell('1', '250');
+    await expect(page.getByText('0.234568', { exact: true })).toBeVisible();
+    await expect(page.getByText('Gain: USD 19.88', { exact: true }).first()).toBeVisible();
+    const sale = await server.prisma.ledgerTransaction.findFirstOrThrow({
+      where: { symbol, side: 'SELL' },
+    });
+    await page
+      .getByRole('button', { name: ledgerText.delete.open(symbol, 'SELL'), exact: true })
+      .click();
+    await expect(page.getByRole('alertdialog')).toHaveAccessibleDescription(
+      ledgerText.delete.warning,
+    );
+    await page.getByRole('button', { name: ledgerText.cancel, exact: true }).click();
+    expect(await server.prisma.ledgerTransaction.count({ where: { symbol } })).toBe(2);
+    await page
+      .getByRole('button', { name: ledgerText.delete.open(symbol, 'SELL'), exact: true })
+      .click();
+    await page.getByRole('button', { name: ledgerText.delete.submit, exact: true }).click();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByText('1.234568', { exact: true }).first()).toBeVisible();
+    expect(await server.prisma.ledgerTransaction.findUnique({ where: { id: sale.id } })).toBeNull();
+    await sell('0.5', '240');
+    await expect(page.getByText('0.734568', { exact: true })).toBeVisible();
+    await expect(page.getByText('Gain: USD 4.94', { exact: true }).first()).toBeVisible();
+    const replacement = await server.prisma.ledgerTransaction.findFirstOrThrow({
+      where: { symbol, side: 'SELL' },
+    });
+    expect(replacement.id).not.toBe(sale.id);
+    expect(replacement.quantity.toFixed()).toBe('0.5');
+    expect(replacement.unitPrice.toFixed()).toBe('240');
+    expect(reserved).toBe(4);
+    await page.reload();
+    await expect(page.getByText('Gain: USD 4.94', { exact: true }).first()).toBeVisible();
   } finally {
     try {
       if (!page.isClosed()) {
