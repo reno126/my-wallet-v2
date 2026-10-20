@@ -2,18 +2,16 @@ import type { z as zod } from 'zod';
 
 import { createTransactionSchema, type transactionResultSchema } from '@my-wallets/contracts';
 
+import type { CreateTransactionCommand } from '../domain/transaction.ts';
 import type { ApiFailure } from '../http/api-failure.ts';
-import type {
-  CreateTransactionInput,
-  PersistedTransaction,
-  TransactionRepository,
-} from '../repositories/transactions.ts';
+import type { PersistedTransaction, TransactionRepository } from '../repositories/transactions.ts';
 import type { WalletRepository } from '../repositories/wallets.ts';
 import { failure, type Result, success } from '../result.ts';
-import type { InstrumentVerifier, VerifiedInstrument } from './instrument-verifier.ts';
+import type { InstrumentVerifier } from './instrument-verifier.ts';
 import { currentMarketDate } from './market-date.ts';
 
 type TransactionResult = zod.infer<typeof transactionResultSchema>;
+type CreateTransactionInput = zod.infer<typeof createTransactionSchema>;
 
 export function createTransactionService(
   dependencies: {
@@ -38,20 +36,14 @@ export function createTransactionService(
       if (!wallet) {
         return failure({ code: 'NOT_FOUND' });
       }
-      const normalizedInput = { ...parsed.data, symbol: parsed.data.symbol.toUpperCase() };
-      let instrument: VerifiedInstrument | undefined;
-      if (normalizedInput.side === 'BUY') {
-        const verified = await dependencies.instruments.verify(normalizedInput.symbol);
-        if (!verified.ok) {
-          return verified;
-        }
-        instrument = verified.value;
+      const prepared = await prepareTransactionCommand(parsed.data, dependencies.instruments);
+      if (!prepared.ok) {
+        return prepared;
       }
       const result = await dependencies.transactions.createForUser(
         userId,
         walletId,
-        normalizedInput,
-        instrument,
+        prepared.value,
       );
       if (!result.ok) {
         return result;
@@ -59,6 +51,21 @@ export function createTransactionService(
       return success(toTransactionResult(result.value));
     },
   };
+}
+
+async function prepareTransactionCommand(
+  input: CreateTransactionInput,
+  instruments: InstrumentVerifier,
+): Promise<Result<CreateTransactionCommand, ApiFailure>> {
+  const normalized = { ...input, symbol: input.symbol.toUpperCase() };
+  if (normalized.side === 'SELL') {
+    return success({ ...normalized, side: 'SELL' });
+  }
+  const verified = await instruments.verify(normalized.symbol);
+  if (!verified.ok) {
+    return verified;
+  }
+  return success({ ...normalized, side: 'BUY', instrument: verified.value });
 }
 
 function toTransactionResult({

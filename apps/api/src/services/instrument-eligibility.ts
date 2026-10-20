@@ -1,6 +1,6 @@
+import type { VerifiedInstrument } from '../domain/instrument.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
-import type { VerifiedInstrument } from './instrument-verifier.js';
 
 interface StockClassification {
   exchange?: string | null | undefined;

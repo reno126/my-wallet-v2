@@ -1,7 +1,3 @@
-import type { z as zod } from 'zod';
-
-import type { createTransactionSchema } from '@my-wallets/contracts';
-
 import type {
   CurrencyCode,
   LedgerTransaction,
@@ -9,11 +5,11 @@ import type {
   PrismaClient,
 } from '../../generated/prisma/client.js';
 import { calculatePosition, type PositionScope } from '../domain/accounting/position.ts';
+import type { VerifiedInstrument } from '../domain/instrument.ts';
+import type { CreateTransactionCommand } from '../domain/transaction.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
-import type { VerifiedInstrument } from '../services/instrument-verifier.js';
 
-export type CreateTransactionInput = zod.infer<typeof createTransactionSchema>;
 export interface PersistedTransaction {
   transaction: LedgerTransaction;
   holdingQuantity: string;
@@ -29,8 +25,7 @@ export function createTransactionRepository(prisma: PrismaClient) {
     async createForUser(
       userId: string,
       walletId: string,
-      input: CreateTransactionInput,
-      verifiedInstrument?: VerifiedInstrument,
+      input: CreateTransactionCommand,
     ): Promise<Result<PersistedTransaction, ApiFailure>> {
       try {
         return await prisma.$transaction(
@@ -44,33 +39,15 @@ export function createTransactionRepository(prisma: PrismaClient) {
             if (!wallet) {
               return failure({ code: 'NOT_FOUND' });
             }
-            if (input.side === 'BUY' && verifiedInstrument === undefined) {
-              throw new Error('A purchase requires a verified instrument.');
+            const prepared = await prepareInstrumentForWrite(
+              database,
+              input,
+              wallet.reportingCurrency,
+            );
+            if (!prepared.ok) {
+              return prepared;
             }
-            const instrument =
-              input.side === 'BUY'
-                ? verifiedInstrument
-                : await database.instrument.findUnique({ where: { symbol: input.symbol } });
-            if (!instrument) {
-              return failure({ code: 'INSUFFICIENT_HOLDING' });
-            }
-            if (instrument.symbol !== input.symbol) {
-              throw new Error('The verified instrument does not match the requested symbol.');
-            }
-            if (
-              wallet.reportingCurrency !== input.currency ||
-              instrument.quoteCurrency !== input.currency
-            ) {
-              return failure({ code: 'CURRENCY_MISMATCH' });
-            }
-
-            if (input.side === 'BUY') {
-              await database.instrument.upsert({
-                where: { symbol: instrument.symbol },
-                create: instrument,
-                update: { name: instrument.name, exchange: instrument.exchange },
-              });
-            }
+            const instrument = prepared.value;
             const transaction = await database.ledgerTransaction.create({
               data: {
                 walletId,
@@ -107,6 +84,34 @@ export function createTransactionRepository(prisma: PrismaClient) {
 }
 
 export type TransactionRepository = ReturnType<typeof createTransactionRepository>;
+
+async function prepareInstrumentForWrite(
+  database: Prisma.TransactionClient,
+  command: CreateTransactionCommand,
+  reportingCurrency: CurrencyCode,
+): Promise<Result<VerifiedInstrument, ApiFailure>> {
+  const instrument =
+    command.side === 'BUY'
+      ? command.instrument
+      : await database.instrument.findUnique({ where: { symbol: command.symbol } });
+  if (!instrument) {
+    return failure({ code: 'INSUFFICIENT_HOLDING' });
+  }
+  if (instrument.symbol !== command.symbol) {
+    throw new Error('The verified instrument does not match the requested symbol.');
+  }
+  if (reportingCurrency !== command.currency || instrument.quoteCurrency !== command.currency) {
+    return failure({ code: 'CURRENCY_MISMATCH' });
+  }
+  if (command.side === 'BUY') {
+    await database.instrument.upsert({
+      where: { symbol: instrument.symbol },
+      create: instrument,
+      update: { name: instrument.name, exchange: instrument.exchange },
+    });
+  }
+  return success(instrument);
+}
 
 async function calculatePersistedHolding(
   database: Prisma.TransactionClient,

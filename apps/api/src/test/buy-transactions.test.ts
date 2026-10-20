@@ -234,11 +234,14 @@ describe('when recording immutable stock purchases', () => {
       const repository = createTransactionRepository(fixture.server.prisma);
       const input = { ...createBuyTransactionSchema.parse(fixture.input), ...changes };
       // Act
-      const operation = repository.createForUser(wallet.userId, wallet.id, input, {
-        symbol: fixture.symbol,
-        name: 'Verified stock',
-        exchange: 'NASDAQ',
-        quoteCurrency: 'USD',
+      const operation = repository.createForUser(wallet.userId, wallet.id, {
+        ...input,
+        instrument: {
+          symbol: fixture.symbol,
+          name: 'Verified stock',
+          exchange: 'NASDAQ',
+          quoteCurrency: 'USD',
+        },
       });
       // Assert
       await expect(operation).rejects.toThrow();
