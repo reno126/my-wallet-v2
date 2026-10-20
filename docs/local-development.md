@@ -25,6 +25,8 @@ Keep `.env.local` on the `wallet_dev` database and edit `.env.ci.local` to set `
 
 Set `BETTER_AUTH_SECRET` in the ignored `.env.local` file before starting the API. Generate a value with `openssl rand -base64 32` and keep it out of Git and chat. Google OAuth and FMP credentials are optional for the initial local setup; see [credentials and production configuration](security-and-deployment.md#runtime-configuration-and-credentials) and [provider availability](api.md#provider-availability).
 
+For provider requests, apply the cache/quota migration and set the API-only FMP key locally. The development budget defaults to 250 requests per day with an America/New_York reset; see [market-data configuration](market-data.md#quota-configuration). Never paste credentials in chat.
+
 Root `:local` scripts select environment files explicitly through `dotenv-cli`. The [Prisma CLI configuration](../apps/api/prisma.config.ts) also loads the root `.env.local` when it exists. Use explicit wrappers for test and hosted environments so the intended database and runtime settings are supplied.
 
 ## Start PostgreSQL

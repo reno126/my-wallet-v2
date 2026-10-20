@@ -5,6 +5,7 @@ import type { ApiPluginOptions } from '../plugin-options.js';
 import { createFmpClient } from '../providers/fmp/client.ts';
 import { createFmpHistoricalPriceProvider } from '../providers/fmp/historical-price-provider.ts';
 import { createFmpInstrumentVerifier } from '../providers/fmp/instrument-verifier.ts';
+import { createProviderQuotaRepository } from '../repositories/provider-quota.ts';
 import { createHistoricalPriceService } from '../services/historical-price.ts';
 import { createInstrumentSearchService } from '../services/instrument-search.ts';
 
@@ -21,13 +22,13 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
   options,
   completePluginRegistration,
 ) => {
+  const quota = createProviderQuotaRepository(server.prisma, {
+    dailyLimit: options.environment.FMP_DAILY_REQUEST_LIMIT,
+    timeZone: options.environment.FMP_QUOTA_TIMEZONE,
+  });
   const client = createFmpClient({
     environment: options.environment,
-    ...(options.fmp ?? {
-      // Shared durable reservations arrive in 7A; never dispatch against an untracked budget.
-      reserveRequest: () =>
-        Promise.reject(new Error('Shared provider request budget is not configured.')),
-    }),
+    ...(options.fmp ?? { reserveRequest: quota.reserveRequest }),
   });
 
   server.decorate('instrumentSearch', createInstrumentSearchService(client));
@@ -39,4 +40,8 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
   completePluginRegistration();
 };
 
-export default fastifyPlugin(fmpPlugin, { name: 'api-fmp', fastify: '5.x' });
+export default fastifyPlugin(fmpPlugin, {
+  name: 'api-fmp',
+  fastify: '5.x',
+  dependencies: ['api-prisma'],
+});

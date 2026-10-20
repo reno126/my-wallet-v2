@@ -2,7 +2,12 @@ import { isIP } from 'node:net';
 
 import { z as zod } from 'zod';
 
-import { fmpApiKeySchema, fmpBaseUrlSchema } from '../providers/fmp/configuration.js';
+import {
+  fmpApiKeySchema,
+  fmpBaseUrlSchema,
+  fmpDailyRequestLimitSchema,
+  fmpQuotaTimezoneSchema,
+} from '../providers/fmp/configuration.js';
 
 const localDevelopmentDatabaseUrl =
   'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public';
@@ -96,6 +101,8 @@ export const apiEnvironmentSchema = zod
     GOOGLE_CLIENT_SECRET: zod.string().default(''),
     FMP_API_KEY: fmpApiKeySchema,
     FMP_BASE_URL: fmpBaseUrlSchema,
+    FMP_DAILY_REQUEST_LIMIT: fmpDailyRequestLimitSchema.optional(),
+    FMP_QUOTA_TIMEZONE: fmpQuotaTimezoneSchema.optional(),
     DATABASE_URL: zod
       .url()
       .refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol), {
@@ -130,6 +137,17 @@ export const apiEnvironmentSchema = zod
     }
 
     if (environment.NODE_ENV === 'production') {
+      if (environment.FMP_API_KEY) {
+        for (const field of ['FMP_DAILY_REQUEST_LIMIT', 'FMP_QUOTA_TIMEZONE'] as const) {
+          if (environment[field] === undefined) {
+            context.addIssue({
+              code: 'custom',
+              path: [field],
+              message: `${field} must be explicitly configured for production provider dispatch.`,
+            });
+          }
+        }
+      }
       if (!environment.FMP_BASE_URL.startsWith('https://')) {
         context.addIssue({
           code: 'custom',
@@ -157,6 +175,8 @@ export const apiEnvironmentSchema = zod
   })
   .transform((environment) => ({
     ...environment,
+    FMP_DAILY_REQUEST_LIMIT: environment.FMP_DAILY_REQUEST_LIMIT ?? 250,
+    FMP_QUOTA_TIMEZONE: environment.FMP_QUOTA_TIMEZONE ?? 'America/New_York',
     BETTER_AUTH_SECRET: environment.BETTER_AUTH_SECRET ?? testOnlyAuthSecret,
     BETTER_AUTH_URL: environment.BETTER_AUTH_URL ?? localBetterAuthUrl,
     WEB_ORIGIN: environment.WEB_ORIGIN ?? localWebOrigin,

@@ -30,6 +30,6 @@ Swagger UI is served by the API with its own static Content Security Policy; kee
 
 ## Shared infrastructure and provider work
 
-FMP dispatch remains unavailable during normal startup until durable shared quota reservations are connected. Provider credentials and budget enforcement belong to the API; see [provider availability](api.md#provider-availability) and [the adapter boundary](architecture.md#fmp-provider-boundary). Scheduler persistence, shared cache/lease guarantees, and refresh lifecycle work remain assigned to Phase 7.
+Normal FMP dispatch uses durable shared PostgreSQL reservations and fails closed on budget/configuration errors. Production provider dispatch requires an explicit quota limit and IANA reset timezone; the approved operational limit is 250. Apply the cache/quota migration before enabling dispatch. Provider credentials and budget enforcement belong to the API; see [provider availability](api.md#provider-availability) and [the adapter boundary](architecture.md#fmp-provider-boundary). Shared cache/lease persistence is implemented in 7A; queue orchestration and refresh lifecycle work remain in 7B–7C. See [market-data persistence](market-data.md) for policy changes, reset semantics and the initial single-process deployment boundary.
 
 For local database start/stop/reset commands and safeguards, see [database lifecycle and reset](local-development.md#database-lifecycle-and-reset).

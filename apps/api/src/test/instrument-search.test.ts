@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { apiErrorSchema, instrumentSearchResponseSchema } from '@my-wallets/contracts';
 
@@ -139,9 +139,12 @@ describe('when using authenticated instrument search against a fake HTTP provide
     expect(fixture.used()).toBe(1);
   });
 
-  it('should fail closed until the shared reservation store is wired', async () => {
+  it('should fail closed without dispatching or leaking details when the durable reservation store is unavailable', async () => {
     // Arrange
     const fixture = await createSearchFixture([], { configureQuota: false });
+    vi.spyOn(fixture.server.prisma, '$executeRaw').mockRejectedValueOnce(
+      new Error('private-budget-database-details'),
+    );
 
     // Act
     const response = await fixture.search();
@@ -150,6 +153,7 @@ describe('when using authenticated instrument search against a fake HTTP provide
     expect(response.statusCode).toBe(503);
     expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_UNAVAILABLE');
     expect(fixture.requests).toHaveLength(0);
+    expect(response.payload).not.toContain('private-budget-database-details');
   });
 
   it('should reject an absent API key without reserving quota', async () => {

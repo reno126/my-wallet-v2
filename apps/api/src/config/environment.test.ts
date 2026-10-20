@@ -51,6 +51,8 @@ describe('API environment validation', () => {
       GOOGLE_CLIENT_SECRET: '',
       FMP_API_KEY: '',
       FMP_BASE_URL: 'https://financialmodelingprep.com/stable/',
+      FMP_DAILY_REQUEST_LIMIT: 250,
+      FMP_QUOTA_TIMEZONE: 'America/New_York',
       DATABASE_URL:
         'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public',
       DATABASE_POOL_MAX: 10,
@@ -303,4 +305,40 @@ describe('when configuring the API-only FMP adapter', () => {
     // Assert
     expectValidationIssue(environment, 'FMP_BASE_URL');
   });
+
+  it.each(['FMP_DAILY_REQUEST_LIMIT', 'FMP_QUOTA_TIMEZONE'])(
+    'should require an explicit %s before production provider dispatch',
+    (field) => {
+      expectValidationIssue({ ...validProductionEnvironment, FMP_API_KEY: 'test-only-key' }, field);
+    },
+  );
+
+  it('should accept the explicitly configured operational budget', () => {
+    expect(
+      apiEnvironmentSchema.parse({
+        ...validProductionEnvironment,
+        FMP_API_KEY: 'test-only-key',
+        FMP_DAILY_REQUEST_LIMIT: '250',
+        FMP_QUOTA_TIMEZONE: 'America/New_York',
+      }),
+    ).toMatchObject({ FMP_DAILY_REQUEST_LIMIT: 250, FMP_QUOTA_TIMEZONE: 'America/New_York' });
+  });
+
+  it.each(['0', '-1', '250.5', '1000001', 'bad', ''])(
+    'should reject invalid daily limits: %s',
+    (limit) =>
+      expectValidationIssue(
+        { ...validTestEnvironment, FMP_DAILY_REQUEST_LIMIT: limit },
+        'FMP_DAILY_REQUEST_LIMIT',
+      ),
+  );
+
+  it.each(['us', 'US', 'Eastern', '+05:00', 'Mars/Olympus', ''])(
+    'should reject ambiguous or invalid quota timezones: %s',
+    (timeZone) =>
+      expectValidationIssue(
+        { ...validTestEnvironment, FMP_QUOTA_TIMEZONE: timeZone },
+        'FMP_QUOTA_TIMEZONE',
+      ),
+  );
 });

@@ -399,7 +399,7 @@ describe('when recording immutable stock purchases', () => {
     [{ replies: [{ stall: true }] }, 504, 'PROVIDER_TIMEOUT', 1],
     [{ replies: [{ body: [] }] }, 404, 'NOT_FOUND', 1],
     [{ quotaLimit: 0 }, 503, 'PROVIDER_QUOTA_EXHAUSTED', 0],
-    [{ configureQuota: false }, 503, 'PROVIDER_UNAVAILABLE', 0],
+    [{ environment: { FMP_API_KEY: '' } }, 503, 'PROVIDER_UNAVAILABLE', 0],
   ] as const)(
     'should leave no partial writes after provider failure: %j',
     async (options, status, code, used) => {

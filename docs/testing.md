@@ -37,6 +37,8 @@ Apply migrations and generate Prisma/build contracts first when running Vitest d
 
 Ledger read integration tests validate the actual OpenAPI response/status/media/header contract for history, wallet holdings and instrument summaries. They cover empty wallets, open/closed/reopened positions, exact products beyond JavaScript safe integers, repeating averages, date/time/ID ordering, latest-delete flags across pages, symbol filters, ownership, validation, rate limits and sanitized failures. A held, uncommitted deletion verifies that reads return the previous committed ledger without waiting for the wallet write lock; subsequent reads see the committed deletion. Deletion/re-entry tests verify the public read summaries and history rather than relying only on internal calculation results.
 
+Market-data persistence tests use independent Prisma clients and test-owned provider/symbol keys. They race quota reservations and refresh lease claims, verify exact snapshots and stale-worker fencing, preserve retry deadlines and stale data, and check wallet-subscription cascades without deleting shared quotes/work/counters. Deterministic calendar tests cover local midnight and daylight-saving boundaries. The default-provider-wiring historical API test owns and cleans the dedicated test database's `FMP` policy/counter rows; other provider tests use isolated keys or explicit controlled reservations. See [market-data persistence](market-data.md).
+
 To run frontend tests alone with bounded worker startup:
 
 ```sh

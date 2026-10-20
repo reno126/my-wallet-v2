@@ -175,17 +175,34 @@ describe('when requesting historical quotes through the authenticated API', () =
     expect(fixture.requests).toHaveLength(1);
   });
 
-  it('should leave normal startup closed to live requests until quota persistence is connected', async () => {
+  it('should use the durable shared budget at normal startup without an injected reservation function', async () => {
     // Arrange
-    const fixture = await createInstrumentApiFixture([], { configureQuota: false });
+    const fixture = await createInstrumentApiFixture([{ body: [profile] }, { body: [row] }], {
+      configureQuota: false,
+    });
+    // This is the sole integration test exercising the default FMP budget key.
+    await fixture.server.prisma.providerQuotaDay.deleteMany({ where: { provider: 'FMP' } });
+    await fixture.server.prisma.providerBudget.deleteMany({ where: { provider: 'FMP' } });
 
     // Act
-    const response = await fixture.get(pricePath);
-
-    // Assert
-    expect(response.statusCode).toBe(503);
-    expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_UNAVAILABLE');
-    expect(fixture.requests).toHaveLength(0);
+    try {
+      const response = await fixture.get(pricePath);
+      const cached = await fixture.get(pricePath);
+      // Assert
+      expect(response.statusCode).toBe(200);
+      expect(cached.statusCode).toBe(200);
+      expect(cached.payload).toBe(response.payload);
+      expect(fixture.requests).toHaveLength(2);
+      expect(
+        await fixture.server.prisma.providerBudget.findUnique({ where: { provider: 'FMP' } }),
+      ).toMatchObject({ dailyLimit: 250, timeZone: 'America/New_York' });
+      expect(
+        await fixture.server.prisma.providerQuotaDay.findFirst({ where: { provider: 'FMP' } }),
+      ).toMatchObject({ used: 2 });
+    } finally {
+      await fixture.server.prisma.providerQuotaDay.deleteMany({ where: { provider: 'FMP' } });
+      await fixture.server.prisma.providerBudget.deleteMany({ where: { provider: 'FMP' } });
+    }
   });
 
   it('should charge a failed historical response and each dispatched request of an explicit retry', async () => {

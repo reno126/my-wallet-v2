@@ -16,6 +16,17 @@ enum TransactionSide {
   SELL
 }
 
+enum PriceSource {
+  FMP
+}
+
+enum RefreshStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 model User {
   id            String    @id
   name          String
@@ -33,15 +44,16 @@ model User {
 }
 
 model Wallet {
-  id                String              @id @default(uuid()) @db.Uuid
-  userId            String
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name              String              @db.VarChar(100)
-  description       String?             @db.VarChar(500)
-  reportingCurrency CurrencyCode        @default(USD)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  transactions      LedgerTransaction[]
+  id                   String                @id @default(uuid()) @db.Uuid
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String                @db.VarChar(100)
+  description          String?               @db.VarChar(500)
+  reportingCurrency    CurrencyCode          @default(USD)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  transactions         LedgerTransaction[]
+  refreshSubscriptions RefreshSubscription[]
 
   @@index([userId, createdAt, id])
   @@map("wallet")
@@ -130,4 +142,63 @@ model RateLimit {
   lastRequest BigInt
 
   @@map("rateLimit")
+}
+
+model ProviderBudget {
+  provider   String             @id @db.VarChar(50)
+  dailyLimit Int
+  timeZone   String             @db.VarChar(100)
+  days       ProviderQuotaDay[]
+
+  @@map("provider_budget")
+}
+
+model ProviderQuotaDay {
+  provider  String         @db.VarChar(50)
+  budget    ProviderBudget @relation(fields: [provider], references: [provider], onDelete: Restrict)
+  quotaDate DateTime       @db.Date
+  used      Int            @default(0)
+
+  @@id([provider, quotaDate])
+  @@map("provider_quota_day")
+}
+
+model PriceSnapshot {
+  symbol      String       @db.VarChar(40)
+  marketDate  DateTime     @db.Date
+  unitPrice   Decimal      @db.Decimal(30, 8)
+  currency    CurrencyCode
+  source      PriceSource
+  retrievedAt DateTime     @db.Timestamptz(3)
+
+  @@id([symbol, marketDate])
+  @@map("price_snapshot")
+}
+
+model RefreshWork {
+  symbol          String                @id @db.VarChar(40)
+  status          RefreshStatus         @default(PENDING)
+  requestedAt     DateTime              @db.Timestamptz(3)
+  updatedAt       DateTime              @db.Timestamptz(3)
+  attempts        Int                   @default(0)
+  leaseToken      String?               @db.Uuid
+  leaseExpiresAt  DateTime?             @db.Timestamptz(3)
+  nextAttemptAt   DateTime?             @db.Timestamptz(3)
+  lastFailureCode String?               @db.VarChar(50)
+  subscriptions   RefreshSubscription[]
+
+  @@index([status, nextAttemptAt])
+  @@index([leaseExpiresAt])
+  @@map("refresh_work")
+}
+
+model RefreshSubscription {
+  walletId String      @db.Uuid
+  wallet   Wallet      @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  symbol   String      @db.VarChar(40)
+  work     RefreshWork @relation(fields: [symbol], references: [symbol], onDelete: Restrict)
+
+  @@id([walletId, symbol])
+  @@index([symbol])
+  @@map("refresh_subscription")
 }
