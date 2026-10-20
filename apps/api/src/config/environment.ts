@@ -8,6 +8,7 @@ import {
   fmpDailyRequestLimitSchema,
   fmpQuotaTimezoneSchema,
 } from '../providers/fmp/configuration.js';
+import { refreshConcurrencySchema } from '../schemas/refresh-concurrency.ts';
 
 const localDevelopmentDatabaseUrl =
   'postgresql://wallet_local:wallet_local_only@127.0.0.1:5432/wallet_dev?schema=public';
@@ -103,7 +104,7 @@ export const apiEnvironmentSchema = zod
     FMP_BASE_URL: fmpBaseUrlSchema,
     FMP_DAILY_REQUEST_LIMIT: fmpDailyRequestLimitSchema.optional(),
     FMP_QUOTA_TIMEZONE: fmpQuotaTimezoneSchema.optional(),
-    FMP_REFRESH_CONCURRENCY: zod.coerce.number().int().min(1).max(5).default(3),
+    FMP_REFRESH_CONCURRENCY: zod.coerce.number().optional().pipe(refreshConcurrencySchema),
     DATABASE_URL: zod
       .url()
       .refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol), {

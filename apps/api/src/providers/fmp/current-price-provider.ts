@@ -1,6 +1,7 @@
 import { z as zod } from 'zod';
 
 import type { createMarketCalendar } from '../../domain/market-calendar.ts';
+import { validateUsdCurrency } from '../../domain/usd-currency.ts';
 import { mapProviderFailure } from '../../http/provider-failure.ts';
 import { failure, success } from '../../result.ts';
 import { normalizedInstrumentSymbolSchema } from '../../schemas/instrument-symbol.ts';
@@ -50,11 +51,9 @@ export function createFmpCurrentPriceProvider(
     if (profile.symbol !== symbol) {
       return failure({ code: 'PROVIDER_ERROR', retryable: false });
     }
-    if (!profile.currency) {
-      return failure({ code: 'CURRENCY_UNAVAILABLE', retryable: false });
-    }
-    if (profile.currency.toUpperCase() !== 'USD') {
-      return failure({ code: 'UNSUPPORTED_CURRENCY', retryable: false });
+    const currency = validateUsdCurrency(profile.currency);
+    if (!currency.ok) {
+      return failure({ ...currency.error, retryable: false });
     }
     const quoteResult = await client.request({
       endpoint: 'quote',
@@ -80,7 +79,7 @@ export function createFmpCurrentPriceProvider(
     return success({
       marketDate: marketCalendar.date(marketInstant),
       unitPrice: quote.price,
-      currency: 'USD',
+      currency: currency.value,
       source: 'FMP',
       retrievedAt,
     });
@@ -88,8 +87,12 @@ export function createFmpCurrentPriceProvider(
 }
 
 function refreshFailure(error: FmpFailure): RefreshFailure {
+  const mapped = mapProviderFailure(error);
+  if (mapped.code !== 'PROVIDER_ERROR' && mapped.code !== 'PROVIDER_TIMEOUT') {
+    return { code: mapped.code, retryable: false };
+  }
   return {
-    code: mapProviderFailure(error).code,
+    code: mapped.code,
     retryable:
       error.code === 'NETWORK_ERROR' ||
       error.code === 'TIMEOUT' ||

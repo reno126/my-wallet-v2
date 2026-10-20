@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 
 import { deferred } from '../../test-support/deferred.ts';
 import { createMarketCalendar } from '../domain/market-calendar.ts';
@@ -299,10 +300,80 @@ describe('when coordinating current-price refreshes', () => {
     expect(fixture.provider.getQuote).toHaveBeenCalledExactlyOnceWith('MSFT');
   });
 
-  it.each([0, 6, 1.5, NaN])('should reject concurrency %s', (concurrency) => {
+  it('should retain the original error when recording that failure also throws', async () => {
+    // Arrange
+    const fixture = createFixture();
+    const originalError = new Error('cache read failed');
+    const recordingError = new Error('failure write failed');
+    fixture.cache.latest.mockRejectedValueOnce(originalError);
+    fixture.work.fail.mockRejectedValueOnce(recordingError);
+
+    // Act
+    const task = fixture.scheduler.enqueue('AAPL');
+
+    // Assert
+    await expect(task).rejects.toBeInstanceOf(AggregateError);
+    await expect(task).rejects.toMatchObject({
+      cause: originalError,
+      errors: [originalError, recordingError],
+    });
+    expect(fixture.onError).toHaveBeenCalledTimes(1);
+    expect(fixture.provider.getQuote).not.toHaveBeenCalled();
+
+    // Act
+    await fixture.scheduler.enqueue('AAPL');
+
+    // Assert
+    expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
+  });
+
+  it('should reject and release queued work when persisting a provider failure throws', async () => {
+    // Arrange
+    const fixture = createFixture();
+    const recordingError = new Error('failure write failed');
+    fixture.provider.getQuote.mockResolvedValueOnce(
+      failure({ code: 'PROVIDER_TIMEOUT', retryable: true }),
+    );
+    fixture.work.fail.mockRejectedValueOnce(recordingError);
+
+    // Act
+    const task = fixture.scheduler.enqueue('AAPL');
+
+    // Assert
+    await expect(task).rejects.toBe(recordingError);
+    expect(fixture.onError).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Act
+    await fixture.scheduler.enqueue('AAPL');
+
+    // Assert
+    expect(fixture.provider.getQuote).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([0, 6, 1.5, NaN, Infinity])('should reject concurrency %s', (concurrency) => {
     // Arrange
     // Act
     // Assert
-    expect(() => createFixture(concurrency)).toThrow(RangeError);
+    expect(() => createFixture(concurrency)).toThrow(ZodError);
+  });
+
+  it.each(['3', null, true])('should reject untyped non-number concurrency %s', (concurrency) => {
+    // Arrange
+    const fixture = createFixture();
+    const options = {
+      work: fixture.work,
+      cache: fixture.cache,
+      provider: fixture.provider,
+      calendar: createMarketCalendar('America/New_York'),
+      onError: fixture.onError,
+      concurrency,
+    };
+
+    // Act
+    // Assert
+    expect(() => {
+      Reflect.apply(createPriceRefreshScheduler, undefined, [options]);
+    }).toThrow(ZodError);
   });
 });

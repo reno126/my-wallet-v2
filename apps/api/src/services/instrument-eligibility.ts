@@ -1,4 +1,5 @@
 import type { VerifiedInstrument } from '../domain/instrument.ts';
+import { validateUsdCurrency } from '../domain/usd-currency.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
 
@@ -27,11 +28,9 @@ export function hasUnsupportedStockClassification(instrument: StockClassificatio
 export function validateBuyInstrument(
   instrument: BuyInstrumentDetails,
 ): Result<VerifiedInstrument, ApiFailure> {
-  if (!instrument.quoteCurrency) {
-    return failure({ code: 'CURRENCY_UNAVAILABLE' });
-  }
-  if (instrument.quoteCurrency.toUpperCase() !== 'USD') {
-    return failure({ code: 'UNSUPPORTED_CURRENCY' });
+  const currency = validateUsdCurrency(instrument.quoteCurrency);
+  if (!currency.ok) {
+    return currency;
   }
   if (
     hasUnsupportedStockClassification(instrument) ||
@@ -48,6 +47,6 @@ export function validateBuyInstrument(
     symbol: instrument.symbol,
     name: instrument.name,
     exchange: instrument.exchange,
-    quoteCurrency: 'USD',
+    quoteCurrency: currency.value,
   });
 }

@@ -264,7 +264,7 @@ describe('when configuring the API-only FMP adapter', () => {
     },
   );
 
-  it.each(['1', '5'])('should accept supported refresh concurrency: %s', (concurrency) => {
+  it.each(['1', '3', '5'])('should accept supported refresh concurrency: %s', (concurrency) => {
     // Arrange
     const input = { ...validTestEnvironment, FMP_REFRESH_CONCURRENCY: concurrency };
 

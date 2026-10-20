@@ -41,6 +41,8 @@ Market-data persistence tests use independent Prisma clients and test-owned prov
 
 Scheduler unit tests verify symbol deduplication while queued, running and waiting for retry, concurrency limits, cache reuse and bounded backoff using fake timers. PostgreSQL scheduler tests use controlled FMP responses and real leases/counters to verify competing wallet refreshes dispatch only once, retries retain their charges, exhausted quota blocks dispatch, and old snapshots survive failures. Refresh ownership and persisted cooldowns are exercised at the service/database boundary; public wallet-open triggers arrive in 7D.
 
+The scheduler integration suite also exercises the registered `server.priceRefresh` decorator with controlled provider dispatch, persistence and fresh-cache reuse. Error-path tests verify that failure-recording exceptions release queue entries and retain the original execution error when both operations fail. Type-contract tests exclude unrelated API failures and retryable quota/currency failures from refresh results.
+
 To run frontend tests alone with bounded worker startup:
 
 ```sh

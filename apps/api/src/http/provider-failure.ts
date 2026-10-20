@@ -1,7 +1,10 @@
 import type { FmpFailure } from '../providers/fmp/client.js';
-import type { ApiFailure } from './api-failure.js';
 
-export function mapProviderFailure(failure: FmpFailure): ApiFailure {
+interface ProviderFailure {
+  code: 'PROVIDER_UNAVAILABLE' | 'PROVIDER_QUOTA_EXHAUSTED' | 'PROVIDER_ERROR' | 'PROVIDER_TIMEOUT';
+}
+
+export function mapProviderFailure(failure: FmpFailure): ProviderFailure {
   switch (failure.code) {
     case 'QUOTA_EXHAUSTED':
       return { code: 'PROVIDER_QUOTA_EXHAUSTED' };

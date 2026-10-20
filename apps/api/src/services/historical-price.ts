@@ -6,6 +6,7 @@ import {
   instrumentPriceQuerySchema,
 } from '@my-wallets/contracts';
 
+import { validateUsdCurrency } from '../domain/usd-currency.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
 import type { HistoricalClose, HistoricalPriceProvider } from './historical-price-provider.js';
@@ -51,11 +52,9 @@ export function createHistoricalPriceService(
       return profileResult;
     }
     const profile = profileResult.value;
-    if (!profile.currency) {
-      return failure({ code: 'CURRENCY_UNAVAILABLE' });
-    }
-    if (profile.currency.toUpperCase() !== 'USD') {
-      return failure({ code: 'UNSUPPORTED_CURRENCY' });
+    const currency = validateUsdCurrency(profile.currency);
+    if (!currency.ok) {
+      return currency;
     }
 
     const selected = await findHistoricalClose(provider, {

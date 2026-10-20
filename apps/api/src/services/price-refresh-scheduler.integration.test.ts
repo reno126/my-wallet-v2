@@ -23,9 +23,12 @@ afterAll(async () => {
   await Promise.all([primary.close(), competitor.close()]);
 });
 
-async function createFixture(dailyLimit = 250) {
+async function createFixture(options: { dailyLimit?: number; now?: () => Date } = {}) {
   const startedAt = Date.now();
-  const now = () => new Date(Date.parse('2026-11-02T17:00:00.000Z') + Date.now() - startedAt);
+  const now =
+    options.now ??
+    (() => new Date(Date.parse('2026-11-02T17:00:00.000Z') + Date.now() - startedAt));
+  const dailyLimit = options.dailyLimit ?? 250;
   const suffix = randomUUID();
   const provider = `scheduler-${suffix}`;
   const symbol = `S${suffix.replaceAll('-', '').toUpperCase()}`;
@@ -111,6 +114,43 @@ async function createFixture(dailyLimit = 250) {
 }
 
 describe('when scheduling refreshes with PostgreSQL coordination', () => {
+  it('should execute and reuse a current quote through the registered Fastify scheduler', async () => {
+    // Arrange
+    const fixture = await createFixture({ now: () => new Date() });
+    const server = createTestServer(
+      { FMP_API_KEY: 'test-only-key', FMP_REFRESH_CONCURRENCY: '1' },
+      { fmp: { reserveRequest: fixture.quota.reserveRequest, fetch: fixture.fetchRequest } },
+    );
+    onTestFinished(async () => server.close());
+    await server.ready();
+
+    // Act
+    const accepted = await server.priceRefresh.requestForWallet(
+      fixture.userId,
+      fixture.firstWallet.id,
+      fixture.symbol,
+    );
+    await server.priceRefresh.enqueue(fixture.symbol);
+    await server.priceRefresh.requestForWallet(
+      fixture.userId,
+      fixture.secondWallet.id,
+      fixture.symbol,
+    );
+    await server.priceRefresh.enqueue(fixture.symbol);
+
+    // Assert
+    expect(accepted).toBe(true);
+    expect(fixture.fetchRequest).toHaveBeenCalledTimes(2);
+    expect(await fixture.quota.read()).toMatchObject({ used: 2 });
+    expect(await fixture.cache.latest(fixture.symbol)).toMatchObject({ unitPrice: '123.45678901' });
+    expect(
+      await server.prisma.refreshWork.findUniqueOrThrow({ where: { symbol: fixture.symbol } }),
+    ).toMatchObject({ status: 'SUCCEEDED', leaseToken: null });
+    expect(
+      await server.prisma.refreshSubscription.count({ where: { symbol: fixture.symbol } }),
+    ).toBe(2);
+  });
+
   it('should share one active dispatch across competing wallet refreshes and reuse the fresh result', async () => {
     // Arrange
     const fixture = await createFixture();
@@ -175,7 +215,7 @@ describe('when scheduling refreshes with PostgreSQL coordination', () => {
 
   it('should stop retry dispatches at the quota boundary and retain the stale quote and retry deadline', async () => {
     // Arrange
-    const fixture = await createFixture(2);
+    const fixture = await createFixture({ dailyLimit: 2 });
     fixture.fetchRequest.mockReset().mockResolvedValue(new Response(null, { status: 503 }));
     await fixture.work.requestForWallet(fixture.userId, fixture.firstWallet.id, fixture.symbol);
     const scheduler = fixture.scheduler();
@@ -203,7 +243,7 @@ describe('when scheduling refreshes with PostgreSQL coordination', () => {
 
   it('should persist quota exhaustion without dispatch or loss of the stale price', async () => {
     // Arrange
-    const fixture = await createFixture(1);
+    const fixture = await createFixture({ dailyLimit: 1 });
     await fixture.quota.reserveRequest();
     await fixture.work.requestForWallet(fixture.userId, fixture.firstWallet.id, fixture.symbol);
     const scheduler = fixture.scheduler();
