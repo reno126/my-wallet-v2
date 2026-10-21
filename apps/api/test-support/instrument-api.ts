@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { expect, onTestFinished } from 'vitest';
 
+import type { FmpDependencies } from '../src/providers/fmp/client.ts';
 import { createAuthenticatedUser } from './authenticated-user.js';
 import { createTestServer } from './create-test-server.js';
 import { createOpenApiValidator } from './openapi-contract.js';
@@ -13,6 +14,7 @@ export interface FakeProviderResponse {
 }
 
 export interface InstrumentApiFixtureOptions {
+  fmp?: FmpDependencies;
   quotaLimit?: number;
   configureQuota?: boolean;
   authenticate?: boolean;
@@ -57,25 +59,30 @@ export async function createInstrumentApiFixture(
       FMP_BASE_URL: `${providerAddress}/stable/`,
       ...options.environment,
     },
-    options.configureQuota === false
-      ? {}
-      : {
-          fmp: {
-            timeoutMs: 500,
-            reserveRequest: () => {
-              if (used >= (options.quotaLimit ?? 100)) {
-                return Promise.resolve(false);
-              }
-              used += 1;
-              return Promise.resolve(true);
+    options.fmp
+      ? { fmp: options.fmp }
+      : options.configureQuota === false
+        ? {}
+        : {
+            fmp: {
+              timeoutMs: 500,
+              reserveRequest: () => {
+                if (used >= (options.quotaLimit ?? 100)) {
+                  return Promise.resolve(false);
+                }
+                used += 1;
+                return Promise.resolve(true);
+              },
             },
           },
-        },
   );
   const registeredEmails: string[] = [];
   const registeredSymbols: string[] = [];
   onTestFinished(async () => {
     try {
+      if (server.hasDecorator('priceRefresh')) {
+        await server.priceRefresh.stop();
+      }
       if (server.hasDecorator('prisma') && registeredEmails.length > 0) {
         await server.prisma.user.deleteMany({ where: { email: { in: registeredEmails } } });
       }

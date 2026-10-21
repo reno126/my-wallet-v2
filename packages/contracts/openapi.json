@@ -450,6 +450,465 @@
         ],
         "additionalProperties": false
       },
+      "CurrentPriceInput": {
+        "type": "object",
+        "properties": {
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "marketDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "retrievedAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "FMP"
+            ]
+          }
+        },
+        "required": [
+          "unitPrice",
+          "currency",
+          "marketDate",
+          "retrievedAt",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "HoldingValuationInput": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "description": "Original acquisition cost of remaining FIFO lots, without display rounding."
+          },
+          "averageUnitCost": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining cost divided by quantity at 100 significant digits; null when quantity is zero."
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "currentValue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLoss": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLossPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator."
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "not_required"
+            ]
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrentPriceInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allocationPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Share of the complete wallet current value, times 100; null when unavailable or zero."
+          }
+        },
+        "required": [
+          "walletId",
+          "symbol",
+          "name",
+          "exchange",
+          "quoteCurrency",
+          "quantity",
+          "remainingCostBasis",
+          "averageUnitCost",
+          "realizedProfitLoss",
+          "lastTransactionDate",
+          "currentValue",
+          "unrealizedProfitLoss",
+          "unrealizedProfitLossPercentage",
+          "freshness",
+          "price",
+          "allocationPercentage"
+        ],
+        "additionalProperties": false
+      },
+      "WalletValuationInput": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCodeInput"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateOnlyInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldingValuationInput"
+            }
+          },
+          "currentValue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLoss": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLossPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator."
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "not_required"
+            ]
+          },
+          "latestPriceUpdateAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimestampInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "walletId",
+          "reportingCurrency",
+          "remainingCostBasis",
+          "realizedProfitLoss",
+          "lastTransactionDate",
+          "holdings",
+          "currentValue",
+          "unrealizedProfitLoss",
+          "unrealizedProfitLossPercentage",
+          "freshness",
+          "latestPriceUpdateAt"
+        ],
+        "additionalProperties": false
+      },
+      "WalletRefreshStatusInput": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "providerConfigured": {
+            "type": "boolean"
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "not_required"
+            ]
+          },
+          "isSyncing": {
+            "type": "boolean"
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[A-Za-z0-9.^=-]+$"
+                },
+                "freshness": {
+                  "type": "string",
+                  "enum": [
+                    "fresh",
+                    "stale",
+                    "missing",
+                    "not_required"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "pending",
+                    "running",
+                    "failed",
+                    "succeeded"
+                  ]
+                },
+                "nextAttemptAt": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TimestampInput"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastFailureCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "INSUFFICIENT_HOLDING",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE",
+                        "RATE_LIMITED",
+                        "PROVIDER_UNAVAILABLE",
+                        "PROVIDER_QUOTA_EXHAUSTED",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_TIMEOUT",
+                        "UNSUPPORTED_CURRENCY",
+                        "UNSUPPORTED_INSTRUMENT",
+                        "CURRENCY_UNAVAILABLE",
+                        "CURRENCY_MISMATCH",
+                        "PRICE_NOT_AVAILABLE",
+                        "PRICE_LOOKUP_INCOMPLETE",
+                        "INTERNAL_SERVER_ERROR"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "symbol",
+                "freshness",
+                "status",
+                "nextAttemptAt",
+                "lastFailureCode"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "walletId",
+          "providerConfigured",
+          "freshness",
+          "isSyncing",
+          "holdings"
+        ],
+        "additionalProperties": false
+      },
+      "PriceRefreshReceiptInput": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceIdInput"
+          },
+          "requestedSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9.^=-]+$"
+            }
+          }
+        },
+        "required": [
+          "walletId",
+          "requestedSymbols"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderQuotaStatusInput": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FMP"
+            ]
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "quotaDate": {
+            "$ref": "#/components/schemas/DateOnlyInput"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "used": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "exhausted": {
+            "type": "boolean"
+          },
+          "resetsAt": {
+            "$ref": "#/components/schemas/TimestampInput"
+          }
+        },
+        "required": [
+          "provider",
+          "configured",
+          "quotaDate",
+          "timeZone",
+          "limit",
+          "used",
+          "remaining",
+          "exhausted",
+          "resetsAt"
+        ],
+        "additionalProperties": false
+      },
       "InstrumentSearchResponseInput": {
         "type": "object",
         "properties": {
@@ -1287,6 +1746,465 @@
           "averageUnitCost",
           "realizedProfitLoss",
           "lastTransactionDate"
+        ],
+        "additionalProperties": false
+      },
+      "CurrentPrice": {
+        "type": "object",
+        "properties": {
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])(?:0|[1-9]\\d{0,21})(?:\\.\\d{1,8})?$"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "marketDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "retrievedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "FMP"
+            ]
+          }
+        },
+        "required": [
+          "unitPrice",
+          "currency",
+          "marketDate",
+          "retrievedAt",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "HoldingValuation": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[A-Za-z0-9.^=-]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "description": "Original acquisition cost of remaining FIFO lots, without display rounding."
+          },
+          "averageUnitCost": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining cost divided by quantity at 100 significant digits; null when quantity is zero."
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "currentValue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLoss": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLossPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator."
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "not_required"
+            ]
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrentPrice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allocationPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Share of the complete wallet current value, times 100; null when unavailable or zero."
+          }
+        },
+        "required": [
+          "walletId",
+          "symbol",
+          "name",
+          "exchange",
+          "quoteCurrency",
+          "quantity",
+          "remainingCostBasis",
+          "averageUnitCost",
+          "realizedProfitLoss",
+          "lastTransactionDate",
+          "currentValue",
+          "unrealizedProfitLoss",
+          "unrealizedProfitLossPercentage",
+          "freshness",
+          "price",
+          "allocationPercentage"
+        ],
+        "additionalProperties": false
+      },
+      "WalletValuation": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "reportingCurrency": {
+            "$ref": "#/components/schemas/CurrencyCode"
+          },
+          "remainingCostBasis": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "realizedProfitLoss": {
+            "type": "string",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          },
+          "lastTransactionDate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateOnly"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldingValuation"
+            }
+          },
+          "currentValue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLoss": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unrealizedProfitLossPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator."
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "not_required"
+            ]
+          },
+          "latestPriceUpdateAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "walletId",
+          "reportingCurrency",
+          "remainingCostBasis",
+          "realizedProfitLoss",
+          "lastTransactionDate",
+          "holdings",
+          "currentValue",
+          "unrealizedProfitLoss",
+          "unrealizedProfitLossPercentage",
+          "freshness",
+          "latestPriceUpdateAt"
+        ],
+        "additionalProperties": false
+      },
+      "WalletRefreshStatus": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "providerConfigured": {
+            "type": "boolean"
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing",
+              "not_required"
+            ]
+          },
+          "isSyncing": {
+            "type": "boolean"
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[A-Za-z0-9.^=-]+$"
+                },
+                "freshness": {
+                  "type": "string",
+                  "enum": [
+                    "fresh",
+                    "stale",
+                    "missing",
+                    "not_required"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "pending",
+                    "running",
+                    "failed",
+                    "succeeded"
+                  ]
+                },
+                "nextAttemptAt": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Timestamp"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastFailureCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "INSUFFICIENT_HOLDING",
+                        "VALIDATION_FAILED",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE",
+                        "RATE_LIMITED",
+                        "PROVIDER_UNAVAILABLE",
+                        "PROVIDER_QUOTA_EXHAUSTED",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_TIMEOUT",
+                        "UNSUPPORTED_CURRENCY",
+                        "UNSUPPORTED_INSTRUMENT",
+                        "CURRENCY_UNAVAILABLE",
+                        "CURRENCY_MISMATCH",
+                        "PRICE_NOT_AVAILABLE",
+                        "PRICE_LOOKUP_INCOMPLETE",
+                        "INTERNAL_SERVER_ERROR"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "symbol",
+                "freshness",
+                "status",
+                "nextAttemptAt",
+                "lastFailureCode"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "walletId",
+          "providerConfigured",
+          "freshness",
+          "isSyncing",
+          "holdings"
+        ],
+        "additionalProperties": false
+      },
+      "PriceRefreshReceipt": {
+        "type": "object",
+        "properties": {
+          "walletId": {
+            "$ref": "#/components/schemas/ResourceId"
+          },
+          "requestedSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9.^=-]+$"
+            }
+          }
+        },
+        "required": [
+          "walletId",
+          "requestedSymbols"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderQuotaStatus": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "FMP"
+            ]
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "quotaDate": {
+            "$ref": "#/components/schemas/DateOnly"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "used": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "exhausted": {
+            "type": "boolean"
+          },
+          "resetsAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "provider",
+          "configured",
+          "quotaDate",
+          "timeZone",
+          "limit",
+          "used",
+          "remaining",
+          "exhausted",
+          "resetsAt"
         ],
         "additionalProperties": false
       },
@@ -2361,6 +3279,61 @@
         }
       }
     },
+    "/market-data/quota": {
+      "get": {
+        "operationId": "getMarketDataQuota",
+        "summary": "Read the shared application provider request budget",
+        "tags": [
+          "Market data"
+        ],
+        "description": "Counts tracked outbound reservations across all users, including failed calls and retries. It is not the provider account balance. Reading consumes no quota. Returns configuration availability, local quota date, reset timezone and next reset instant.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderQuotaStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets": {
       "get": {
         "operationId": "listWallets",
@@ -3296,6 +4269,378 @@
         }
       }
     },
+    "/wallets/{walletId}/valuation": {
+      "get": {
+        "operationId": "getWalletValuation",
+        "summary": "Read cached current values and FIFO unrealized P/L for an owned wallet",
+        "tags": [
+          "Wallets"
+        ],
+        "description": "Returns unrounded USD decimal strings with per-position price dates and freshness. Retains stale prices. If an open position has no price, wallet current value, unrealized P/L and allocation percentages are null. Closed positions need no price and contribute zero current value. Reads never dispatch provider calls or request refreshes.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletValuation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{walletId}/valuation/{symbol}": {
+      "get": {
+        "operationId": "getWalletHoldingValuation",
+        "summary": "Read cached valuation for one holding with its share of the complete wallet",
+        "tags": [
+          "Wallets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ResourceIdInput"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[A-Za-z0-9.^=-]+$"
+            },
+            "in": "path",
+            "name": "symbol",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingValuation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{walletId}/price-refresh": {
+      "get": {
+        "operationId": "getWalletPriceRefreshStatus",
+        "summary": "Read shared refresh state for the owned wallet holdings without scheduling work",
+        "tags": [
+          "Wallets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletRefreshStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "requestWalletPriceRefresh",
+        "summary": "Idempotently request shared refreshes for stale open holdings",
+        "tags": [
+          "Wallets"
+        ],
+        "description": "Call after opening a wallet. Persists intent and returns without waiting for FMP. Repeated requests coalesce by symbol and preserve pending retries, active leases and terminal cooldowns. requestedSymbols reports persisted requests, not completed refreshes or quota reservations. Fresh and closed holdings are skipped. Poll refresh status or reread valuation for completion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "walletId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceRefreshReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/wallets/{walletId}/transactions/{transactionId}": {
       "delete": {
         "operationId": "deleteLatestTransaction",
@@ -3419,6 +4764,10 @@
     }
   ],
   "tags": [
+    {
+      "name": "Market data",
+      "description": "Authenticated shared refresh and tracked request budget status."
+    },
     {
       "name": "Transactions",
       "description": "Authenticated immutable USD stock purchases and sales."

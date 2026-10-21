@@ -16,10 +16,12 @@ import { sendResult } from '../../../http/send-result.ts';
 import { createWalletRepository } from '../../../repositories/wallets.ts';
 import { createWalletService } from '../../../services/wallets.ts';
 import ledgerRoutes from './ledger.ts';
+import priceRoutes from './prices.ts';
 import transactionRoutes from './transactions.ts';
 
 const walletRoutes: FastifyPluginCallbackZod = (server, _options, completePluginRegistration) => {
   server.register(ledgerRoutes);
+  server.register(priceRoutes);
   server.register(transactionRoutes);
   const wallets = createWalletService(createWalletRepository(server.prisma));
   const commonErrorResponses = {

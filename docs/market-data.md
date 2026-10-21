@@ -2,7 +2,7 @@
 
 [Project overview](../README.md) · [API behavior](api.md#provider-availability)
 
-Slices 7A–7C supply PostgreSQL quota accounting, shared quote snapshots, durable refresh intent, wallet subscriptions, fenced leases, scheduling, restart recovery and graceful shutdown. Normal search, historical lookup and BUY verification use the durable budget. Public valuation/status endpoints and wallet-open triggers arrive in 7D, and freshness UI in 7E. Existing browser routes do not yet enqueue refresh work.
+Slices 7A–7D supply PostgreSQL quota accounting, shared quote snapshots, durable refresh intent, wallet subscriptions, fenced leases, scheduling, restart recovery, graceful shutdown and authenticated valuation/refresh/quota endpoints. Normal search, historical lookup and BUY verification use the durable budget. Browser wallet-open triggers and freshness UI arrive in 7E; existing browser routes do not yet enqueue refresh work.
 
 ## Quota configuration
 
@@ -14,7 +14,7 @@ Slices 7A–7C supply PostgreSQL quota accounting, shared quote snapshots, durab
 
 Production with an FMP key requires both variables explicitly. `US` is ambiguous and is rejected; the deployed reset timezone must be confirmed for the target environment. The approved operational limit is 250. No provider key is needed for automated tests.
 
-The first reservation persists one `FMP` policy in `provider_budget`. Later processes must match its limit and timezone or fail closed. There is one shared application budget per database, independent of users, wallets, symbols and API restarts. Development, CI and production must use separate databases. A coordinated policy change requires stopping dispatch, updating the persisted policy and all API configurations consistently, then restarting. Do not delete counters or change timezone during an active quota day to obtain another allowance.
+The first budget read or reservation persists one `FMP` policy in `provider_budget`. Later processes must match its limit and timezone or fail closed. Reading status does not create a daily charge. There is one shared application budget per database, independent of users, wallets, symbols and API restarts. Development, CI and production must use separate databases. A coordinated policy change requires stopping dispatch, updating the persisted policy and all API configurations consistently, then restarting. Do not delete counters or change timezone during an active quota day to obtain another allowance.
 
 `provider_quota_day` retains each day's used count. A conditional PostgreSQL upsert increments it only below the policy limit. Every search, needed profile/history follow-up and explicit retry reserves separately immediately before HTTP dispatch. Failed responses and transport errors keep their charges; there are no refunds. Missing keys and denied reservations cause no dispatch. Database/policy failures return the existing sanitized provider-unavailable result.
 
@@ -24,7 +24,7 @@ The calendar uses UTC instants and the configured timezone, with local-midnight 
 
 `price_snapshot` has a unique `(symbol, marketDate)` key and stores a positive exact `NUMERIC(30,8)` price, explicit USD currency, FMP source and UTC retrieval timestamp. Writes validate symbol/date/price precision before persistence; concurrent or delayed responses cannot replace a newer retrieval with an older one. The latest read orders by market date rather than retrieval time.
 
-A quote successfully retrieved on the configured current day can be fresh even when its market date is an earlier trading day, such as a weekend or holiday. Yesterday's retrieval and future-dated data are not fresh. Failed or exhausted refreshes preserve the previous snapshot and its retrieval timestamp. This cache belongs to the upcoming current-quote flow. The existing bounded 60-second search and historical lookup caches retain their separate keys and behavior.
+A quote successfully retrieved on the configured current day can be fresh even when its market date is an earlier trading day, such as a weekend or holiday. Yesterday's retrieval and future-dated data are not fresh. Failed or exhausted refreshes preserve the previous snapshot and its retrieval timestamp. Cached valuations use this shared current-quote cache. The existing bounded 60-second search and historical lookup caches retain their separate keys and behavior.
 
 ## Durable refresh work
 
@@ -58,7 +58,27 @@ Pending retry deadlines and unexpired lease deadlines become cancellable, proces
 
 `SIGINT` and `SIGTERM` close the API once. Fastify `preClose` stops admission, cancels recovery/retry timers and skips queued attempts. Already active attempts and intent writes drain; successful writes and retry intent commit before the FMP `onClose` hook finishes and Prisma disconnects. The shipped HTTP timeout is 10 seconds per call, and an active profile-plus-quote attempt can use two calls. Deployment termination grace must allow those calls and database cleanup. A forced kill leaves recoverable pending work or a lease that must expire; it does not reset quota. Timers do not keep an otherwise idle process alive.
 
-`buildServer({ recoverRefreshWork: false })` disables startup reconstruction for controlled tooling. OpenAPI generation and the API test-server helper use it to avoid background dispatch during schema export or unrelated tests. It does not remove the internal scheduler or its shutdown hooks. There is no new environment variable, dependency or migration for 7C. Browser refresh triggers, status/quota endpoints and valuation remain in 7D; visible freshness E2E coverage remains in 7E.
+`buildServer({ recoverRefreshWork: false })` disables startup reconstruction for controlled tooling. OpenAPI generation and the API test-server helper use it to avoid background dispatch during schema export or unrelated tests. It does not remove the internal scheduler or its shutdown hooks. Slices 7C–7D require no new environment variable, dependency or migration. Browser triggers and visible freshness E2E coverage remain in 7E.
+
+## Cached valuation and refresh API
+
+All endpoints require a session and use `Cache-Control: no-store`. Wallet endpoints check ownership before reading shared symbols or quota; missing and foreign wallets both return `404`.
+
+| Method and path                                | Behavior                                                                                                                                                                                                                     |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/wallets/:walletId/valuation`         | FIFO holdings enriched with cached prices, current values, unrealized P/L and percentages, allocation, aggregate freshness and latest retrieval time.                                                                        |
+| `GET /api/wallets/:walletId/valuation/:symbol` | One instrument with its allocation against the complete wallet. Unknown wallet instruments return `404`; closed positions remain readable.                                                                                   |
+| `POST /api/wallets/:walletId/price-refresh`    | Accepts no body, `null`, or `{}`. Persists requests for stale/missing open holdings and returns `202` with `requestedSymbols`, without waiting for provider completion. Client-selected symbols or force flags are rejected. |
+| `GET /api/wallets/:walletId/price-refresh`     | Per-holding freshness and durable work state, safe last failure code, next attempt/cooldown instant, provider configuration and `isSyncing`.                                                                                 |
+| `GET /api/market-data/quota`                   | Shared tracked used/remaining/limit, exhaustion, provider configuration, local quota date, timezone and next reset timestamp.                                                                                                |
+
+GETs do not schedule refreshes or call FMP. A future browser wallet-open flow reads valuation promptly, then uses the idempotent POST and polls status/rereads valuation. Fresh and closed positions are skipped. Concurrent requests reuse shared intent and leases, including requests from separate owned wallets. A receipt acknowledges persisted demand, including a coalesced request during cooldown; it does not promise dispatch, completion, or a reserved quota unit. Missing provider configuration, exhausted quota before admission, or a failed quota read returns a safe `503` while valuation remains readable. Existing retries and cooldowns are preserved.
+
+Valuation reuses ledger-only FIFO outputs. Current value is remaining quantity × cached unit price; unrealized P/L is current value minus remaining FIFO cost. P/L percentage divides by remaining cost and multiplies by 100; allocation divides by complete wallet current value and multiplies by 100. Values use exact decimal arithmetic with the existing 100-significant-digit division context and no presentation rounding. Monetary fields have explicit USD quote/reporting currency.
+
+Freshness is `fresh`, `stale`, `missing`, or `not_required`. Stale prices remain usable. A missing open-position price makes wallet current value, unrealized P/L and all allocation percentages `null`, while known position values and ledger totals remain visible. Closed positions contribute zero current value and unrealized P/L, retain realized P/L, and require no quote; an empty/all-closed wallet has zero totals and `not_required` freshness. Percentages with no denominator are `null`. Wallet freshness prioritizes missing, then stale, then fresh; `latestPriceUpdateAt` is the latest available open-position retrieval time, not proof that every position is fresh.
+
+The ledger is loaded from its owned `RepeatableRead` snapshot. Current quotes and work states are then batch-read from a short separate `RepeatableRead` snapshot. PostgreSQL `DISTINCT ON` selects one latest market-date quote per held symbol instead of loading all historical snapshots or querying once per holding. Concurrent ledger or refresh commits can appear on a later request. The existing full-ledger replay limitation remains; price reads add no materialized accounting state.
 
 ## Migration and checks
 

@@ -86,7 +86,7 @@ Holdings include fully closed positions: quantity and remaining cost are `"0"`, 
 
 Each response reads ownership, transactions and instrument metadata in a short PostgreSQL `RepeatableRead` transaction. FIFO calculation and DTO mapping run after that snapshot is loaded. Reads do not take the wallet write lock, expose uncommitted trades, or call the provider. Separate requests can observe different committed snapshots. A history row's `canDelete` can become stale; DELETE still checks under its write lock. History pagination bounds the response, while accounting currently replays the complete matching ledger in memory. There is no materialized summary or ledger-size cap in this release.
 
-Missing or inaccessible wallets return `404`, malformed identifiers/queries return `400`, missing sessions return `401`, private request limits return `429`, and unexpected database or invalid-ledger failures return sanitized `500` responses. All responses use `Cache-Control: no-store`. Current market value, live price, unrealized P/L, percentage share and freshness remain deferred to Phase 7. Wallet and instrument screens consume these summaries and paginated history directly.
+Missing or inaccessible wallets return `404`, malformed identifiers/queries return `400`, missing sessions return `401`, private request limits return `429`, and unexpected database or invalid-ledger failures return sanitized `500` responses. All responses use `Cache-Control: no-store`. These ledger DTOs retain their original shape. Cached prices, current market value, unrealized P/L, allocation and freshness are available through the separate [valuation, refresh and quota endpoints](market-data.md#cached-valuation-and-refresh-api).
 
 ## Latest transaction deletion
 

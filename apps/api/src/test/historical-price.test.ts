@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { apiErrorSchema, historicalPriceSchema } from '@my-wallets/contracts';
 
@@ -177,12 +177,16 @@ describe('when requesting historical quotes through the authenticated API', () =
 
   it('should use the durable shared budget at normal startup without an injected reservation function', async () => {
     // Arrange
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2040-01-02T17:00:00Z'));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const quotaDay = { provider: 'FMP', quotaDate: new Date('2040-01-02T00:00:00Z') };
     const fixture = await createInstrumentApiFixture([{ body: [profile] }, { body: [row] }], {
       configureQuota: false,
     });
-    // This is the sole integration test exercising the default FMP budget key.
-    await fixture.server.prisma.providerQuotaDay.deleteMany({ where: { provider: 'FMP' } });
-    await fixture.server.prisma.providerBudget.deleteMany({ where: { provider: 'FMP' } });
+    await fixture.server.prisma.providerQuotaDay.deleteMany({ where: quotaDay });
 
     // Act
     try {
@@ -197,11 +201,12 @@ describe('when requesting historical quotes through the authenticated API', () =
         await fixture.server.prisma.providerBudget.findUnique({ where: { provider: 'FMP' } }),
       ).toMatchObject({ dailyLimit: 250, timeZone: 'America/New_York' });
       expect(
-        await fixture.server.prisma.providerQuotaDay.findFirst({ where: { provider: 'FMP' } }),
+        await fixture.server.prisma.providerQuotaDay.findUnique({
+          where: { provider_quotaDate: quotaDay },
+        }),
       ).toMatchObject({ used: 2 });
     } finally {
-      await fixture.server.prisma.providerQuotaDay.deleteMany({ where: { provider: 'FMP' } });
-      await fixture.server.prisma.providerBudget.deleteMany({ where: { provider: 'FMP' } });
+      await fixture.server.prisma.providerQuotaDay.deleteMany({ where: quotaDay });
     }
   });
 

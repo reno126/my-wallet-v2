@@ -163,6 +163,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/market-data/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the shared application provider request budget
+         * @description Counts tracked outbound reservations across all users, including failed calls and retries. It is not the provider account balance. Reading consumes no quota. Returns configuration availability, local quota date, reset timezone and next reset instant.
+         */
+        get: operations["getMarketDataQuota"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wallets": {
         parameters: {
             query?: never;
@@ -258,6 +278,64 @@ export interface paths {
         get: operations["getWalletHolding"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wallets/{walletId}/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read cached current values and FIFO unrealized P/L for an owned wallet
+         * @description Returns unrounded USD decimal strings with per-position price dates and freshness. Retains stale prices. If an open position has no price, wallet current value, unrealized P/L and allocation percentages are null. Closed positions need no price and contribute zero current value. Reads never dispatch provider calls or request refreshes.
+         */
+        get: operations["getWalletValuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wallets/{walletId}/valuation/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read cached valuation for one holding with its share of the complete wallet */
+        get: operations["getWalletHoldingValuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wallets/{walletId}/price-refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read shared refresh state for the owned wallet holdings without scheduling work */
+        get: operations["getWalletPriceRefreshStatus"];
+        put?: never;
+        /**
+         * Idempotently request shared refreshes for stale open holdings
+         * @description Call after opening a wallet. Persists intent and returns without waiting for FMP. Repeated requests coalesce by symbol and preserve pending retries, active leases and terminal cooldowns. requestedSymbols reports persisted requests, not completed refreshes or quota reservations. Fresh and closed holdings are skipped. Poll refresh status or reread valuation for completion.
+         */
+        post: operations["requestWalletPriceRefresh"];
         delete?: never;
         options?: never;
         head?: never;
@@ -382,6 +460,84 @@ export interface components {
             averageUnitCost: string | null;
             realizedProfitLoss: string;
             lastTransactionDate: components["schemas"]["DateOnlyInput"];
+        };
+        CurrentPriceInput: {
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCodeInput"];
+            marketDate: components["schemas"]["DateOnlyInput"];
+            retrievedAt: components["schemas"]["TimestampInput"];
+            /** @enum {string} */
+            source: "FMP";
+        };
+        HoldingValuationInput: {
+            walletId: components["schemas"]["ResourceIdInput"];
+            symbol: string;
+            name: string;
+            exchange: string;
+            quoteCurrency: components["schemas"]["CurrencyCodeInput"];
+            quantity: string;
+            /** @description Original acquisition cost of remaining FIFO lots, without display rounding. */
+            remainingCostBasis: string;
+            /** @description Remaining cost divided by quantity at 100 significant digits; null when quantity is zero. */
+            averageUnitCost: string | null;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnlyInput"];
+            currentValue: string | null;
+            unrealizedProfitLoss: string | null;
+            /** @description Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator. */
+            unrealizedProfitLossPercentage: string | null;
+            /** @enum {string} */
+            freshness: "fresh" | "stale" | "missing" | "not_required";
+            price: components["schemas"]["CurrentPriceInput"] | null;
+            /** @description Share of the complete wallet current value, times 100; null when unavailable or zero. */
+            allocationPercentage: string | null;
+        };
+        WalletValuationInput: {
+            walletId: components["schemas"]["ResourceIdInput"];
+            reportingCurrency: components["schemas"]["CurrencyCodeInput"];
+            remainingCostBasis: string;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnlyInput"] | null;
+            holdings: components["schemas"]["HoldingValuationInput"][];
+            currentValue: string | null;
+            unrealizedProfitLoss: string | null;
+            /** @description Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator. */
+            unrealizedProfitLossPercentage: string | null;
+            /** @enum {string} */
+            freshness: "fresh" | "stale" | "missing" | "not_required";
+            latestPriceUpdateAt: components["schemas"]["TimestampInput"] | null;
+        };
+        WalletRefreshStatusInput: {
+            walletId: components["schemas"]["ResourceIdInput"];
+            providerConfigured: boolean;
+            /** @enum {string} */
+            freshness: "fresh" | "stale" | "missing" | "not_required";
+            isSyncing: boolean;
+            holdings: {
+                symbol: string;
+                /** @enum {string} */
+                freshness: "fresh" | "stale" | "missing" | "not_required";
+                /** @enum {string} */
+                status: "idle" | "pending" | "running" | "failed" | "succeeded";
+                nextAttemptAt: components["schemas"]["TimestampInput"] | null;
+                lastFailureCode: ("UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "INSUFFICIENT_HOLDING" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR") | null;
+            }[];
+        };
+        PriceRefreshReceiptInput: {
+            walletId: components["schemas"]["ResourceIdInput"];
+            requestedSymbols: string[];
+        };
+        ProviderQuotaStatusInput: {
+            /** @enum {string} */
+            provider: "FMP";
+            configured: boolean;
+            quotaDate: components["schemas"]["DateOnlyInput"];
+            timeZone: string;
+            limit: number;
+            used: number;
+            remaining: number;
+            exhausted: boolean;
+            resetsAt: components["schemas"]["TimestampInput"];
         };
         InstrumentSearchResponseInput: {
             results: components["schemas"]["InstrumentInput"][];
@@ -561,6 +717,84 @@ export interface components {
             averageUnitCost: string | null;
             realizedProfitLoss: string;
             lastTransactionDate: components["schemas"]["DateOnly"];
+        };
+        CurrentPrice: {
+            unitPrice: string;
+            currency: components["schemas"]["CurrencyCode"];
+            marketDate: components["schemas"]["DateOnly"];
+            retrievedAt: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            source: "FMP";
+        };
+        HoldingValuation: {
+            walletId: components["schemas"]["ResourceId"];
+            symbol: string;
+            name: string;
+            exchange: string;
+            quoteCurrency: components["schemas"]["CurrencyCode"];
+            quantity: string;
+            /** @description Original acquisition cost of remaining FIFO lots, without display rounding. */
+            remainingCostBasis: string;
+            /** @description Remaining cost divided by quantity at 100 significant digits; null when quantity is zero. */
+            averageUnitCost: string | null;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnly"];
+            currentValue: string | null;
+            unrealizedProfitLoss: string | null;
+            /** @description Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator. */
+            unrealizedProfitLossPercentage: string | null;
+            /** @enum {string} */
+            freshness: "fresh" | "stale" | "missing" | "not_required";
+            price: components["schemas"]["CurrentPrice"] | null;
+            /** @description Share of the complete wallet current value, times 100; null when unavailable or zero. */
+            allocationPercentage: string | null;
+        };
+        WalletValuation: {
+            walletId: components["schemas"]["ResourceId"];
+            reportingCurrency: components["schemas"]["CurrencyCode"];
+            remainingCostBasis: string;
+            realizedProfitLoss: string;
+            lastTransactionDate: components["schemas"]["DateOnly"] | null;
+            holdings: components["schemas"]["HoldingValuation"][];
+            currentValue: string | null;
+            unrealizedProfitLoss: string | null;
+            /** @description Unrealized P/L divided by remaining FIFO cost, times 100; null without a denominator. */
+            unrealizedProfitLossPercentage: string | null;
+            /** @enum {string} */
+            freshness: "fresh" | "stale" | "missing" | "not_required";
+            latestPriceUpdateAt: components["schemas"]["Timestamp"] | null;
+        };
+        WalletRefreshStatus: {
+            walletId: components["schemas"]["ResourceId"];
+            providerConfigured: boolean;
+            /** @enum {string} */
+            freshness: "fresh" | "stale" | "missing" | "not_required";
+            isSyncing: boolean;
+            holdings: {
+                symbol: string;
+                /** @enum {string} */
+                freshness: "fresh" | "stale" | "missing" | "not_required";
+                /** @enum {string} */
+                status: "idle" | "pending" | "running" | "failed" | "succeeded";
+                nextAttemptAt: components["schemas"]["Timestamp"] | null;
+                lastFailureCode: ("UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "INSUFFICIENT_HOLDING" | "VALIDATION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_QUOTA_EXHAUSTED" | "PROVIDER_ERROR" | "PROVIDER_TIMEOUT" | "UNSUPPORTED_CURRENCY" | "UNSUPPORTED_INSTRUMENT" | "CURRENCY_UNAVAILABLE" | "CURRENCY_MISMATCH" | "PRICE_NOT_AVAILABLE" | "PRICE_LOOKUP_INCOMPLETE" | "INTERNAL_SERVER_ERROR") | null;
+            }[];
+        };
+        PriceRefreshReceipt: {
+            walletId: components["schemas"]["ResourceId"];
+            requestedSymbols: string[];
+        };
+        ProviderQuotaStatus: {
+            /** @enum {string} */
+            provider: "FMP";
+            configured: boolean;
+            quotaDate: components["schemas"]["DateOnly"];
+            timeZone: string;
+            limit: number;
+            used: number;
+            remaining: number;
+            exhausted: boolean;
+            resetsAt: components["schemas"]["Timestamp"];
         };
         InstrumentSearchResponse: {
             results: components["schemas"]["Instrument"][];
@@ -1132,6 +1366,54 @@ export interface operations {
             };
             /** @description Default Response */
             504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getMarketDataQuota: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderQuotaStatus"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1848,6 +2130,283 @@ export interface operations {
             429: components["responses"]["RateLimited"];
             /** @description Default Response */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getWalletValuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletValuation"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getWalletHoldingValuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: components["schemas"]["ResourceIdInput"];
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingValuation"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getWalletPriceRefreshStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalletRefreshStatus"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    requestWalletPriceRefresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                walletId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never> | null;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceRefreshReceipt"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

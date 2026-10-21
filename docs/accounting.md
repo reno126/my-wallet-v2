@@ -20,6 +20,8 @@ Each BUY opens a lot at its original acquisition unit price. Each SELL consumes 
 
 The average describes the original acquisition cost of the remaining inventory. It never determines FIFO matching or realized profit/loss. Realized results accumulate across closing and reopening a position. The result includes remaining lots and each sale's accounting, with explicit USD currency and plain decimal strings. No current-price valuation is performed.
 
+The separate [cached valuation service](market-data.md#cached-valuation-and-refresh-api), introduced in slice 7D, enriches those ledger results with current value (remaining quantity × cached price), unrealized P/L (current value − remaining FIFO cost), P/L percentages and wallet allocation. It uses the same exact decimal context, retains stale quotes, and leaves incomplete totals null when an open position lacks a price. Accounting replay itself remains independent of prices and refresh work.
+
 A SELL exceeding inventory at its chronological position returns `INSUFFICIENT_HOLDING`, even if a later BUY would cover it. Other expected failures use `UNSUPPORTED_CURRENCY`, `LEDGER_SCOPE_MISMATCH`, or `INVALID_LEDGER_ENTRY` through the shared `Result` type. The repository and service own authorization, database locking, atomic writes, and the HTTP conflict mapping; the calculation remains independent of those concerns. Replaying a supplied ledger does not itself authorize deletion or enforce latest-only deletion.
 
 ## Decimal precision and presentation

@@ -14,11 +14,15 @@ import {
   createTransactionSchema,
   createWalletSchema,
   currencyCodeSchema,
+  currentPriceSchema,
   dateOnlySchema,
   historicalPriceSchema,
   holdingSchema,
+  holdingValuationSchema,
   instrumentSchema,
   instrumentSearchResponseSchema,
+  priceRefreshReceiptSchema,
+  providerQuotaStatusSchema,
   resourceIdSchema,
   timestampSchema,
   transactionHistoryEntrySchema,
@@ -29,7 +33,9 @@ import {
   updateWalletSchema,
   walletHoldingsSchema,
   walletListSchema,
+  walletRefreshStatusSchema,
   walletSummarySchema,
+  walletValuationSchema,
 } from '@my-wallets/contracts';
 
 registerPublicSchemas();
@@ -46,6 +52,10 @@ const openApiPlugin: FastifyPluginAsync = async (server) => {
       },
       servers: [{ url: '/api' }],
       tags: [
+        {
+          name: 'Market data',
+          description: 'Authenticated shared refresh and tracked request budget status.',
+        },
         {
           name: 'Transactions',
           description: 'Authenticated immutable USD stock purchases and sales.',
@@ -96,6 +106,12 @@ function registerPublicSchemas() {
   zod.globalRegistry.add(instrumentSchema, { id: 'Instrument' });
   zod.globalRegistry.add(historicalPriceSchema, { id: 'HistoricalPrice' });
   zod.globalRegistry.add(holdingSchema, { id: 'Holding' });
+  zod.globalRegistry.add(currentPriceSchema, { id: 'CurrentPrice' });
+  zod.globalRegistry.add(holdingValuationSchema, { id: 'HoldingValuation' });
+  zod.globalRegistry.add(walletValuationSchema, { id: 'WalletValuation' });
+  zod.globalRegistry.add(walletRefreshStatusSchema, { id: 'WalletRefreshStatus' });
+  zod.globalRegistry.add(priceRefreshReceiptSchema, { id: 'PriceRefreshReceipt' });
+  zod.globalRegistry.add(providerQuotaStatusSchema, { id: 'ProviderQuotaStatus' });
   zod.globalRegistry.add(instrumentSearchResponseSchema, { id: 'InstrumentSearchResponse' });
   zod.globalRegistry.add(resourceIdSchema, { id: 'ResourceId' });
   zod.globalRegistry.add(timestampSchema, { id: 'Timestamp' });

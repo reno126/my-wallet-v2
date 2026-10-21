@@ -7,11 +7,15 @@ import { createFmpClient } from '../providers/fmp/client.ts';
 import { createFmpCurrentPriceProvider } from '../providers/fmp/current-price-provider.ts';
 import { createFmpHistoricalPriceProvider } from '../providers/fmp/historical-price-provider.ts';
 import { createFmpInstrumentVerifier } from '../providers/fmp/instrument-verifier.ts';
+import { createLedgerRepository } from '../repositories/ledger.ts';
+import { createMarketDataRepository } from '../repositories/market-data.ts';
 import { createPriceCacheRepository } from '../repositories/price-cache.ts';
 import { createProviderQuotaRepository } from '../repositories/provider-quota.ts';
 import { createRefreshWorkRepository } from '../repositories/refresh-work.ts';
 import { createHistoricalPriceService } from '../services/historical-price.ts';
 import { createInstrumentSearchService } from '../services/instrument-search.ts';
+import { createLedgerService } from '../services/ledger.ts';
+import { createMarketDataService } from '../services/market-data.ts';
 import { createPriceRefreshRecovery } from '../services/price-refresh-recovery.ts';
 import { createPriceRefreshScheduler } from '../services/price-refresh-scheduler.ts';
 
@@ -21,6 +25,7 @@ declare module 'fastify' {
     historicalPrices: ReturnType<typeof createHistoricalPriceService>;
     instrumentVerifier: ReturnType<typeof createFmpInstrumentVerifier>;
     priceRefresh: ReturnType<typeof createPriceRefreshScheduler>;
+    marketData: ReturnType<typeof createMarketDataService>;
   }
 }
 
@@ -50,6 +55,17 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
       server.log.error('Background price refresh failed; persisted work may require recovery.'),
   });
   server.decorate('priceRefresh', scheduler);
+  server.decorate(
+    'marketData',
+    createMarketDataService({
+      ledger: createLedgerService(createLedgerRepository(server.prisma)),
+      market: createMarketDataRepository(server.prisma),
+      scheduler,
+      quota,
+      calendar: createMarketCalendar(options.environment.FMP_QUOTA_TIMEZONE),
+      configured: options.environment.FMP_API_KEY.length > 0,
+    }),
+  );
   const recovery = createPriceRefreshRecovery({
     work,
     quota,
