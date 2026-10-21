@@ -20,14 +20,17 @@ describe('when exposing cached valuations and shared price refreshes', () => {
     // Arrange
     const fixture = await createMarketDataFixture({ environment: { FMP_API_KEY: '' } });
     // Act
-    const empty = walletValuationSchema.parse(
-      (await fixture.get(`${fixture.base}/valuation`)).json(),
-    );
-    await fixture.seedTransaction();
-    await fixture.seedTransaction({ side: 'SELL' });
-    const closed = walletValuationSchema.parse(
-      (await fixture.get(`${fixture.base}/valuation`)).json(),
-    );
+    const emptyResponse = await fixture.get(`${fixture.base}/valuation`);
+    expect(emptyResponse.statusCode, emptyResponse.body).toBe(200);
+    const empty = walletValuationSchema.parse(emptyResponse.json());
+    const purchase = await fixture.seedTransaction();
+    await fixture.seedTransaction({
+      side: 'SELL',
+      createdAt: new Date(purchase.createdAt.getTime() + 1),
+    });
+    const closedResponse = await fixture.get(`${fixture.base}/valuation`);
+    expect(closedResponse.statusCode, closedResponse.body).toBe(200);
+    const closed = walletValuationSchema.parse(closedResponse.json());
     const requested = await fixture.refresh();
     // Assert
     expect(empty).toMatchObject({
