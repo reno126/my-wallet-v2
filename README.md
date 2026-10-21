@@ -2,10 +2,6 @@
 
 My Wallet is an application for managing separate USD investment wallets and recording stock purchases. It uses a TypeScript/pnpm workspace with a React SPA, React Router, a Fastify API, PostgreSQL/Prisma, and shared Zod/OpenAPI contracts.
 
-## Development status
-
-Authentication, wallet lifecycle, instrument search, historical quotes, BUY/SELL journeys, FIFO accounting, latest-only transaction deletion, and wallet/instrument history and holdings are implemented. [Market data](docs/market-data.md) includes cached valuations, refresh/status endpoints, a durable shared quota and refresh recovery. Browser refresh triggers and freshness UI follow in the next [delivery slice](IMPLEMENTATION_PLAN.md#delivery-slice-map).
-
 ## Quick start
 
 Use the Node.js and pnpm versions specified in [`package.json`](package.json), and start Docker with Compose support. Run commands from the workspace root.
