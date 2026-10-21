@@ -1,6 +1,3 @@
-import { useEffect } from 'react';
-import { useLocation } from 'react-router';
-
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -11,20 +8,7 @@ import { useProviderQuota } from '../_hooks/useProviderQuota';
 import { pricingDictionary as text, quotaRemaining } from '../pricingDictionary';
 
 export function ProviderQuotaStatus() {
-  const { data, load, state } = useProviderQuota();
-  const { pathname } = useLocation();
-  useEffect(() => {
-    void load('/market-data/quota');
-  }, [load, pathname]);
-  useEffect(() => {
-    if (state !== 'idle') {
-      return;
-    }
-    const timer = globalThis.setTimeout(() => {
-      void load('/market-data/quota');
-    }, 30_000);
-    return () => globalThis.clearTimeout(timer);
-  }, [data, load, state]);
+  const { data, refresh, state } = useProviderQuota();
   const quota = data?.ok ? data.value : undefined;
   return (
     <aside aria-label={text.quota.title} className="mb-6 min-w-0">
@@ -75,7 +59,7 @@ export function ProviderQuotaStatus() {
               className="self-start"
               disabled={state !== 'idle'}
               aria-busy={state !== 'idle'}
-              onClick={() => void load('/market-data/quota')}
+              onClick={() => void refresh()}
             >
               {state !== 'idle' ? (
                 <Spinner aria-hidden="true" role={undefined} data-icon="inline-start" />

@@ -3,21 +3,24 @@ import { useFetcher } from 'react-router';
 
 import type { WalletValuation } from '@/lib/api/marketData';
 
+import {
+  canRequestPriceRefresh,
+  needsPriceRefresh,
+  pricePollingDecision,
+  pricePollIntervalMs,
+  valuationBehindStatus,
+} from '../_utils/pricePolling';
 import type { priceRefreshAction, pricingLoader } from '../pricingResource';
 import { useProviderQuota } from './useProviderQuota';
-
-export const pricePollIntervalMs = 3_000;
-export const pricePollLimit = 20;
 
 export function useWalletPricing(walletId: string) {
   const { data, state, load } = useFetcher<typeof pricingLoader>();
   const refresh = useFetcher<typeof priceRefreshAction>();
-  const { data: quotaResult, load: loadQuota } = useProviderQuota();
+  const { data: quotaResult, refresh: refreshQuota } = useProviderQuota();
   const { submit, reset } = refresh;
   const [cachedValuation, setCachedValuation] = useState<WalletValuation>();
-  const [pausedWallet, setPausedWallet] = useState<string>();
-  const paused = pausedWallet === walletId;
-  const automaticRequestSent = useRef<string | undefined>(undefined);
+  const [paused, setPaused] = useState(false);
+  const automaticRequestSent = useRef(false);
   const exhaustedPendingChecked = useRef(false);
   const polls = useRef(0);
   const resource = `/wallets/${walletId}/pricing`;
@@ -33,17 +36,16 @@ export function useWalletPricing(walletId: string) {
   const status =
     data?.status.ok && data.status.value.walletId === walletId ? data.status.value : undefined;
   const quota = quotaResult?.ok ? quotaResult.value : undefined;
-  const canRefresh =
-    status?.providerConfigured === true && quota?.configured === true && !quota.exhausted;
-  const needsPrice = valuation?.freshness === 'stale' || valuation?.freshness === 'missing';
-  const pricesBehindStatus =
-    needsPrice && (status?.freshness === 'fresh' || status?.freshness === 'not_required');
-  const running = status?.holdings.some((holding) => holding.status === 'running') ?? false;
-  const shouldPoll = running || status?.hasPendingWork === true || pricesBehindStatus;
+  const canRefresh = canRequestPriceRefresh(status, quota);
+  const needsPrice = needsPriceRefresh(valuation);
+  const pricesBehindStatus = valuationBehindStatus(valuation, status);
+  const valuationFailed = data?.valuation.ok === false;
+  const statusFailed = data?.status.ok === false;
+  const quotaFailed = quotaResult?.ok === false;
   const readPrices = useCallback(() => {
     void load(resource);
-    void loadQuota('/market-data/quota');
-  }, [load, resource, loadQuota]);
+    void refreshQuota();
+  }, [load, resource, refreshQuota]);
 
   useEffect(() => {
     polls.current = 0;
@@ -57,36 +59,34 @@ export function useWalletPricing(walletId: string) {
       needsPrice &&
       !pricesBehindStatus &&
       canRefresh &&
-      automaticRequestSent.current !== walletId
+      !automaticRequestSent.current
     ) {
-      automaticRequestSent.current = walletId;
+      automaticRequestSent.current = true;
       void submit({}, { method: 'post', action: resource });
     }
   }, [state, needsPrice, pricesBehindStatus, canRefresh, submit, resource, walletId]);
 
   useEffect(() => {
-    if (
-      state !== 'idle' ||
-      refresh.state !== 'idle' ||
-      !shouldPoll ||
-      !data?.valuation.ok ||
-      paused
-    ) {
+    if (state !== 'idle' || refresh.state !== 'idle') {
       return;
     }
-    if (
-      !running &&
-      !pricesBehindStatus &&
-      !canRefresh &&
-      (!quota?.configured || !quota.exhausted || exhaustedPendingChecked.current)
-    ) {
+    const pollDecision = pricePollingDecision({
+      valuation,
+      status,
+      quota,
+      readFailed: valuationFailed || statusFailed,
+      paused,
+      polls: polls.current,
+      exhaustedPendingChecked: exhaustedPendingChecked.current,
+    });
+    if (pollDecision === 'stop') {
       return;
     }
     const timer = globalThis.setTimeout(() => {
-      if (polls.current >= pricePollLimit) {
-        setPausedWallet(walletId);
+      if (pollDecision === 'pause') {
+        setPaused(true);
       } else {
-        if (!running && quota?.exhausted) {
+        if (pollDecision === 'confirm-exhausted') {
           exhaustedPendingChecked.current = true;
         }
         polls.current += 1;
@@ -95,23 +95,21 @@ export function useWalletPricing(walletId: string) {
     }, pricePollIntervalMs);
     return () => globalThis.clearTimeout(timer);
   }, [
-    data,
+    valuation,
+    status,
+    quota,
+    valuationFailed,
+    statusFailed,
     paused,
     refresh.state,
-    shouldPoll,
     state,
-    walletId,
-    running,
-    pricesBehindStatus,
-    canRefresh,
-    quota,
     readPrices,
   ]);
 
   const checkAgain = useCallback(() => {
     polls.current = 0;
     exhaustedPendingChecked.current = false;
-    setPausedWallet(undefined);
+    setPaused(false);
     reset();
     readPrices();
   }, [readPrices, reset]);
@@ -119,10 +117,10 @@ export function useWalletPricing(walletId: string) {
   const requestRefresh = useCallback(() => {
     polls.current = 0;
     exhaustedPendingChecked.current = false;
-    setPausedWallet(undefined);
-    automaticRequestSent.current = walletId;
+    setPaused(false);
+    automaticRequestSent.current = true;
     void submit({}, { method: 'post', action: resource });
-  }, [submit, resource, walletId]);
+  }, [submit, resource]);
 
   return useMemo(
     () => ({
@@ -134,9 +132,9 @@ export function useWalletPricing(walletId: string) {
       needsPrice,
       busy: state !== 'idle' || refresh.state !== 'idle',
       requesting: refresh.state === 'submitting',
-      loadFailed:
-        (data !== undefined && (!data.valuation.ok || !data.status.ok)) ||
-        quotaResult?.ok === false,
+      valuationFailed,
+      statusFailed,
+      quotaFailed,
       refreshFailure: refresh.data && !refresh.data.ok ? refresh.data.error : undefined,
       checkAgain,
       requestRefresh,
@@ -151,8 +149,9 @@ export function useWalletPricing(walletId: string) {
       state,
       refresh.state,
       refresh.data,
-      data,
-      quotaResult,
+      valuationFailed,
+      statusFailed,
+      quotaFailed,
       checkAgain,
       requestRefresh,
     ],

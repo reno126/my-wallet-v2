@@ -38,7 +38,16 @@ export async function walletDetailLoader(args: LoaderFunctionArgs) {
 }
 
 export function WalletDetailComponent() {
-  const { wallet, summary, history } = useLoaderData<typeof walletDetailLoader>();
+  const data = useLoaderData<typeof walletDetailLoader>();
+  return <WalletDetailContent key={data.wallet.id} data={data} />;
+}
+
+interface WalletDetailContentProps {
+  data: Awaited<ReturnType<typeof walletDetailLoader>>;
+}
+
+export function WalletDetailContent({ data }: WalletDetailContentProps) {
+  const { wallet, summary, history } = data;
   const navigation = useNavigation();
   const pricing = useWalletPricing(wallet.id);
   return (

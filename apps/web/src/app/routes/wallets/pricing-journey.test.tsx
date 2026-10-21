@@ -19,10 +19,12 @@ import { ledgerHistory, walletHoldings } from '@/test/ledger-api';
 import { priceValuation, providerQuota, refreshStatus } from '@/test/market-data-api';
 import { walletSummary } from '@/test/wallet-api';
 
+import { appDictionary } from '../../appDictionary';
 import { routeObjects } from '../../router';
-import { pricePollIntervalMs, pricePollLimit } from './_hooks/useWalletPricing';
+import { pricePollIntervalMs, pricePollLimit } from './_utils/pricePolling';
 import { ledgerDictionary } from './ledgerDictionary';
 import { pricingDictionary as text, quotaRemaining } from './pricingDictionary';
+import { walletDictionary } from './walletDictionary';
 
 const { session } = vi.hoisted(() => ({ session: vi.fn() }));
 vi.mock('@/lib/auth-client', () => ({
@@ -97,9 +99,31 @@ function openPage(suffix = '') {
 
 function acceleratePricePolling() {
   const schedule = globalThis.setTimeout;
-  vi.spyOn(globalThis, 'setTimeout').mockImplementation((handler, timeout) =>
-    schedule(handler, timeout === pricePollIntervalMs ? 10 : timeout),
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(
+    (handler, timeout, ...arguments_: unknown[]) =>
+      schedule(handler, timeout === pricePollIntervalMs ? 10 : timeout, ...arguments_),
   );
+}
+
+function mockOtherWallet() {
+  const otherId = 'b7e967c0-0b21-46f1-8c60-89e19bb2f841';
+  const otherEndpoint = `${base}/wallets/${otherId}`;
+  server.use(
+    http.get(otherEndpoint, () =>
+      HttpResponse.json({ ...walletSummary, id: otherId, name: 'Another wallet' }),
+    ),
+    http.get(`${otherEndpoint}/holdings`, () => HttpResponse.json(walletHoldings([], otherId))),
+    http.get(`${otherEndpoint}/transactions`, () =>
+      HttpResponse.json({ ...ledgerHistory, transactions: [] }),
+    ),
+    http.get(`${otherEndpoint}/valuation`, () =>
+      HttpResponse.json({ ...priceValuation('not_required'), walletId: otherId, holdings: [] }),
+    ),
+    http.get(`${otherEndpoint}/price-refresh`, () =>
+      HttpResponse.json({ ...refreshStatus('not_required'), walletId: otherId, holdings: [] }),
+    ),
+  );
+  return { id: otherId, endpoint: otherEndpoint, path: `/wallets/${otherId}` };
 }
 
 describe('when showing cached valuations and refresh progress', () => {
@@ -314,27 +338,214 @@ describe('when showing cached valuations and refresh progress', () => {
     status = refreshStatus('fresh');
     const page = openPage();
     await within(await screen.findByRole('region', { name: text.title })).findByText('USD 30.00');
-    const otherId = 'b7e967c0-0b21-46f1-8c60-89e19bb2f841';
-    const otherEndpoint = `${base}/wallets/${otherId}`;
+    const other = mockOtherWallet();
     server.use(
-      http.get(otherEndpoint, () =>
-        HttpResponse.json({ ...walletSummary, id: otherId, name: 'Another wallet' }),
-      ),
-      http.get(`${otherEndpoint}/holdings`, () => HttpResponse.json(walletHoldings([], otherId))),
-      http.get(`${otherEndpoint}/transactions`, () =>
-        HttpResponse.json({ ...ledgerHistory, transactions: [] }),
-      ),
-      http.get(`${otherEndpoint}/valuation`, () => HttpResponse.json({}, { status: 503 })),
-      http.get(`${otherEndpoint}/price-refresh`, () => HttpResponse.json({}, { status: 503 })),
+      http.get(`${other.endpoint}/valuation`, () => HttpResponse.json({}, { status: 503 })),
+      http.get(`${other.endpoint}/price-refresh`, () => HttpResponse.json({}, { status: 503 })),
     );
     // Act
     await act(async () => {
-      await page.router.navigate(`/wallets/${otherId}`);
+      await page.router.navigate(other.path);
     });
     // Assert
     expect(await within(page.panel()).findByText(text.unavailable)).toBeVisible();
     expect(within(page.panel()).queryByText('USD 30.00')).not.toBeInTheDocument();
     expect(requests).toBe(0);
+  });
+
+  it.each(['', '/instruments/AAPL'])(
+    'should isolate a rejected refresh when changing wallets from %s',
+    async (suffix) => {
+      // Arrange
+      server.use(
+        http.post(`${endpoint}/price-refresh`, () =>
+          HttpResponse.json(
+            { error: { code: 'RATE_LIMITED', message: 'Limited', requestId: walletSummary.id } },
+            { status: 429 },
+          ),
+        ),
+      );
+      const other = mockOtherWallet();
+      const page = openPage(suffix);
+      await within(await screen.findByRole('region', { name: text.title })).findByText(
+        text.limited,
+      );
+      server.use(
+        http.get(`${other.endpoint}/holdings/AAPL`, () =>
+          HttpResponse.json({ ...walletHoldings().holdings[0], walletId: other.id }),
+        ),
+        http.get(`${other.endpoint}/valuation`, () =>
+          HttpResponse.json({
+            ...priceValuation('fresh'),
+            walletId: other.id,
+            holdings: priceValuation('fresh').holdings.map((holding) => ({
+              ...holding,
+              walletId: other.id,
+            })),
+          }),
+        ),
+      );
+      // Act
+      await act(async () => {
+        await page.router.navigate(other.path + suffix);
+      });
+      // Assert
+      expect(await within(page.panel()).findByText(text.freshness.fresh)).toBeVisible();
+      expect(within(page.panel()).queryByText(text.limited)).not.toBeInTheDocument();
+    },
+  );
+
+  it('should start a new bounded polling session when returning to a paused wallet', async () => {
+    // Arrange
+    acceleratePricePolling();
+    const other = mockOtherWallet();
+    const page = openPage();
+    await within(await screen.findByRole('region', { name: text.title })).findByText(
+      text.paused,
+      {},
+      { timeout: 10_000 },
+    );
+    const previousReads = reads;
+    // Act
+    await act(async () => {
+      await page.router.navigate(other.path);
+    });
+    await within(page.panel()).findByText(text.freshness.not_required);
+    await act(async () => {
+      await page.router.navigate(path);
+    });
+    // Assert
+    expect(await within(page.panel()).findByText(text.pending)).toBeVisible();
+    await waitFor(() => expect(requests).toBe(2));
+    await waitFor(() => expect(reads).toBeGreaterThan(previousReads + 2));
+    expect(within(page.panel()).queryByText(text.paused)).not.toBeInTheDocument();
+  });
+
+  it.each(['fresh', 'stale'] as const)(
+    'should preserve %s values and report a quota failure separately',
+    async (freshness) => {
+      // Arrange
+      valuation = priceValuation(freshness);
+      status = refreshStatus(freshness);
+      server.use(
+        http.get(`${base}/market-data/quota`, () => HttpResponse.json({}, { status: 503 })),
+      );
+      const page = openPage();
+      // Assert
+      await within(await screen.findByRole('region', { name: text.title })).findByText(
+        text.freshness[freshness],
+      );
+      expect(await screen.findByText(text.quota.unavailable)).toBeVisible();
+      expect(within(page.panel()).getByText('USD 30.00')).toBeVisible();
+      expect(within(page.panel()).queryByText(text.unavailable)).not.toBeInTheDocument();
+      if (freshness === 'stale') {
+        expect(within(page.panel()).getByText(text.quota.refreshUnavailable)).toBeVisible();
+      }
+      expect(requests).toBe(0);
+    },
+  );
+
+  it('should preserve values and recover a failed refresh-status read independently', async () => {
+    // Arrange
+    valuation = priceValuation('fresh');
+    status = refreshStatus('fresh');
+    server.use(http.get(`${endpoint}/price-refresh`, () => HttpResponse.json({}, { status: 503 })));
+    const page = openPage();
+    // Assert
+    expect(
+      await within(await screen.findByRole('region', { name: text.title })).findByText(
+        text.statusUnavailable,
+      ),
+    ).toBeVisible();
+    expect(within(page.panel()).getByText('USD 30.00')).toBeVisible();
+    expect(within(page.panel()).queryByText(text.unavailable)).not.toBeInTheDocument();
+    // Act
+    server.use(http.get(`${endpoint}/price-refresh`, () => HttpResponse.json(status)));
+    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    // Assert
+    await waitFor(() =>
+      expect(within(page.panel()).queryByText(text.statusUnavailable)).not.toBeInTheDocument(),
+    );
+  });
+
+  it('should share an in-flight quota read between navigation and explicit pricing checks', async () => {
+    // Arrange
+    valuation = priceValuation('fresh');
+    status = refreshStatus('fresh');
+    let quotaReads = 0;
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    onTestFinished(release);
+    server.use(
+      http.get(`${base}/market-data/quota`, async () => {
+        quotaReads += 1;
+        await gate;
+        return HttpResponse.json(quota);
+      }),
+    );
+    const page = openPage();
+    await within(await screen.findByRole('region', { name: text.title })).findByText('USD 30.00');
+    await waitFor(() => expect(quotaReads).toBe(1));
+    // Act
+    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await waitFor(() =>
+      expect(within(page.panel()).getByRole('button', { name: text.retry })).toBeEnabled(),
+    );
+    // Assert
+    expect(quotaReads).toBe(1);
+    // Act
+    act(release);
+    // Assert
+    expect(await screen.findByText(quotaRemaining(quota.remaining, quota.limit))).toBeVisible();
+  });
+
+  it.each(['GET', 'POST'] as const)(
+    'should treat a malformed pricing resource ID in %s as an unavailable page',
+    async (method) => {
+      // Arrange
+      const page = openPage();
+      await screen.findByRole('region', { name: text.title });
+      // Act
+      await act(async () => {
+        await page.router.navigate(
+          '/wallets/invalid/pricing',
+          method === 'POST' ? { formMethod: 'post', formData: new FormData() } : undefined,
+        );
+      });
+      // Assert
+      expect(
+        await screen.findByRole('heading', { name: walletDictionary.detail.unavailable }),
+      ).toBeVisible();
+      expect(screen.getByText(walletDictionary.detail.unavailableDescription)).toBeVisible();
+      expect(
+        screen.queryByRole('button', { name: appDictionary.pageErrors.reload }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it('should stop showing an old rate-limit failure once a revalidation finds fresh prices', async () => {
+    // Arrange
+    server.use(
+      http.post(`${endpoint}/price-refresh`, () =>
+        HttpResponse.json(
+          { error: { code: 'RATE_LIMITED', message: 'Limited', requestId: walletSummary.id } },
+          { status: 429 },
+        ),
+      ),
+    );
+    const page = openPage();
+    await within(await screen.findByRole('region', { name: text.title })).findByText(text.limited);
+    valuation = priceValuation('fresh');
+    status = refreshStatus('fresh');
+    // Act
+    await act(async () => {
+      await page.router.revalidate();
+    });
+    // Assert
+    expect(await within(page.panel()).findByText(text.freshness.fresh)).toBeVisible();
+    expect(within(page.panel()).queryByText(text.limited)).not.toBeInTheDocument();
   });
 
   it('should render the ledger before pricing responds and refresh stale prices without hiding cached values', async () => {

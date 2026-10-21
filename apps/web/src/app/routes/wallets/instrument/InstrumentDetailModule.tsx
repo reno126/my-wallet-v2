@@ -34,7 +34,16 @@ export async function instrumentDetailLoader(args: LoaderFunctionArgs) {
 }
 
 export function InstrumentDetailComponent() {
-  const { wallet, holding, history } = useLoaderData<typeof instrumentDetailLoader>();
+  const data = useLoaderData<typeof instrumentDetailLoader>();
+  return <InstrumentDetailContent key={data.wallet.id} data={data} />;
+}
+
+interface InstrumentDetailContentProps {
+  data: Awaited<ReturnType<typeof instrumentDetailLoader>>;
+}
+
+export function InstrumentDetailContent({ data }: InstrumentDetailContentProps) {
+  const { wallet, holding, history } = data;
   const navigation = useNavigation();
   const pricing = useWalletPricing(wallet.id);
   return (

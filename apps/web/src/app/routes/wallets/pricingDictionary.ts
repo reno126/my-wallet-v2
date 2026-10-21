@@ -2,6 +2,7 @@ export const pricingDictionary = {
   title: 'Market values',
   loading: 'Loading cached market values…',
   unavailable: 'Market values could not be loaded. Your ledger is still available.',
+  statusUnavailable: 'Price refresh progress could not be loaded. Cached values remain available.',
   refresh: 'Refresh prices',
   retry: 'Check prices again',
   requesting: 'Requesting a price refresh…',
@@ -35,6 +36,8 @@ export const pricingDictionary = {
     title: 'Shared market-data budget',
     loading: 'Checking the shared market-data budget…',
     unavailable: 'Shared market-data budget status is unavailable.',
+    refreshUnavailable:
+      'Price refresh availability could not be checked. Cached values remain available.',
     disabled: 'Market-data provider is not configured.',
     warning: 'The shared request budget is running low.',
     tracked: 'Based on requests tracked by this app; this is not the provider account balance.',

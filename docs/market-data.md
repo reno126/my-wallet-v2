@@ -92,6 +92,8 @@ The authenticated layout displays the globally shared tracked budget, its reset 
 
 The quota panel keeps its count and warnings visible while a keyboard-accessible “Budget details” disclosure contains reset information and the tracking explanation. Initial pricing/quota loads use skeleton placeholders; subsequent checks keep cached values visible. Spinners and button busy states indicate active browser requests, while durable pending work retains a text notice. Pricing and holding actions use card footers, and holding cards separate ledger metrics from market valuations.
 
+Each wallet detail body owns its pricing session through a wallet-ID React key. Changing wallets resets refresh errors, automatic admission and polling limits together; reopening a paused wallet starts a new bounded session. Valuation, refresh-status and quota failures have separate feedback, so an unavailable budget does not label successfully loaded market values as unavailable. Valuation/status failures stop automatic checks; an active lease can still be observed when only the quota read fails. Polling decisions are tested separately from request and timer orchestration. The authenticated layout owns the shared quota controller, and overlapping explicit quota reads join the same in-flight request. Malformed pricing-resource IDs use the same unavailable/404 handling as wallet pages.
+
 ## Migration and checks
 
 Apply `20261020170000_cache_quota_persistence` before using durable provider dispatch. For local development, run the documented [migration workflow](local-development.md#apply-migrations-and-generate-the-client), then restart the API. Set the API-only FMP key in the ignored local environment or hosted secret manager; never use a `VITE_` key or send credentials in chat.

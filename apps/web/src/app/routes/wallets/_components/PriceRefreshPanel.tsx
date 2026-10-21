@@ -27,7 +27,7 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
       <CardContent className="flex min-w-0 flex-col gap-4">
         {valuation ? (
           <ValuationMetrics valuation={valuation} />
-        ) : !pricing.loadFailed ? (
+        ) : !pricing.valuationFailed ? (
           <div role="status" aria-label={text.loading}>
             <span className="sr-only">{text.loading}</span>
             <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -73,10 +73,20 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
 }
 
 function priceNotice(pricing: ReturnType<typeof useWalletPricing>) {
-  if (pricing.loadFailed) {
+  if (pricing.valuationFailed) {
     return text.unavailable;
   }
-  if (pricing.refreshFailure?.kind === 'http' && pricing.refreshFailure.status === 429) {
+  if (pricing.statusFailed) {
+    return text.statusUnavailable;
+  }
+  if (pricing.quotaFailed && pricing.needsPrice) {
+    return text.quota.refreshUnavailable;
+  }
+  if (
+    pricing.needsPrice &&
+    pricing.refreshFailure?.kind === 'http' &&
+    pricing.refreshFailure.status === 429
+  ) {
     return text.limited;
   }
   if (pricing.refreshFailure && pricing.needsPrice) {
