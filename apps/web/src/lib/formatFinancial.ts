@@ -21,6 +21,10 @@ export function formatUsd(value: string, places: 2 | 4 = 2): string {
   return `USD ${integer.replace(/\B(?=(\d{3})+(?!\d))/gu, ',')}.${fraction}`;
 }
 
+export function formatPercentage(value: string): string {
+  return `${roundDecimal(value, 2)}%`;
+}
+
 export function formatQuantity(value: string): string {
   if (decimalParts(value).negative) {
     throw new RangeError('Share quantity cannot be negative.');

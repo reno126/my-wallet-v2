@@ -57,6 +57,20 @@ export const routeObjects = [
             ErrorBoundary: PrivateRouteErrorBoundary,
             children: [
               {
+                path: 'market-data/quota',
+                lazy: async () => {
+                  const module = await import('./routes/wallets/pricingResource');
+                  return { loader: module.quotaLoader };
+                },
+              },
+              {
+                path: 'wallets/:walletId/pricing',
+                lazy: async () => {
+                  const module = await import('./routes/wallets/pricingResource');
+                  return { loader: module.pricingLoader, action: module.priceRefreshAction };
+                },
+              },
+              {
                 path: 'wallets',
                 HydrateFallback: WalletsLoadingState,
                 lazy: async () => {

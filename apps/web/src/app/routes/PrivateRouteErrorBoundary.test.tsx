@@ -24,6 +24,7 @@ function openRoute(route: RouteObject) {
       {
         Component: AuthenticatedLayout,
         children: [
+          { path: '/market-data/quota', loader: () => ({ ok: false, error: { kind: 'network' } }) },
           {
             ErrorBoundary: PrivateRouteErrorBoundary,
             children: [{ path: '/wallets/test', ...route }],

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { compareQuantities, formatQuantity, formatUsd, multiplyDecimals } from './formatFinancial';
+import {
+  compareQuantities,
+  formatPercentage,
+  formatQuantity,
+  formatUsd,
+  multiplyDecimals,
+} from './formatFinancial';
 
 describe('when presenting exact financial strings', () => {
   it('should round positive and negative halfway amounts away from zero', () => {
@@ -11,6 +17,9 @@ describe('when presenting exact financial strings', () => {
     expect(formatUsd('9007199254740993.12345678', 4)).toBe('USD 9,007,199,254,740,993.1235');
     expect(formatQuantity('1.1234565')).toBe('1.123457');
     expect(formatQuantity('1.20000000')).toBe('1.2');
+    expect(formatPercentage('12.345')).toBe('12.35%');
+    expect(formatPercentage('-12.345')).toBe('-12.35%');
+    expect(formatPercentage('9007199254740993.125')).toBe('9007199254740993.13%');
   });
 
   it('should calculate preview proceeds and compare shares without floating point', () => {

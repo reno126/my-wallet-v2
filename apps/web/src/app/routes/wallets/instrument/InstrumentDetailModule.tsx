@@ -9,8 +9,10 @@ import { createLedgerApi } from '@/lib/api/ledger';
 import { pageFailureResponse } from '../../_utils/pageFailure';
 import { requirePageData } from '../../_utils/requirePageData';
 import { LedgerSummary } from '../_components/LedgerSummary';
+import { PriceRefreshPanel } from '../_components/PriceRefreshPanel';
 import { SellDialog } from '../_components/SellDialog';
 import { TransactionHistory } from '../_components/TransactionHistory';
+import { useWalletPricing } from '../_hooks/useWalletPricing';
 import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
 import { loadWallet } from '../_utils/loadWallet';
 import { ledgerDictionary as text } from '../ledgerDictionary';
@@ -34,6 +36,7 @@ export async function instrumentDetailLoader(args: LoaderFunctionArgs) {
 export function InstrumentDetailComponent() {
   const { wallet, holding, history } = useLoaderData<typeof instrumentDetailLoader>();
   const navigation = useNavigation();
+  const pricing = useWalletPricing(wallet.id);
   return (
     <section
       className="flex min-w-0 flex-col gap-6"
@@ -52,7 +55,6 @@ export function InstrumentDetailComponent() {
         <p className="wrap-anywhere text-muted-foreground">
           {wallet.name} · {holding.exchange} · {holding.quoteCurrency}
         </p>
-        <p className="text-sm text-muted-foreground">{text.ledgerOnly}</p>
         <div className="flex flex-wrap gap-3">
           <SellDialog key={`${holding.walletId}:${holding.symbol}`} holding={holding} />
           <Button asChild variant="outline">
@@ -61,6 +63,7 @@ export function InstrumentDetailComponent() {
         </div>
       </header>
       <LedgerSummary summary={holding} />
+      <PriceRefreshPanel pricing={pricing} symbol={holding.symbol} />
       <TransactionHistory history={history} instrumentView />
     </section>
   );

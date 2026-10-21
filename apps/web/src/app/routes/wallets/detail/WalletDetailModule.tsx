@@ -18,10 +18,11 @@ import { createLedgerApi } from '@/lib/api/ledger';
 import { requirePageData } from '../../_utils/requirePageData';
 import { HoldingList } from '../_components/HoldingList';
 import { LedgerSummary } from '../_components/LedgerSummary';
+import { PriceRefreshPanel } from '../_components/PriceRefreshPanel';
 import { TransactionHistory } from '../_components/TransactionHistory';
+import { useWalletPricing } from '../_hooks/useWalletPricing';
 import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
 import { loadWallet } from '../_utils/loadWallet';
-import { ledgerDictionary as ledgerText } from '../ledgerDictionary';
 import { walletDictionary as walletMsg } from '../walletDictionary';
 import { DeleteWalletDialog } from './_components/DeleteWalletDialog';
 
@@ -39,6 +40,7 @@ export async function walletDetailLoader(args: LoaderFunctionArgs) {
 export function WalletDetailComponent() {
   const { wallet, summary, history } = useLoaderData<typeof walletDetailLoader>();
   const navigation = useNavigation();
+  const pricing = useWalletPricing(wallet.id);
   return (
     <section
       className="flex flex-col gap-6"
@@ -77,9 +79,9 @@ export function WalletDetailComponent() {
           <DeleteWalletDialog key={wallet.id} wallet={wallet} />
         </CardFooter>
       </Card>
-      <p className="text-sm text-muted-foreground">{ledgerText.ledgerOnly}</p>
       <LedgerSummary summary={summary} />
-      <HoldingList holdings={summary.holdings} />
+      <PriceRefreshPanel pricing={pricing} />
+      <HoldingList holdings={summary.holdings} valuations={pricing.valuation?.holdings} />
       <TransactionHistory history={history} />
     </section>
   );

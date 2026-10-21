@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyLedgerHandlers } from '@/test/ledger-api';
+import { unavailablePricingHandlers } from '@/test/market-data-api';
 import { walletPage, walletSummary } from '@/test/wallet-api';
 
 import { appDictionary } from '../../appDictionary';
@@ -28,7 +29,10 @@ vi.mock('@/api/client', async (importOriginal) => {
   };
 });
 const endpoint = 'https://wallet-api.test/api/wallets';
-const mockApiServer = setupServer(...emptyLedgerHandlers(endpoint));
+const mockApiServer = setupServer(
+  ...emptyLedgerHandlers(endpoint),
+  ...unavailablePricingHandlers('https://wallet-api.test/api'),
+);
 beforeAll(() => mockApiServer.listen());
 afterEach(() => {
   mockApiServer.resetHandlers();

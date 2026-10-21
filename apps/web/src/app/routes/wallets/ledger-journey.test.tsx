@@ -17,6 +17,7 @@ import {
 } from 'vitest';
 
 import { ledgerHistory, ledgerHolding, walletHoldings } from '@/test/ledger-api';
+import { unavailablePricingHandlers } from '@/test/market-data-api';
 import { walletSummary } from '@/test/wallet-api';
 
 import { appDictionary } from '../../appDictionary';
@@ -37,7 +38,7 @@ vi.mock('@/api/client', async (importOriginal) => {
 });
 const endpoint = `https://ledger.test/api/wallets/${walletSummary.id}`;
 const path = `/wallets/${walletSummary.id}`;
-const server = setupServer();
+const server = setupServer(...unavailablePricingHandlers('https://ledger.test/api'));
 let holding = { ...ledgerHolding };
 let history = structuredClone(ledgerHistory);
 const mutations: { method: string; body: unknown }[] = [];
@@ -211,7 +212,7 @@ describe('when managing the ledger through wallet routes', () => {
     await page.user.clear(screen.getByRole('textbox', { name: text.sell.price }));
     await page.user.type(screen.getByRole('textbox', { name: text.sell.price }), '20.12345678');
     // Assert
-    expect(screen.getByRole('status')).toHaveTextContent('USD 10.06');
+    expect(within(screen.getByRole('dialog')).getByRole('status')).toHaveTextContent('USD 10.06');
     expect(mutations).toHaveLength(0);
   });
 
@@ -552,7 +553,9 @@ describe('when managing the ledger through wallet routes', () => {
     fails = false;
     await page.user.click(screen.getByRole('button', { name: appDictionary.pageErrors.retry }));
     // Assert
-    expect(await screen.findByRole('heading', { name: text.history })).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: text.history, level: 2 })).toBeVisible(),
+    );
   });
 
   it('should keep confirmation controls disabled until a pending deletion completes', async () => {

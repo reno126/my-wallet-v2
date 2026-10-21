@@ -20,14 +20,14 @@ export function LoadError({ message, retryLabel, retryAt }: LoadErrorProps) {
     if (retryAt === undefined || retryAt <= Date.now()) {
       return;
     }
-    const timer = window.setInterval(() => {
+    const timer = globalThis.setInterval(() => {
       const currentTime = Date.now();
       setNow(currentTime);
       if (currentTime >= retryAt) {
-        window.clearInterval(timer);
+        globalThis.clearInterval(timer);
       }
     }, 1000);
-    return () => window.clearInterval(timer);
+    return () => globalThis.clearInterval(timer);
   }, [retryAt]);
   return (
     <Alert variant="destructive">

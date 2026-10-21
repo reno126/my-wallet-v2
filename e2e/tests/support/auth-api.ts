@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 
+import { providerQuota } from '../../../apps/web/src/test/market-data-api';
+
 export type SignInResponse = 'success' | 'api-rate-limit' | 'better-auth-rate-limit';
 
 interface AuthApiMockOptions {
@@ -27,6 +29,10 @@ export async function mockAuthApi(
   let signedIn = initiallySignedIn;
   const googleSignInRequests: unknown[] = [];
   const unexpectedRequests: string[] = [];
+
+  await page.route('**/api/market-data/quota', (route) =>
+    route.fulfill({ json: { ...providerQuota, configured: false } }),
+  );
 
   await page.route(authApiRoute, async (route) => {
     const request = route.request();

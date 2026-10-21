@@ -79,7 +79,9 @@ for (const width of responsiveViewportWidths) {
     await page.goto(path);
     await page.getByRole('link', { name: text.details('AAPL'), exact: true }).click();
     // Assert
-    await expect(page.getByRole('status')).toHaveText(appDictionary.navigation.loading);
+    await expect(
+      page.getByRole('status').filter({ hasText: appDictionary.navigation.loading }),
+    ).toHaveText(appDictionary.navigation.loading);
     await noOverflow();
     // Act
     release();

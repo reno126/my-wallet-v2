@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
 
 import { appDictionary } from '../appDictionary';
+import { ProviderQuotaStatus } from '../routes/wallets/_components/ProviderQuotaStatus';
 
 export function AuthenticatedLayout() {
   const navigate = useNavigate();
@@ -67,6 +68,7 @@ export function AuthenticatedLayout() {
             {appDictionary.navigation.loading}
           </p>
         ) : null}
+        <ProviderQuotaStatus />
         <Outlet />
       </main>
     </div>

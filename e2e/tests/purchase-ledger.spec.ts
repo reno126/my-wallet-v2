@@ -2,9 +2,14 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
+import type {} from '../../apps/api/src/plugins/fmp';
 import type {} from '../../apps/api/src/plugins/prisma';
 import { purchaseDictionary as text } from '../../apps/web/src/app/routes/wallets/buy/purchaseDictionary';
 import { ledgerDictionary as ledgerText } from '../../apps/web/src/app/routes/wallets/ledgerDictionary';
+import {
+  pricingDictionary as pricingText,
+  quotaRemaining,
+} from '../../apps/web/src/app/routes/wallets/pricingDictionary';
 import { historicalPrice, purchaseInput } from '../../apps/web/src/test/purchase-api';
 
 test('a browser buy, sell, delete and corrected re-entry persist exact FIFO results in PostgreSQL', async ({
@@ -28,7 +33,11 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
   const email = `browser-${randomUUID()}@example.test`;
   const symbol = `E${randomUUID().replaceAll('-', '').toUpperCase()}`;
   const providerRequests: string[] = [];
-  const budget = createTestProviderBudget();
+  const budget = createTestProviderBudget(6);
+  let releaseQuote = () => {};
+  const quoteGate = new Promise<void>((resolve) => {
+    releaseQuote = resolve;
+  });
   const server = createTestServer(
     {
       DATABASE_URL: databaseUrl,
@@ -40,9 +49,16 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     {
       fmp: {
         budget,
-        fetch: (input) => {
+        timeoutMs: 30_000,
+        fetch: async (input) => {
           const url = new URL(input instanceof Request ? input.url : input);
           providerRequests.push(url.pathname);
+          if (url.pathname.endsWith('/quote')) {
+            await quoteGate;
+            return Response.json([
+              { symbol, price: 250, timestamp: Math.floor(Date.now() / 1000) },
+            ]);
+          }
           const profile = {
             symbol,
             name: 'Browser test stock',
@@ -56,7 +72,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
           const body = url.pathname.endsWith('/historical-price-eod/full')
             ? [{ symbol, date: historicalPrice.effectiveDate, close: historicalPrice.unitPrice }]
             : [profile];
-          return Promise.resolve(Response.json(body));
+          return Response.json(body);
         },
       },
     },
@@ -122,13 +138,23 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     expect(saved?.unitPrice.toFixed()).toBe(purchaseInput.unitPrice);
     expect(saved?.description).toBe(purchaseInput.description);
     expect(saved?.currency).toBe('USD');
-    expect(budget.used()).toBe(4);
+    const pricing = page.getByRole('region', { name: pricingText.title });
+    await expect(pricing.getByText(pricingText.freshness.missing, { exact: true })).toBeVisible();
+    await expect(pricing.getByText(pricingText.running)).toBeVisible();
+    expect(budget.used()).toBe(6);
     expect(providerRequests).toEqual([
       '/stable/search-symbol',
       '/stable/profile',
       '/stable/historical-price-eod/full',
       '/stable/profile',
+      '/stable/profile',
+      '/stable/quote',
     ]);
+    releaseQuote();
+    await expect(pricing.getByText(pricingText.freshness.fresh, { exact: true })).toBeVisible();
+    await expect(page.getByText(quotaRemaining(0, 6), { exact: true })).toBeVisible();
+    const snapshot = await server.prisma.priceSnapshot.findFirstOrThrow({ where: { symbol } });
+    expect(snapshot.unitPrice.toFixed()).toBe('250');
     await page.reload();
     await expect(
       page.getByRole('heading', { name: 'Purchase browser journey', exact: true }),
@@ -176,10 +202,11 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     expect(replacement.id).not.toBe(sale.id);
     expect(replacement.quantity.toFixed()).toBe('0.5');
     expect(replacement.unitPrice.toFixed()).toBe('240');
-    expect(budget.used()).toBe(4);
+    expect(budget.used()).toBe(6);
     await page.reload();
     await expect(page.getByText('Gain: USD 4.94', { exact: true }).first()).toBeVisible();
   } finally {
+    releaseQuote();
     try {
       if (!page.isClosed()) {
         await page.unrouteAll({ behavior: 'wait' });
@@ -187,7 +214,12 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     } finally {
       try {
         if (server.hasDecorator('prisma')) {
+          if (server.hasDecorator('priceRefresh')) {
+            await server.priceRefresh.stop();
+          }
           await server.prisma.user.deleteMany({ where: { email } });
+          await server.prisma.refreshWork.deleteMany({ where: { symbol } });
+          await server.prisma.priceSnapshot.deleteMany({ where: { symbol } });
           await server.prisma.instrument.deleteMany({ where: { symbol } });
         }
       } finally {
