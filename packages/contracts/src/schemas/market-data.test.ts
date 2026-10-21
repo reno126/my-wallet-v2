@@ -45,25 +45,28 @@ describe('when validating public market data contracts', () => {
     }
   });
 
-  it('should expose only public work states and known safe failure codes', () => {
-    // Arrange
-    const status = {
-      symbol: 'AAPL',
-      freshness: 'stale',
-      status: 'failed',
-      nextAttemptAt: null,
-      lastFailureCode: 'PROVIDER_QUOTA_EXHAUSTED',
-    };
-    // Assert
-    expect(holdingRefreshStatusSchema.parse(status)).toEqual(status);
-    expect(
-      holdingRefreshStatusSchema.safeParse({ ...status, lastFailureCode: 'raw provider body' })
-        .success,
-    ).toBe(false);
-    expect(holdingRefreshStatusSchema.safeParse({ ...status, leaseToken: 'private' }).success).toBe(
-      false,
-    );
-  });
+  it.each(['PROVIDER_QUOTA_EXHAUSTED', 'PROVIDER_PAYMENT_REQUIRED'])(
+    'should expose only public work states and safe failure code %s',
+    (lastFailureCode) => {
+      // Arrange
+      const status = {
+        symbol: 'AAPL',
+        freshness: 'stale',
+        status: 'failed',
+        nextAttemptAt: null,
+        lastFailureCode,
+      };
+      // Assert
+      expect(holdingRefreshStatusSchema.parse(status)).toEqual(status);
+      expect(
+        holdingRefreshStatusSchema.safeParse({ ...status, lastFailureCode: 'raw provider body' })
+          .success,
+      ).toBe(false);
+      expect(
+        holdingRefreshStatusSchema.safeParse({ ...status, leaseToken: 'private' }).success,
+      ).toBe(false);
+    },
+  );
 
   it('should describe the application request budget with integer counters and a reset instant', () => {
     // Arrange

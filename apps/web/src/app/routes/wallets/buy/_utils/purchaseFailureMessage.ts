@@ -2,6 +2,7 @@ import { redirect } from 'react-router';
 
 import type { ApiFailure } from '@/lib/api/requestApiResult';
 
+import { pricingDictionary } from '../../pricingDictionary';
 import { purchaseDictionary as text } from '../purchaseDictionary';
 
 export function purchaseFailureMessage(error: ApiFailure, operation: 'search' | 'price' | 'buy') {
@@ -20,6 +21,8 @@ export function purchaseFailureMessage(error: ApiFailure, operation: 'search' | 
       : text.errors.retryAfter(error.retryAfterSeconds);
   }
   switch (error.code) {
+    case 'PROVIDER_PAYMENT_REQUIRED':
+      return pricingDictionary.paymentRequired;
     case 'PROVIDER_QUOTA_EXHAUSTED':
       return text.errors.quota;
     case 'PROVIDER_UNAVAILABLE':
@@ -53,6 +56,7 @@ export function isUnconfirmedPurchaseFailure(error: ApiFailure): boolean {
       'PROVIDER_QUOTA_EXHAUSTED',
       'PROVIDER_UNAVAILABLE',
       'PROVIDER_ERROR',
+      'PROVIDER_PAYMENT_REQUIRED',
       'PROVIDER_TIMEOUT',
     ].includes(error.code);
   return error.status >= 500 && !rejectedBeforePersistence;

@@ -312,6 +312,74 @@ describe('when showing cached valuations and refresh progress', () => {
     expect(requests).toBe(1);
   });
 
+  it.each(['', '/instruments/AAPL'])(
+    'should explain a paid-plan price restriction on %s while retaining cached values',
+    async (suffix) => {
+      // Arrange
+      quota = { ...quota, exhausted: true, used: 250, remaining: 0 };
+      status = {
+        ...status,
+        holdings: status.holdings.map((holding) => ({
+          ...holding,
+          status: 'failed',
+          lastFailureCode: 'PROVIDER_PAYMENT_REQUIRED',
+        })),
+      };
+      const page = openPage(suffix);
+      // Assert
+      expect(
+        await within(await screen.findByRole('region', { name: text.title })).findByText(
+          text.paymentRequired,
+        ),
+      ).toBeVisible();
+      expect(within(page.panel()).getByText('USD 30.00')).toBeVisible();
+      expect(requests).toBe(0);
+    },
+  );
+
+  it('should not attribute another holding’s paid-plan restriction to the selected asset', async () => {
+    // Arrange
+    quota = { ...quota, exhausted: true, used: 250, remaining: 0 };
+    valuation = {
+      ...priceValuation(),
+      remainingCostBasis: '30',
+      currentValue: '60',
+      unrealizedProfitLoss: '30',
+      holdings: [
+        ...priceValuation('fresh').holdings.map((holding) => ({
+          ...holding,
+          allocationPercentage: '50',
+        })),
+        ...priceValuation().holdings.map((holding) => ({
+          ...holding,
+          symbol: 'MSFT',
+          name: 'Microsoft',
+          allocationPercentage: '50',
+        })),
+      ],
+    };
+    status = {
+      ...status,
+      holdings: [
+        ...refreshStatus('fresh').holdings,
+        ...status.holdings.map((holding): typeof holding => ({
+          ...holding,
+          symbol: 'MSFT',
+          status: 'failed',
+          lastFailureCode: 'PROVIDER_PAYMENT_REQUIRED',
+        })),
+      ],
+    };
+    const page = openPage('/instruments/AAPL');
+    // Assert
+    expect(
+      await within(await screen.findByRole('region', { name: text.title })).findByText(
+        text.freshness.fresh,
+      ),
+    ).toBeVisible();
+    expect(within(page.panel()).queryByText(text.paymentRequired)).not.toBeInTheDocument();
+  });
+
   it('should remove an active polling timer when navigating away', async () => {
     // Arrange
     acceleratePricePolling();
@@ -622,8 +690,10 @@ describe('when showing cached valuations and refresh progress', () => {
           'USD 30.00',
         ),
       ).toBeVisible();
-      expect(within(page.panel()).getByRole('status')).toHaveTextContent(
-        condition === 'exhausted' ? text.exhausted : text.providerUnavailable,
+      await waitFor(() =>
+        expect(within(page.panel()).getByRole('status')).toHaveTextContent(
+          condition === 'exhausted' ? text.exhausted : text.providerUnavailable,
+        ),
       );
       expect(await screen.findByText(quotaRemaining(quota.remaining, quota.limit))).toBeVisible();
       expect(requests).toBe(0);

@@ -1,6 +1,6 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
-import { apiErrorSchema, historicalPriceSchema } from '@my-wallets/contracts';
+import { apiErrorMessages, apiErrorSchema, historicalPriceSchema } from '@my-wallets/contracts';
 
 import { createInstrumentApiFixture } from '../../test-support/instrument-api.js';
 
@@ -242,6 +242,31 @@ describe('when requesting historical quotes through the authenticated API', () =
     expect(apiErrorSchema.parse(response.json()).error.code).toBe('PROVIDER_TIMEOUT');
     expect(fixture.used()).toBe(2);
   });
+
+  it.each(['profile', 'history'])(
+    'should identify and sanitize a payment-required %s response',
+    async (stage) => {
+      // Arrange
+      const denied = {
+        status: 402,
+        rawJson: 'Premium Query Parameter: private-provider-details test-only-provider-key',
+      };
+      const fixture = await createInstrumentApiFixture(
+        stage === 'profile' ? [denied] : [{ body: [profile] }, denied],
+      );
+      // Act
+      const response = await fixture.get(pricePath);
+      // Assert
+      expect(response.statusCode).toBe(502);
+      expect(apiErrorSchema.parse(response.json()).error).toMatchObject({
+        code: 'PROVIDER_PAYMENT_REQUIRED',
+        message: apiErrorMessages.PROVIDER_PAYMENT_REQUIRED,
+      });
+      expect(response.payload).not.toContain('private-provider-details');
+      expect(response.payload).not.toContain('test-only-provider-key');
+      expect(fixture.used()).toBe(stage === 'profile' ? 1 : 2);
+    },
+  );
 
   it.each(['[{"symbol":"AAPL","date":"2026-10-16","close":190.123456789}]', '{broken'])(
     'should reject malformed or excessive-precision history: %s',

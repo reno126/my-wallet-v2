@@ -131,6 +131,32 @@ describe('when fetching an FMP current quote', () => {
     expect(result).toEqual({ ok: false, error: { code: 'PROVIDER_ERROR', retryable: true } });
   });
 
+  it.each(['profile', 'quote'])(
+    'should reject a paid-plan restriction on %s without retrying',
+    async (endpoint) => {
+      // Arrange
+      const fixture = createFixture();
+      const denied = new Response('Premium Query Parameter: private-provider-details', {
+        status: 402,
+      });
+      fixture.fetchRequest.mockReset();
+      if (endpoint === 'quote') {
+        fixture.fetchRequest.mockResolvedValueOnce(
+          new Response('[{"symbol":"AAPL","currency":"USD"}]'),
+        );
+      }
+      fixture.fetchRequest.mockResolvedValueOnce(denied);
+      // Act
+      const result = await fixture.provider.getQuote('AAPL');
+      // Assert
+      expect(result).toStrictEqual({
+        ok: false,
+        error: { code: 'PROVIDER_PAYMENT_REQUIRED', retryable: false },
+      });
+      expect(fixture.fetchRequest).toHaveBeenCalledTimes(endpoint === 'profile' ? 1 : 2);
+    },
+  );
+
   it('should stop before a quote when the profile consumed the final quota unit', async () => {
     // Arrange
     const fixture = createFixture();

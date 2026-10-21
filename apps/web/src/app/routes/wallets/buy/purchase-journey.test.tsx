@@ -12,6 +12,7 @@ import { historicalPrice, purchaseInput, purchaseResult, stock } from '@/test/pu
 import { walletSummary } from '@/test/wallet-api';
 
 import { routeObjects } from '../../../router';
+import { pricingDictionary } from '../pricingDictionary';
 import { buyPurchaseAction } from './BuyPurchaseModule';
 import { purchaseDictionary as text } from './purchaseDictionary';
 
@@ -309,6 +310,7 @@ describe('when recording a purchase', () => {
     ['PROVIDER_QUOTA_EXHAUSTED', 503, text.errors.quota],
     ['UNSUPPORTED_CURRENCY', 422, text.errors.currency],
     ['PROVIDER_UNAVAILABLE', 503, text.errors.provider],
+    ['PROVIDER_PAYMENT_REQUIRED', 502, pricingDictionary.paymentRequired],
   ])('should explain %s and allow an explicit price retry', async (code, status, message) => {
     // Arrange
     let fail = true;
@@ -385,6 +387,39 @@ describe('when recording a purchase', () => {
     } else {
       await waitFor(() => expect(page.submit()).toBeDisabled());
     }
+  });
+
+  it('should explain a paid-plan rejection before saving without marking the purchase outcome uncertain', async () => {
+    // Arrange
+    let submissions = 0;
+    mockApiServer.use(
+      http.post(transactionEndpoint, () => {
+        submissions += 1;
+        return HttpResponse.json(
+          {
+            error: {
+              code: 'PROVIDER_PAYMENT_REQUIRED',
+              message: 'Internal provider detail',
+              requestId: walletSummary.id,
+            },
+          },
+          { status: 502 },
+        );
+      }),
+    );
+    const page = await openPurchase();
+    await page.search();
+    await page.select();
+    await page.user.type(page.quantity(), purchaseInput.quantity);
+    // Act
+    await page.user.click(page.submit());
+    // Assert
+    expect(await screen.findByText(pricingDictionary.paymentRequired)).toBeVisible();
+    expect(page.quantity()).toHaveValue(purchaseInput.quantity);
+    expect(page.submit()).toBeEnabled();
+    expect(screen.queryByText(text.errors.unconfirmed)).not.toBeInTheDocument();
+    expect(screen.queryByText('Internal provider detail')).not.toBeInTheDocument();
+    expect(submissions).toBe(1);
   });
 
   it('should redirect expired sessions from a lookup to login', async () => {

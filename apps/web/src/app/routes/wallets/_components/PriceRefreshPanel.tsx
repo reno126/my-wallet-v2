@@ -17,7 +17,7 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
   const valuation = symbol
     ? pricing.valuation?.holdings.find((holding) => holding.symbol === symbol)
     : pricing.valuation;
-  const notice = priceNotice(pricing);
+  const notice = priceNotice(pricing, symbol);
   const checking = pricing.busy && !pricing.requesting;
   return (
     <Card role="region" aria-label={text.title}>
@@ -72,7 +72,7 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
   );
 }
 
-function priceNotice(pricing: ReturnType<typeof useWalletPricing>) {
+function priceNotice(pricing: ReturnType<typeof useWalletPricing>, symbol?: string) {
   if (pricing.valuationFailed) {
     return text.unavailable;
   }
@@ -81,6 +81,9 @@ function priceNotice(pricing: ReturnType<typeof useWalletPricing>) {
   }
   if (pricing.quotaFailed && pricing.needsPrice) {
     return text.quota.refreshUnavailable;
+  }
+  if (hasPaymentRequiredPriceFailure(pricing, symbol)) {
+    return text.paymentRequired;
   }
   if (
     pricing.needsPrice &&
@@ -120,4 +123,22 @@ function priceNotice(pricing: ReturnType<typeof useWalletPricing>) {
     return text.stale;
   }
   return undefined;
+}
+
+function hasPaymentRequiredPriceFailure(
+  { needsPrice, status }: ReturnType<typeof useWalletPricing>,
+  symbol?: string,
+) {
+  if (!needsPrice) {
+    return false;
+  }
+  return (
+    status?.holdings.some(
+      (holding) =>
+        (!symbol || holding.symbol === symbol) &&
+        holding.status === 'failed' &&
+        holding.lastFailureCode === 'PROVIDER_PAYMENT_REQUIRED' &&
+        (holding.freshness === 'stale' || holding.freshness === 'missing'),
+    ) ?? false
+  );
 }

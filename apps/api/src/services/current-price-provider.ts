@@ -10,6 +10,7 @@ export type RefreshFailure =
         | 'CURRENCY_MISMATCH'
         | 'PRICE_NOT_AVAILABLE'
         | 'PROVIDER_UNAVAILABLE'
+        | 'PROVIDER_PAYMENT_REQUIRED'
         | 'PROVIDER_QUOTA_EXHAUSTED';
       retryable: false;
     };

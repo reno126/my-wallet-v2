@@ -14,6 +14,7 @@ export const apiErrorMessages = {
   PROVIDER_QUOTA_EXHAUSTED:
     'The shared market-data request budget is exhausted. Try again after it resets.',
   PROVIDER_ERROR: 'The market-data provider could not return valid results. Try again later.',
+  PROVIDER_PAYMENT_REQUIRED: 'The requested market data requires a paid provider subscription.',
   PROVIDER_TIMEOUT: 'The market-data provider did not respond in time. Try again later.',
   UNSUPPORTED_CURRENCY: 'Only USD-denominated instruments and prices are supported.',
   UNSUPPORTED_INSTRUMENT:

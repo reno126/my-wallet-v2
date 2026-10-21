@@ -11,6 +11,7 @@ export const pricingDictionary = {
   paused: 'Automatic checks have paused. Check again for updated prices.',
   failed: 'Some prices could not be refreshed. Last known values are shown.',
   refreshFailed: 'The refresh request could not be confirmed. Check prices before trying again.',
+  paymentRequired: 'Price data for this asset is only available on the data provider’s paid plan',
   limited: 'Price requests are temporarily limited. Try again later.',
   providerUnavailable: 'Price updates are unavailable. Last known values are shown.',
   exhausted:

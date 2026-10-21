@@ -21,7 +21,11 @@ export type ApiFailure =
     }
   | {
       code:
-        'PROVIDER_UNAVAILABLE' | 'PROVIDER_QUOTA_EXHAUSTED' | 'PROVIDER_ERROR' | 'PROVIDER_TIMEOUT';
+        | 'PROVIDER_UNAVAILABLE'
+        | 'PROVIDER_QUOTA_EXHAUSTED'
+        | 'PROVIDER_ERROR'
+        | 'PROVIDER_PAYMENT_REQUIRED'
+        | 'PROVIDER_TIMEOUT';
     };
 
 interface FailureResponse {
@@ -42,6 +46,10 @@ const publicFailureDetails: Record<ApiFailure['code'], { statusCode: number; mes
   PROVIDER_UNAVAILABLE: { statusCode: 503, message: apiErrorMessages.PROVIDER_UNAVAILABLE },
   PROVIDER_QUOTA_EXHAUSTED: { statusCode: 503, message: apiErrorMessages.PROVIDER_QUOTA_EXHAUSTED },
   PROVIDER_ERROR: { statusCode: 502, message: apiErrorMessages.PROVIDER_ERROR },
+  PROVIDER_PAYMENT_REQUIRED: {
+    statusCode: 502,
+    message: apiErrorMessages.PROVIDER_PAYMENT_REQUIRED,
+  },
   PROVIDER_TIMEOUT: { statusCode: 504, message: apiErrorMessages.PROVIDER_TIMEOUT },
   UNSUPPORTED_CURRENCY: { statusCode: 422, message: apiErrorMessages.UNSUPPORTED_CURRENCY },
   UNSUPPORTED_INSTRUMENT: { statusCode: 422, message: apiErrorMessages.UNSUPPORTED_INSTRUMENT },

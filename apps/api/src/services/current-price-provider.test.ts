@@ -17,6 +17,10 @@ describe('when defining refresh failure contracts', () => {
       code: 'UNSUPPORTED_CURRENCY';
       retryable: true;
     }>().not.toExtend<RefreshFailure>();
+    expectTypeOf<{
+      code: 'PROVIDER_PAYMENT_REQUIRED';
+      retryable: true;
+    }>().not.toExtend<RefreshFailure>();
   });
 
   it('should exclude authentication and transaction failures from quote results', () => {
