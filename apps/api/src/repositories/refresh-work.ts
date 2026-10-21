@@ -13,11 +13,22 @@ export interface RefreshLease {
   attempt: number;
 }
 
+export interface UnfinishedRefreshWork {
+  symbol: string;
+  notBefore: Date;
+}
+
+interface RefreshFailureUpdate {
+  code: ApiFailure['code'];
+  nextAttemptAt: Date;
+  retry: boolean;
+}
+
 export function createRefreshWorkRepository(
   prisma: PrismaClient,
   now: () => Date = () => new Date(),
 ) {
-  return { requestForWallet, claim, complete, fail, unfinished };
+  return { requestForWallet, claim, complete, recordFailure, unfinished };
 
   async function requestForWallet(
     userId: string,
@@ -72,7 +83,7 @@ export function createRefreshWorkRepository(
         subscriptions: { some: {} },
         OR: [
           {
-            status: { in: ['PENDING', 'FAILED'] },
+            status: 'PENDING',
             OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: instant } }],
           },
           { status: 'RUNNING', leaseExpiresAt: { lte: instant } },
@@ -112,28 +123,23 @@ export function createRefreshWorkRepository(
     });
   }
 
-  async function fail(
-    lease: RefreshLease,
-    code: ApiFailure['code'],
-    nextAttemptAt: Date,
-    options: { retry: boolean } = { retry: false },
-  ) {
+  async function recordFailure(lease: RefreshLease, failure: RefreshFailureUpdate) {
     const instant = now();
     const changed = await prisma.refreshWork.updateMany({
       where: activeLease(lease, instant),
       data: {
-        status: options.retry ? 'PENDING' : 'FAILED',
+        status: failure.retry ? 'PENDING' : 'FAILED',
         leaseToken: null,
         leaseExpiresAt: null,
-        lastFailureCode: code,
-        nextAttemptAt,
+        lastFailureCode: failure.code,
+        nextAttemptAt: failure.nextAttemptAt,
         updatedAt: instant,
       },
     });
     return changed.count === 1;
   }
 
-  async function* unfinished(): AsyncGenerator<{ symbol: string; notBefore: Date }> {
+  async function* unfinished(): AsyncGenerator<UnfinishedRefreshWork> {
     let after: string | undefined;
     for (;;) {
       const rows = await prisma.refreshWork.findMany({

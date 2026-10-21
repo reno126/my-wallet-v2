@@ -39,7 +39,9 @@ function createFixture(concurrency?: number, now?: () => Date) {
     complete: vi
       .fn<ReturnType<typeof createRefreshWorkRepository>['complete']>()
       .mockResolvedValue(true),
-    fail: vi.fn<ReturnType<typeof createRefreshWorkRepository>['fail']>().mockResolvedValue(true),
+    recordFailure: vi
+      .fn<ReturnType<typeof createRefreshWorkRepository>['recordFailure']>()
+      .mockResolvedValue(true),
   };
   const cache = {
     latest: vi.fn<(symbol: string) => Promise<PriceSnapshot | null>>().mockResolvedValue(null),
@@ -155,12 +157,11 @@ describe('when coordinating current-price refreshes', () => {
       'AAPL',
       'MSFT',
     ]);
-    expect(fixture.work.fail).toHaveBeenCalledWith(
-      expect.anything(),
-      'PROVIDER_TIMEOUT',
-      new Date(instant.getTime() + 1000),
-      { retry: true },
-    );
+    expect(fixture.work.recordFailure).toHaveBeenCalledWith(expect.anything(), {
+      code: 'PROVIDER_TIMEOUT',
+      nextAttemptAt: new Date(instant.getTime() + 1000),
+      retry: true,
+    });
 
     // Act
     await vi.advanceTimersByTimeAsync(1000);
@@ -188,12 +189,11 @@ describe('when coordinating current-price refreshes', () => {
 
     // Assert
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(3);
-    expect(fixture.work.fail).toHaveBeenLastCalledWith(
-      expect.anything(),
-      'PROVIDER_ERROR',
-      new Date(instant.getTime() + 303_000),
-      { retry: false },
-    );
+    expect(fixture.work.recordFailure).toHaveBeenLastCalledWith(expect.anything(), {
+      code: 'PROVIDER_ERROR',
+      nextAttemptAt: new Date(instant.getTime() + 303_000),
+      retry: false,
+    });
     expect(fixture.work.complete).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -237,7 +237,9 @@ describe('when coordinating current-price refreshes', () => {
     await fixture.scheduler.enqueue('AAPL');
 
     // Assert
-    expect(fixture.work.fail).toHaveBeenCalledWith(expect.anything(), code, new Date(nextAttempt), {
+    expect(fixture.work.recordFailure).toHaveBeenCalledWith(expect.anything(), {
+      code,
+      nextAttemptAt: new Date(nextAttempt),
       retry: false,
     });
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
@@ -263,7 +265,7 @@ describe('when coordinating current-price refreshes', () => {
     fixture.provider.getQuote.mockResolvedValue(
       failure({ code: 'PROVIDER_TIMEOUT', retryable: true }),
     );
-    fixture.work.fail.mockResolvedValue(false);
+    fixture.work.recordFailure.mockResolvedValue(false);
 
     // Act
     await fixture.scheduler.enqueue('AAPL');
@@ -284,12 +286,11 @@ describe('when coordinating current-price refreshes', () => {
 
     // Assert
     expect(fixture.onError).toHaveBeenCalledTimes(1);
-    expect(fixture.work.fail).toHaveBeenCalledWith(
-      expect.anything(),
-      'PROVIDER_UNAVAILABLE',
-      expect.any(Date),
-      { retry: false },
-    );
+    expect(fixture.work.recordFailure).toHaveBeenCalledWith(expect.anything(), {
+      code: 'PROVIDER_UNAVAILABLE',
+      nextAttemptAt: new Date(instant.getTime() + 300_000),
+      retry: false,
+    });
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
   });
 
@@ -315,7 +316,7 @@ describe('when coordinating current-price refreshes', () => {
     const originalError = new Error('cache read failed');
     const recordingError = new Error('failure write failed');
     fixture.cache.latest.mockRejectedValueOnce(originalError);
-    fixture.work.fail.mockRejectedValueOnce(recordingError);
+    fixture.work.recordFailure.mockRejectedValueOnce(recordingError);
 
     // Act
     const task = fixture.scheduler.enqueue('AAPL');
@@ -343,7 +344,7 @@ describe('when coordinating current-price refreshes', () => {
     fixture.provider.getQuote.mockResolvedValueOnce(
       failure({ code: 'PROVIDER_TIMEOUT', retryable: true }),
     );
-    fixture.work.fail.mockRejectedValueOnce(recordingError);
+    fixture.work.recordFailure.mockRejectedValueOnce(recordingError);
 
     // Act
     const task = fixture.scheduler.enqueue('AAPL');
@@ -408,12 +409,11 @@ describe('when coordinating current-price refreshes', () => {
 
     // Assert
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
-    expect(fixture.work.fail).toHaveBeenCalledWith(
-      expect.anything(),
-      'PROVIDER_TIMEOUT',
-      expect.any(Date),
-      { retry: true },
-    );
+    expect(fixture.work.recordFailure).toHaveBeenCalledWith(expect.anything(), {
+      code: 'PROVIDER_TIMEOUT',
+      nextAttemptAt: new Date(instant.getTime() + 1000),
+      retry: true,
+    });
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -432,12 +432,11 @@ describe('when coordinating current-price refreshes', () => {
 
     // Assert
     expect(fixture.provider.getQuote).toHaveBeenCalledTimes(1);
-    expect(fixture.work.fail).toHaveBeenCalledWith(
-      expect.anything(),
-      'PROVIDER_TIMEOUT',
-      expect.any(Date),
-      { retry: true },
-    );
+    expect(fixture.work.recordFailure).toHaveBeenCalledWith(expect.anything(), {
+      code: 'PROVIDER_TIMEOUT',
+      nextAttemptAt: new Date(instant.getTime() + 1000),
+      retry: true,
+    });
     expect(vi.getTimerCount()).toBe(0);
   });
 

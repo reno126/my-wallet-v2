@@ -292,7 +292,13 @@ describe('when persisting shared market data in PostgreSQL', () => {
     const current = requireLease(claims.find((lease) => lease !== null) ?? null);
     expect(claims.filter(Boolean)).toHaveLength(1);
     expect(await fixture.work.complete(expired, fixture.snapshot)).toBe(false);
-    expect(await fixture.work.fail(expired, 'PROVIDER_ERROR', fixture.now())).toBe(false);
+    expect(
+      await fixture.work.recordFailure(expired, {
+        code: 'PROVIDER_ERROR',
+        nextAttemptAt: fixture.now(),
+        retry: false,
+      }),
+    ).toBe(false);
     expect(await fixture.cache.latest(fixture.symbol)).toBeNull();
     expect(await fixture.otherWork.complete(current, fixture.snapshot)).toBe(true);
     expect(
@@ -300,15 +306,25 @@ describe('when persisting shared market data in PostgreSQL', () => {
     ).toMatchObject({ attempts: 2, status: 'SUCCEEDED' });
   });
 
-  it('should retain stale prices and retry timing after failure without allowing wallet opens to bypass it', async () => {
+  it('should retain stale prices and require new demand after a terminal-failure cooldown', async () => {
+    // Arrange
     const fixture = await createFixture();
     const stale = { ...fixture.snapshot, retrievedAt: new Date('2026-10-31T18:00:00Z') };
     await fixture.cache.save(stale);
     await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
     const lease = requireLease(await fixture.work.claim(fixture.symbol, 60_000));
     const nextAttempt = new Date('2026-11-01T19:00:00Z');
-    expect(await fixture.work.fail(lease, 'PROVIDER_QUOTA_EXHAUSTED', nextAttempt)).toBe(true);
+
+    // Act
+    const recorded = await fixture.work.recordFailure(lease, {
+      code: 'PROVIDER_QUOTA_EXHAUSTED',
+      nextAttemptAt: nextAttempt,
+      retry: false,
+    });
     await fixture.otherWork.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+
+    // Assert
+    expect(recorded).toBe(true);
     expect(await fixture.otherWork.claim(fixture.symbol, 60_000)).toBeNull();
     expect(await fixture.otherCache.latest(fixture.symbol)).toEqual(stale);
     expect(
@@ -318,8 +334,23 @@ describe('when persisting shared market data in PostgreSQL', () => {
       nextAttemptAt: nextAttempt,
       lastFailureCode: 'PROVIDER_QUOTA_EXHAUSTED',
     });
+
+    // Act
     fixture.setNow(nextAttempt.toISOString());
-    expect(await fixture.otherWork.claim(fixture.symbol, 60_000)).not.toBeNull();
+    const withoutNewDemand = await fixture.otherWork.claim(fixture.symbol, 60_000);
+
+    // Assert
+    expect(withoutNewDemand).toBeNull();
+    expect(
+      await primary.prisma.refreshWork.findUnique({ where: { symbol: fixture.symbol } }),
+    ).toMatchObject({ status: 'FAILED', attempts: 1 });
+
+    // Act
+    await fixture.otherWork.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
+    const nextCycle = requireLease(await fixture.otherWork.claim(fixture.symbol, 60_000));
+
+    // Assert
+    expect(nextCycle.attempt).toBe(1);
   });
 
   it('should roll back completion and keep the lease if the snapshot is invalid', async () => {
@@ -346,7 +377,11 @@ describe('when persisting shared market data in PostgreSQL', () => {
     await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
     const first = requireLease(await fixture.work.claim(fixture.symbol, 60_000));
     const retryAt = new Date(fixture.now().getTime() + 1000);
-    await fixture.work.fail(first, 'PROVIDER_TIMEOUT', retryAt, { retry: true });
+    await fixture.work.recordFailure(first, {
+      code: 'PROVIDER_TIMEOUT',
+      nextAttemptAt: retryAt,
+      retry: true,
+    });
 
     // Act
     await fixture.otherWork.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
@@ -361,7 +396,11 @@ describe('when persisting shared market data in PostgreSQL', () => {
     await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
     const nextCycle = requireLease(await fixture.work.claim(fixture.symbol, 60_000));
     const cooldown = new Date(fixture.now().getTime() + 300_000);
-    await fixture.work.fail(nextCycle, 'PROVIDER_ERROR', cooldown);
+    await fixture.work.recordFailure(nextCycle, {
+      code: 'PROVIDER_ERROR',
+      nextAttemptAt: cooldown,
+      retry: false,
+    });
     await fixture.work.requestForWallet(fixture.userId, fixture.wallet.id, fixture.symbol);
 
     // Assert

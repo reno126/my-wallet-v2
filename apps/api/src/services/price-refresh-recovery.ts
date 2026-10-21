@@ -1,5 +1,8 @@
 import type { createProviderQuotaRepository } from '../repositories/provider-quota.ts';
-import type { createRefreshWorkRepository } from '../repositories/refresh-work.ts';
+import type {
+  createRefreshWorkRepository,
+  UnfinishedRefreshWork,
+} from '../repositories/refresh-work.ts';
 import type { createPriceRefreshScheduler } from './price-refresh-scheduler.ts';
 import { waitUntilRefreshDeadline } from './refresh-wait.ts';
 
@@ -31,18 +34,35 @@ export function createPriceRefreshRecovery(options: RecoveryOptions) {
     if (available <= 0 || shutdown.signal.aborted) {
       return;
     }
+    const waiting: UnfinishedRefreshWork[] = [];
     for await (const work of options.work.unfinished()) {
       if (shutdown.signal.aborted || available <= 0) {
         return;
       }
-      available--;
-      const task = restore(work).finally(() => tasks.delete(task));
-      tasks.add(task);
-      void task.catch(options.onError);
+      if (work.notBefore > now()) {
+        if (waiting.length < available) {
+          waiting.push(work);
+        }
+      } else {
+        available--;
+        schedule(work);
+      }
+    }
+    for (const work of waiting.slice(0, available)) {
+      if (shutdown.signal.aborted) {
+        return;
+      }
+      schedule(work);
     }
   }
 
-  async function restore(work: { symbol: string; notBefore: Date }) {
+  function schedule(work: UnfinishedRefreshWork) {
+    const task = restore(work).finally(() => tasks.delete(task));
+    tasks.add(task);
+    void task.catch(options.onError);
+  }
+
+  async function restore(work: UnfinishedRefreshWork) {
     if (!(await waitUntilRefreshDeadline(work.notBefore, now, shutdown.signal))) {
       return;
     }

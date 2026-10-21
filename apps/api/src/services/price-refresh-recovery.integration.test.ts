@@ -206,6 +206,39 @@ describe('when recovering persisted refresh work after a restart', () => {
     );
   });
 
+  it('should recover ready work before an alphabetically earlier unexpired lease within the remaining allowance', async () => {
+    // Arrange
+    const instant = new Date('2026-11-02T17:00:00.000Z');
+    const fixture = await createFixture(2, () => instant);
+    const waiting = fixture.symbol();
+    const ready = fixture.symbol();
+    await fixture.request(waiting);
+    const lease = requireLease(await fixture.work.claim(waiting, 180_000));
+    await fixture.request(ready);
+    await fixture.quota.reserveRequest();
+    const scheduler = fixture.scheduler(replica.prisma);
+    const recovery = fixture.recovery(scheduler, replica.prisma);
+
+    // Act
+    await recovery.start();
+    await fixture.dispatched.promise;
+    await scheduler.stop();
+
+    // Assert
+    expect(fixture.fetchRequest).toHaveBeenCalledTimes(1);
+    expect(
+      fixture.fetchRequest.mock.calls.every(
+        ([input]) =>
+          new URL(input instanceof Request ? input.url : input).searchParams.get('symbol') ===
+          ready,
+      ),
+    ).toBe(true);
+    expect(await fixture.quota.read()).toMatchObject({ used: 2, remaining: 0 });
+    expect(
+      await primary.prisma.refreshWork.findUniqueOrThrow({ where: { symbol: waiting } }),
+    ).toMatchObject({ status: 'RUNNING', leaseToken: lease.token, attempts: 1 });
+  });
+
   it('should preserve an unexpired lease then allow only one competing recovery after expiry', async () => {
     // Arrange
     let instant = new Date('2026-11-02T17:00:00.000Z');
@@ -264,7 +297,11 @@ describe('when recovering persisted refresh work after a restart', () => {
     for (let attempt = 0; attempt < 2; attempt++) {
       const lease = requireLease(await fixture.work.claim(symbol, 180_000));
       await fixture.provider.getQuote(symbol);
-      await fixture.work.fail(lease, 'PROVIDER_ERROR', new Date(), { retry: true });
+      await fixture.work.recordFailure(lease, {
+        code: 'PROVIDER_ERROR',
+        nextAttemptAt: new Date(),
+        retry: true,
+      });
     }
     const scheduler = fixture.scheduler(replica.prisma);
     const recovery = fixture.recovery(scheduler, replica.prisma);
@@ -299,11 +336,11 @@ describe('when recovering persisted refresh work after a restart', () => {
       fixture.snapshot(completed),
     );
     await fixture.request(failed);
-    await fixture.work.fail(
-      requireLease(await fixture.work.claim(failed, 180_000)),
-      'PROVIDER_UNAVAILABLE',
-      new Date(0),
-    );
+    await fixture.work.recordFailure(requireLease(await fixture.work.claim(failed, 180_000)), {
+      code: 'PROVIDER_UNAVAILABLE',
+      nextAttemptAt: new Date(0),
+      retry: false,
+    });
     await primary.prisma.refreshWork.create({
       data: { symbol: orphan, requestedAt: new Date(), updatedAt: new Date() },
     });

@@ -6,7 +6,10 @@ import type { CurrentPriceProvider, RefreshFailure } from './current-price-provi
 import { refreshLeaseMs, refreshRetryDecision } from './refresh-retry.ts';
 
 export interface PriceRefreshExecutorOptions {
-  work: Pick<ReturnType<typeof createRefreshWorkRepository>, 'claim' | 'complete' | 'fail'>;
+  work: Pick<
+    ReturnType<typeof createRefreshWorkRepository>,
+    'claim' | 'complete' | 'recordFailure'
+  >;
   cache: Pick<ReturnType<typeof createPriceCacheRepository>, 'latest'>;
   provider: CurrentPriceProvider;
   calendar: ReturnType<typeof createMarketCalendar>;
@@ -58,7 +61,9 @@ export function createPriceRefreshExecutor(options: PriceRefreshExecutorOptions)
       instant,
       options.calendar.nextReset(instant),
     );
-    const recorded = await options.work.fail(lease, failure.code, decision.nextAttemptAt, {
+    const recorded = await options.work.recordFailure(lease, {
+      code: failure.code,
+      nextAttemptAt: decision.nextAttemptAt,
       retry: decision.retry,
     });
     return recorded && decision.retry ? decision.nextAttemptAt : null;

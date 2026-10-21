@@ -12,7 +12,7 @@ import { waitUntilRefreshDeadline } from './refresh-wait.ts';
 interface SchedulerOptions extends PriceRefreshExecutorOptions {
   work: Pick<
     ReturnType<typeof createRefreshWorkRepository>,
-    'requestForWallet' | 'claim' | 'complete' | 'fail'
+    'requestForWallet' | 'claim' | 'complete' | 'recordFailure'
   >;
   concurrency?: number;
   onError: () => void;

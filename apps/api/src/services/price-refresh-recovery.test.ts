@@ -154,6 +154,50 @@ describe('when reconstructing unfinished refresh work', () => {
     expect(fixture.scheduler.enqueue.mock.calls).toEqual([['AAPL'], ['MSFT']]);
   });
 
+  it('should prioritize ready work over earlier waiting candidates when allowance is limited', async () => {
+    // Arrange
+    const fixture = createFixture(
+      [
+        { symbol: 'AAPL', notBefore: new Date(instant.getTime() + 180_000) },
+        { symbol: 'MSFT', notBefore: instant },
+      ],
+      1,
+    );
+
+    // Act
+    await fixture.recovery.start();
+    await vi.advanceTimersByTimeAsync(180_000);
+
+    // Assert
+    expect(fixture.scheduler.enqueue).toHaveBeenCalledExactlyOnceWith('MSFT');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('should use only the remaining admission allowance for waiting work after ready work', async () => {
+    // Arrange
+    const fixture = createFixture(
+      [
+        { symbol: 'AAPL', notBefore: new Date(instant.getTime() + 1000) },
+        { symbol: 'MSFT', notBefore: instant },
+        { symbol: 'GOOG', notBefore: new Date(instant.getTime() + 1000) },
+      ],
+      2,
+    );
+
+    // Act
+    await fixture.recovery.start();
+
+    // Assert
+    expect(fixture.scheduler.enqueue).toHaveBeenCalledExactlyOnceWith('MSFT');
+
+    // Act
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // Assert
+    expect(fixture.scheduler.enqueue.mock.calls).toEqual([['MSFT'], ['AAPL']]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('should recheck quota after waiting rather than dispatching with an exhausted budget', async () => {
     // Arrange
     const fixture = createFixture([
