@@ -1,6 +1,8 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 
 import type { useWalletPricing } from '../_hooks/useWalletPricing';
 import { pricingDictionary as text } from '../pricingDictionary';
@@ -16,6 +18,7 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
     ? pricing.valuation?.holdings.find((holding) => holding.symbol === symbol)
     : pricing.valuation;
   const notice = priceNotice(pricing);
+  const checking = pricing.busy && !pricing.requesting;
   return (
     <Card role="region" aria-label={text.title}>
       <CardHeader>
@@ -25,24 +28,46 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
         {valuation ? (
           <ValuationMetrics valuation={valuation} />
         ) : !pricing.loadFailed ? (
-          <p>{text.loading}</p>
+          <div role="status" aria-label={text.loading}>
+            <span className="sr-only">{text.loading}</span>
+            <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
+          </div>
         ) : null}
         {notice ? (
           <Alert role="status">
             <AlertDescription>{notice}</AlertDescription>
           </Alert>
         ) : null}
-        <div className="flex flex-wrap gap-3">
-          {pricing.canRefresh && pricing.needsPrice ? (
-            <Button disabled={pricing.busy} onClick={pricing.requestRefresh}>
-              {text.refresh}
-            </Button>
-          ) : null}
-          <Button variant="outline" disabled={pricing.busy} onClick={pricing.checkAgain}>
-            {text.retry}
-          </Button>
-        </div>
       </CardContent>
+      <CardFooter className="flex flex-wrap gap-3">
+        {pricing.canRefresh && pricing.needsPrice ? (
+          <Button
+            disabled={pricing.busy}
+            aria-busy={pricing.requesting}
+            onClick={pricing.requestRefresh}
+          >
+            {pricing.requesting ? (
+              <Spinner aria-hidden="true" role={undefined} data-icon="inline-start" />
+            ) : null}
+            {text.refresh}
+          </Button>
+        ) : null}
+        <Button
+          variant="outline"
+          disabled={pricing.busy}
+          aria-busy={checking}
+          onClick={pricing.checkAgain}
+        >
+          {checking ? (
+            <Spinner aria-hidden="true" role={undefined} data-icon="inline-start" />
+          ) : null}
+          {text.retry}
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

@@ -93,7 +93,18 @@ for (const width of responsiveViewportWidths) {
     await expect(panel.getByText(text.running)).toBeVisible();
     await expect(panel.getByText('USD 30.00', { exact: true })).toBeVisible();
     await expect(quota.getByText(quotaRemaining(0, 250))).toBeVisible();
+    const details = quota.getByRole('button', { name: text.quota.details, exact: true });
+    await expect(details).toHaveAttribute('aria-expanded', 'false');
+    await expect(quota.getByText(text.quota.tracked)).toHaveCount(0);
+    await details.focus();
+    await page.keyboard.press('Space');
+    await expect(details).toHaveAttribute('aria-expanded', 'true');
     await expect(quota.getByText('1/20/2026, 12:00:00 AM', { exact: true })).toBeVisible();
+    await expect(quota.getByText(text.quota.tracked)).toBeVisible();
+    await noOverflow();
+    await page.keyboard.press('Enter');
+    await expect(details).toHaveAttribute('aria-expanded', 'false');
+    await expect(quota.getByText(text.exhausted)).toBeVisible();
     await noOverflow();
     await page.screenshot({ path: test.info().outputPath('stale-wallet.png'), fullPage: true });
     // Act

@@ -90,6 +90,8 @@ Status checks run every three seconds while work is pending/running, with at mos
 
 The authenticated layout displays the globally shared tracked budget, its reset date/time and timezone, low-budget warning (at or below 10%), missing configuration and exhaustion. It rereads on navigation, action revalidation and every 30 seconds while mounted. This is app-tracked usage, not the FMP account balance. Exhaustion explains that retained prices may be stale. Pricing failures stay inline so the ledger and trade actions remain usable; an expired session redirects to login. All requests use the shared client with the loader/action's abort signal.
 
+The quota panel keeps its count and warnings visible while a keyboard-accessible “Budget details” disclosure contains reset information and the tracking explanation. Initial pricing/quota loads use skeleton placeholders; subsequent checks keep cached values visible. Spinners and button busy states indicate active browser requests, while durable pending work retains a text notice. Pricing and holding actions use card footers, and holding cards separate ledger metrics from market valuations.
+
 ## Migration and checks
 
 Apply `20261020170000_cache_quota_persistence` before using durable provider dispatch. For local development, run the documented [migration workflow](local-development.md#apply-migrations-and-generate-the-client), then restart the API. Set the API-only FMP key in the ignored local environment or hosted secret manager; never use a `VITE_` key or send credentials in chat.

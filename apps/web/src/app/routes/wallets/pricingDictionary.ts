@@ -39,6 +39,7 @@ export const pricingDictionary = {
     warning: 'The shared request budget is running low.',
     tracked: 'Based on requests tracked by this app; this is not the provider account balance.',
     resets: 'Resets',
+    details: 'Budget details',
   },
 } as const;
 

@@ -103,6 +103,95 @@ function acceleratePricePolling() {
 }
 
 describe('when showing cached valuations and refresh progress', () => {
+  it('should expose quota loading accessibly and keep exhaustion visible while toggling budget details with the keyboard', async () => {
+    // Arrange
+    quota = { ...quota, remaining: 0, used: 250, exhausted: true };
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    onTestFinished(release);
+    server.use(
+      http.get(`${base}/market-data/quota`, async () => {
+        await gate;
+        return HttpResponse.json(quota);
+      }),
+    );
+    const page = openPage();
+    const budget = await screen.findByRole(
+      'complementary',
+      { name: text.quota.title },
+      { timeout: 10_000 },
+    );
+    // Assert
+    expect(within(budget).getByRole('status', { name: text.quota.loading })).toBeVisible();
+    // Act
+    act(() => {
+      release();
+    });
+    const details = await within(budget).findByRole('button', { name: text.quota.details });
+    // Assert
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    expect(within(budget).getByText(text.exhausted)).toBeVisible();
+    expect(within(budget).queryByText(text.quota.tracked)).not.toBeInTheDocument();
+    // Act
+    await page.user.click(details);
+    // Assert
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    expect(within(budget).getByText(text.quota.tracked)).toBeVisible();
+    expect(within(budget).getByText(quotaRemaining(0, 250))).toBeVisible();
+    // Act
+    await page.user.keyboard('{Enter}');
+    // Assert
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    expect(within(budget).queryByText(text.quota.tracked)).not.toBeInTheDocument();
+    expect(within(budget).getByText(text.exhausted)).toBeVisible();
+    expect(details).toHaveFocus();
+    expect(requests).toBe(0);
+  });
+
+  it('should mark only active refresh requests busy while preserving the cached valuation', async () => {
+    // Arrange
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    onTestFinished(release);
+    server.use(
+      http.post(`${endpoint}/price-refresh`, async () => {
+        requests += 1;
+        await gate;
+        status = {
+          ...status,
+          hasPendingWork: true,
+          holdings: status.holdings.map((holding) => ({ ...holding, status: 'pending' })),
+        };
+        return HttpResponse.json(
+          { walletId: walletSummary.id, requestedSymbols: ['AAPL'] },
+          { status: 202 },
+        );
+      }),
+    );
+    const page = openPage();
+    const panel = await screen.findByRole('region', { name: text.title });
+    const refresh = await within(panel).findByRole('button', { name: text.refresh });
+    // Assert
+    await waitFor(() => expect(refresh).toHaveAttribute('aria-busy', 'true'));
+    expect(refresh).toBeDisabled();
+    expect(within(panel).getByText('USD 30.00')).toBeVisible();
+    // Act
+    act(() => {
+      release();
+    });
+    // Assert
+    expect(await within(panel).findByText(text.pending)).toBeVisible();
+    await waitFor(() => expect(refresh).toBeEnabled());
+    expect(refresh).toHaveAttribute('aria-busy', 'false');
+    expect(within(panel).getByText('USD 30.00')).toBeVisible();
+    expect(requests).toBe(1);
+    expect(page.router.state.location.pathname).toBe(path);
+  });
+
   it('should reconcile a valuation read that finishes before the status reports fresh prices without another refresh request', async () => {
     // Arrange
     acceleratePricePolling();
@@ -267,6 +356,7 @@ describe('when showing cached valuations and refresh progress', () => {
       await screen.findByRole('heading', { name: walletSummary.name }, { timeout: 10_000 }),
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: ledgerDictionary.walletSummary })).toBeVisible();
+    expect(within(page.panel()).getByRole('status', { name: text.loading })).toBeVisible();
     expect(requests).toBe(0);
     // Act
     act(() => {

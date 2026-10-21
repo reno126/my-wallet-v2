@@ -2,7 +2,15 @@ import { Link } from 'react-router';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import type { Holding } from '@/lib/api/ledger';
 import type { HoldingValuation } from '@/lib/api/marketData';
 import { formatQuantity, formatUsd } from '@/lib/formatFinancial';
@@ -57,22 +65,27 @@ export function HoldingList({ holdings, valuations }: HoldingListProps) {
                     <ProfitLoss value={holding.realizedProfitLoss} />
                   </LedgerMetric>
                 </dl>
-                {valuation ? <ValuationMetrics valuation={valuation} /> : null}
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="h-auto min-h-12 max-w-full py-2 whitespace-normal wrap-anywhere"
-                  >
-                    <Link
-                      to={`/wallets/${holding.walletId}/instruments/${encodeURIComponent(holding.symbol)}`}
-                    >
-                      {text.details(holding.symbol)}
-                    </Link>
-                  </Button>
-                  <SellDialog holding={holding} />
-                </div>
+                {valuation ? (
+                  <>
+                    <Separator />
+                    <ValuationMetrics valuation={valuation} />
+                  </>
+                ) : null}
               </CardContent>
+              <CardFooter className="flex flex-wrap gap-3">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-auto min-h-12 max-w-full py-2 whitespace-normal wrap-anywhere"
+                >
+                  <Link
+                    to={`/wallets/${holding.walletId}/instruments/${encodeURIComponent(holding.symbol)}`}
+                  >
+                    {text.details(holding.symbol)}
+                  </Link>
+                </Button>
+                <SellDialog holding={holding} />
+              </CardFooter>
             </Card>
           );
         })}

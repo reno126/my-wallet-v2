@@ -76,6 +76,8 @@ pnpm exec dotenv -e .env.ci.local -- pnpm test:e2e
 
 The browser suite covers authentication, wallet creation/deletion, purchase interactions, ledger history and summaries, sale validation, deletion confirmation/conflicts, page-failure recovery, and responsive states. Ledger viewport checks cover 320, 375, 768, 1024 and 1440 pixels, including full-viewport mobile dialogs, keyboard focus, long names, empty/closed positions, and recoverable load failures. Router component tests also cover sale-state isolation across wallet/instrument navigation, preserving form values through holding refreshes, and blocking uncertain sale/delete retries until a manual refresh. Provider behavior is controlled, so automated checks do not consume live FMP quota.
 
+Pricing feedback checks also exercise initial loading status, busy refresh controls with retained cached values, keyboard operation and expanded state of quota details, and warnings that remain visible when those details are collapsed. The responsive journey verifies the quota reset time in its configured timezone while the browser uses another timezone.
+
 ## Contract ownership
 
 Pricing route tests cover non-blocking loading, exact decimal formatting, fresh/stale/missing/closed holdings, exhausted or disabled providers, retained valuations after read failures, explicit recovery, bounded polling, navigation cleanup and expired sessions. Controlled browser checks cover freshness transitions, the last quota unit, exhausted stale values, unavailable pricing and quota recovery at the established phone/tablet/desktop widths, asserting no page overflow and saving screenshots. These checks exercise UI behavior; they do not replace the PostgreSQL lease/quota race tests.
