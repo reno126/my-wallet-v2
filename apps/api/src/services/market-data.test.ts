@@ -36,6 +36,9 @@ function createFixture(configured = true) {
       .mockResolvedValue(success({ ...wallet, holdings: [...wallet.holdings] })),
   };
   const market = {
+    latestPricesForSymbols: vi
+      .fn<MarketDataRepository['latestPricesForSymbols']>()
+      .mockResolvedValue([]),
     readForSymbols: vi
       .fn<MarketDataRepository['readForSymbols']>()
       .mockResolvedValue({ prices: [], work: [] }),
@@ -82,6 +85,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
     // Assert
     expect(results.every((result) => !result.ok && result.error.code === 'NOT_FOUND')).toBe(true);
     expect(fixture.market.readForSymbols).not.toHaveBeenCalled();
+    expect(fixture.market.latestPricesForSymbols).not.toHaveBeenCalled();
     expect(fixture.quota.read).not.toHaveBeenCalled();
     expect(fixture.scheduler.requestForWallet).not.toHaveBeenCalled();
   });
@@ -94,6 +98,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
     await fixture.service.refreshStatus('user', 'wallet');
     // Assert
     expect(fixture.market.readForSymbols).toHaveBeenCalledWith(['AAPL']);
+    expect(fixture.market.latestPricesForSymbols).toHaveBeenCalledExactlyOnceWith(['AAPL']);
     expect(fixture.quota.read).not.toHaveBeenCalled();
     expect(fixture.scheduler.requestForWallet).not.toHaveBeenCalled();
   });
@@ -132,19 +137,16 @@ describe('when serving cached wallet prices and refresh intent', () => {
           }),
         );
       } else {
-        fixture.market.readForSymbols.mockResolvedValue({
-          prices: [
-            {
-              symbol: 'AAPL',
-              unitPrice: '10',
-              currency: 'USD',
-              marketDate: '2026-11-02',
-              retrievedAt: now,
-              source: 'FMP',
-            },
-          ],
-          work: [],
-        });
+        fixture.market.latestPricesForSymbols.mockResolvedValue([
+          {
+            symbol: 'AAPL',
+            unitPrice: '10',
+            currency: 'USD',
+            marketDate: '2026-11-02',
+            retrievedAt: now,
+            source: 'FMP',
+          },
+        ]);
       }
       // Act
       const result = await fixture.service.requestRefresh('user', 'wallet');
@@ -166,6 +168,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
           status: 'PENDING',
           nextAttemptAt: now,
           lastFailureCode: 'PROVIDER_TIMEOUT',
+          leaseExpiresAt: null,
         },
       ],
     });
@@ -179,6 +182,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
           status: 'FAILED',
           nextAttemptAt: now,
           lastFailureCode: 'unsafe-provider-secret',
+          leaseExpiresAt: null,
         },
       ],
     });
@@ -187,7 +191,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
     expect(pending).toMatchObject({
       ok: true,
       value: {
-        isSyncing: true,
+        hasPendingWork: true,
         holdings: [
           {
             status: 'pending',
@@ -199,7 +203,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
     });
     expect(failed).toMatchObject({
       ok: true,
-      value: { isSyncing: false, holdings: [{ status: 'failed', lastFailureCode: null }] },
+      value: { hasPendingWork: false, holdings: [{ status: 'failed', lastFailureCode: null }] },
     });
   });
 
@@ -219,6 +223,72 @@ describe('when serving cached wallet prices and refresh intent', () => {
       },
     });
     expect(fixture.scheduler.requestForWallet).not.toHaveBeenCalled();
+  });
+
+  it('should read refresh-work rows only for status, while valuation and admission read prices alone', async () => {
+    // Arrange
+    const fixture = createFixture();
+    // Act
+    await fixture.service.valuation('user', 'wallet');
+    await fixture.service.requestRefresh('user', 'wallet');
+    // Assert
+    expect(fixture.market.latestPricesForSymbols).toHaveBeenCalledTimes(2);
+    expect(fixture.market.readForSymbols).not.toHaveBeenCalled();
+  });
+
+  it('should describe pending durable demand even without a configured provider or available quota', async () => {
+    // Arrange
+    const fixture = createFixture(false);
+    fixture.market.readForSymbols.mockResolvedValue({
+      prices: [],
+      work: [
+        {
+          symbol: 'AAPL',
+          status: 'PENDING',
+          nextAttemptAt: null,
+          lastFailureCode: null,
+          leaseExpiresAt: null,
+        },
+      ],
+    });
+    fixture.quota.read.mockRejectedValue(new Error('Quota is unavailable'));
+    // Act
+    const result = await fixture.service.refreshStatus('user', 'wallet');
+    // Assert
+    expect(result).toMatchObject({
+      ok: true,
+      value: { providerConfigured: false, hasPendingWork: true, holdings: [{ status: 'pending' }] },
+    });
+    expect(fixture.quota.read).not.toHaveBeenCalled();
+    expect(fixture.scheduler.requestForWallet).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['2026-11-02T16:59:59Z', 'pending'],
+    ['2026-11-02T17:00:00Z', 'pending'],
+    ['2026-11-02T17:00:01Z', 'running'],
+  ] as const)('should describe running work expiring at %s as %s', async (expires, status) => {
+    // Arrange
+    const fixture = createFixture();
+    fixture.market.readForSymbols.mockResolvedValue({
+      prices: [],
+      work: [
+        {
+          symbol: 'AAPL',
+          status: 'RUNNING',
+          leaseExpiresAt: new Date(expires),
+          nextAttemptAt: null,
+          lastFailureCode: null,
+        },
+      ],
+    });
+    // Act
+    const result = await fixture.service.refreshStatus('user', 'wallet');
+    // Assert
+    expect(result).toMatchObject({
+      ok: true,
+      value: { hasPendingWork: true, holdings: [{ status }] },
+    });
   });
 
   it.each([

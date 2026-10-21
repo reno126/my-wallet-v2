@@ -10,13 +10,12 @@ import { type ApiErrorInput, apiErrorMessages } from '@my-wallets/contracts';
 import { apiEnvironment, type ApiEnvironmentInput } from './config/environment.js';
 import { mapFailureToResponse } from './http/api-failure.js';
 import { getRequestFailure } from './http/request-failure.js';
-import type { ApiPluginOptions } from './plugin-options.js';
-import type { FmpDependencies } from './providers/fmp/client.js';
+import type { ApiPluginOptions, FmpPluginDependencies } from './plugin-options.js';
 
 export interface BuildServerOptions {
   environment?: ApiEnvironmentInput;
   logger?: FastifyServerOptions['logger'];
-  fmp?: FmpDependencies;
+  fmp?: FmpPluginDependencies;
   recoverRefreshWork?: boolean;
 }
 

@@ -1,12 +1,16 @@
 import { randomUUID } from 'node:crypto';
 
-import { expect, onTestFinished, vi } from 'vitest';
+import { expect, vi } from 'vitest';
 
 import { createMarketCalendar } from '../src/domain/market-calendar.ts';
 import type { PriceSnapshot } from '../src/domain/price-snapshot.ts';
 import { createPriceCacheRepository } from '../src/repositories/price-cache.ts';
-import { createProviderQuotaRepository } from '../src/repositories/provider-quota.ts';
-import { createBuyLedgerFixture } from './buy-ledger.ts';
+import {
+  createProviderQuotaRepository,
+  type ProviderRequestBudget,
+} from '../src/repositories/provider-quota.ts';
+import { createApiFixture } from './api-fixture.ts';
+import { createLedgerFixture } from './ledger.ts';
 
 export async function createMarketDataFixture(
   options: {
@@ -15,7 +19,10 @@ export async function createMarketDataFixture(
     authenticate?: boolean;
   } = {},
 ) {
-  let reserveRequest = () => Promise.resolve(false);
+  const budget: ProviderRequestBudget = {
+    reserveRequest: () => quota.reserveRequest(),
+    read: () => quota.read(),
+  };
   const fetchRequest = vi.fn<typeof fetch>().mockImplementation((input) => {
     const url = new URL(input instanceof Request ? input.url : input);
     const symbol = url.searchParams.get('symbol');
@@ -27,13 +34,12 @@ export async function createMarketDataFixture(
       ),
     );
   });
-  const fixture = await createBuyLedgerFixture(
-    {},
-    {
+  const fixture = await createLedgerFixture(
+    await createApiFixture({
       authenticate: options.authenticate ?? true,
-      environment: options.environment ?? {},
-      fmp: { reserveRequest: () => reserveRequest(), fetch: fetchRequest, timeoutMs: 5000 },
-    },
+      environment: { FMP_API_KEY: 'test-only-provider-key', ...options.environment },
+      fmp: { budget, fetch: fetchRequest, timeoutMs: 5000 },
+    }),
   );
   const provider = `read-model-${randomUUID()}`;
   const quota = createProviderQuotaRepository(fixture.server.prisma, {
@@ -41,23 +47,9 @@ export async function createMarketDataFixture(
     dailyLimit: options.limit ?? 250,
     timeZone: 'America/New_York',
   });
-  reserveRequest = quota.reserveRequest;
+  fixture.registeredProviders.push(provider);
   const cache = createPriceCacheRepository(fixture.server.prisma);
   const calendar = createMarketCalendar('America/New_York');
-  onTestFinished(async () => {
-    await fixture.server.priceRefresh.stop();
-    await fixture.server.prisma.refreshSubscription.deleteMany({
-      where: { symbol: { in: fixture.registeredSymbols } },
-    });
-    await fixture.server.prisma.refreshWork.deleteMany({
-      where: { symbol: { in: fixture.registeredSymbols } },
-    });
-    await fixture.server.prisma.priceSnapshot.deleteMany({
-      where: { symbol: { in: fixture.registeredSymbols } },
-    });
-    await fixture.server.prisma.providerQuotaDay.deleteMany({ where: { provider } });
-    await fixture.server.prisma.providerBudget.deleteMany({ where: { provider } });
-  });
   const base = `/api/wallets/${fixture.wallet.id}`;
   return {
     ...fixture,

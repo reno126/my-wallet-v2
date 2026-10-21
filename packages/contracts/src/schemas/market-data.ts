@@ -62,7 +62,11 @@ export const walletRefreshStatusSchema = zod.strictObject({
   walletId: resourceIdSchema,
   providerConfigured: zod.boolean(),
   freshness: priceFreshnessSchema,
-  isSyncing: zod.boolean(),
+  hasPendingWork: zod
+    .boolean()
+    .describe(
+      'Durable unfinished demand for stale/missing holdings, including retries or lease recovery. Does not imply an active worker or available quota.',
+    ),
   holdings: zod.array(holdingRefreshStatusSchema),
 });
 

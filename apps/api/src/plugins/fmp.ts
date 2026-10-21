@@ -34,13 +34,16 @@ const fmpPlugin: FastifyPluginCallback<ApiPluginOptions> = (
   options,
   completePluginRegistration,
 ) => {
-  const quota = createProviderQuotaRepository(server.prisma, {
-    dailyLimit: options.environment.FMP_DAILY_REQUEST_LIMIT,
-    timeZone: options.environment.FMP_QUOTA_TIMEZONE,
-  });
+  const { budget: quota, ...transport } = options.fmp ?? {
+    budget: createProviderQuotaRepository(server.prisma, {
+      dailyLimit: options.environment.FMP_DAILY_REQUEST_LIMIT,
+      timeZone: options.environment.FMP_QUOTA_TIMEZONE,
+    }),
+  };
   const client = createFmpClient({
     environment: options.environment,
-    ...(options.fmp ?? { reserveRequest: quota.reserveRequest }),
+    ...transport,
+    reserveRequest: quota.reserveRequest,
   });
 
   server.decorate('instrumentSearch', createInstrumentSearchService(client));

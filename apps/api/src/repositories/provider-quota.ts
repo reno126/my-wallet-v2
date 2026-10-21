@@ -8,6 +8,8 @@ interface ProviderQuotaOptions {
   now?: () => Date;
 }
 
+export type ProviderRequestBudget = ReturnType<typeof createProviderQuotaRepository>;
+
 export function createProviderQuotaRepository(prisma: PrismaClient, options: ProviderQuotaOptions) {
   if (
     !Number.isInteger(options.dailyLimit) ||

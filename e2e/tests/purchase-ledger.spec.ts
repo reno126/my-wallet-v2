@@ -24,10 +24,11 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     throw new Error('The purchase journey may only use the local wallet_test database.');
   }
   const { createTestServer } = await import('../../apps/api/test-support/create-test-server');
+  const { createTestProviderBudget } = await import('../../apps/api/test-support/provider-budget');
   const email = `browser-${randomUUID()}@example.test`;
   const symbol = `E${randomUUID().replaceAll('-', '').toUpperCase()}`;
   const providerRequests: string[] = [];
-  let reserved = 0;
+  const budget = createTestProviderBudget();
   const server = createTestServer(
     {
       DATABASE_URL: databaseUrl,
@@ -38,10 +39,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     },
     {
       fmp: {
-        reserveRequest: () => {
-          reserved += 1;
-          return Promise.resolve(true);
-        },
+        budget,
         fetch: (input) => {
           const url = new URL(input instanceof Request ? input.url : input);
           providerRequests.push(url.pathname);
@@ -124,7 +122,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     expect(saved?.unitPrice.toFixed()).toBe(purchaseInput.unitPrice);
     expect(saved?.description).toBe(purchaseInput.description);
     expect(saved?.currency).toBe('USD');
-    expect(reserved).toBe(4);
+    expect(budget.used()).toBe(4);
     expect(providerRequests).toEqual([
       '/stable/search-symbol',
       '/stable/profile',
@@ -178,7 +176,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     expect(replacement.id).not.toBe(sale.id);
     expect(replacement.quantity.toFixed()).toBe('0.5');
     expect(replacement.unitPrice.toFixed()).toBe('240');
-    expect(reserved).toBe(4);
+    expect(budget.used()).toBe(4);
     await page.reload();
     await expect(page.getByText('Gain: USD 4.94', { exact: true }).first()).toBeVisible();
   } finally {

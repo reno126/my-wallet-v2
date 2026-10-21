@@ -9,7 +9,12 @@ import type {
 
 import { financialDecimal } from '../domain/accounting/decimal.ts';
 import type { createMarketCalendar } from '../domain/market-calendar.ts';
-import { isPriceFresh, type PriceSnapshot } from '../domain/price-snapshot.ts';
+import type { PriceSnapshot } from '../domain/price-snapshot.ts';
+import {
+  assessHoldingPrices,
+  type HoldingPriceState,
+  walletPriceFreshness,
+} from './holding-prices.ts';
 
 type WalletHoldings = zod.infer<typeof walletHoldingsSchema>;
 type Holding = zod.infer<typeof holdingSchema>;
@@ -22,10 +27,7 @@ export function valueWalletHoldings(
   now: Date,
   calendar: ReturnType<typeof createMarketCalendar>,
 ): WalletValuation {
-  const bySymbol = new Map(prices.map((price) => [price.symbol, price]));
-  const holdings = ledger.holdings.map((holding) =>
-    valueHolding(holding, bySymbol.get(holding.symbol), now, calendar),
-  );
+  const holdings = assessHoldingPrices(ledger.holdings, prices, now, calendar).map(valueHolding);
   const freshness = walletPriceFreshness(holdings);
   const currentValue =
     freshness === 'missing'
@@ -58,22 +60,21 @@ export function valueWalletHoldings(
   };
 }
 
-function valueHolding(
-  holding: Holding,
-  snapshot: PriceSnapshot | undefined,
-  now: Date,
-  calendar: ReturnType<typeof createMarketCalendar>,
-): HoldingValuation {
+function valueHolding({
+  holding,
+  price: snapshot,
+  freshness,
+}: HoldingPriceState<Holding>): HoldingValuation {
   const valuation: HoldingValuation = {
     ...holding,
     price: null,
-    freshness: 'missing',
+    freshness,
     currentValue: null,
     unrealizedProfitLoss: null,
     unrealizedProfitLossPercentage: null,
     allocationPercentage: null,
   };
-  if (financialDecimal(holding.quantity).isZero()) {
+  if (freshness === 'not_required') {
     return {
       ...valuation,
       freshness: 'not_required',
@@ -97,21 +98,10 @@ function valueHolding(
       retrievedAt: snapshot.retrievedAt.toISOString(),
       source: snapshot.source,
     },
-    freshness: isPriceFresh(snapshot, now, calendar) ? 'fresh' : 'stale',
     currentValue,
     unrealizedProfitLoss,
     unrealizedProfitLossPercentage: percentage(unrealizedProfitLoss, holding.remainingCostBasis),
   };
-}
-
-function walletPriceFreshness(holdings: readonly Pick<HoldingValuation, 'freshness'>[]) {
-  if (holdings.some((holding) => holding.freshness === 'missing')) {
-    return 'missing';
-  }
-  if (holdings.some((holding) => holding.freshness === 'stale')) {
-    return 'stale';
-  }
-  return holdings.some((holding) => holding.freshness === 'fresh') ? 'fresh' : 'not_required';
 }
 
 function percentage(numerator: string | null, denominator: string | null): string | null {

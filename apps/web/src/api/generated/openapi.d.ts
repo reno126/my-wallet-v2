@@ -512,7 +512,8 @@ export interface components {
             providerConfigured: boolean;
             /** @enum {string} */
             freshness: "fresh" | "stale" | "missing" | "not_required";
-            isSyncing: boolean;
+            /** @description Durable unfinished demand for stale/missing holdings, including retries or lease recovery. Does not imply an active worker or available quota. */
+            hasPendingWork: boolean;
             holdings: {
                 symbol: string;
                 /** @enum {string} */
@@ -769,7 +770,8 @@ export interface components {
             providerConfigured: boolean;
             /** @enum {string} */
             freshness: "fresh" | "stale" | "missing" | "not_required";
-            isSyncing: boolean;
+            /** @description Durable unfinished demand for stale/missing holdings, including retries or lease recovery. Does not imply an active worker or available quota. */
+            hasPendingWork: boolean;
             holdings: {
                 symbol: string;
                 /** @enum {string} */

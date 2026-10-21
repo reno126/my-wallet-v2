@@ -737,8 +737,9 @@
               "not_required"
             ]
           },
-          "isSyncing": {
-            "type": "boolean"
+          "hasPendingWork": {
+            "type": "boolean",
+            "description": "Durable unfinished demand for stale/missing holdings, including retries or lease recovery. Does not imply an active worker or available quota."
           },
           "holdings": {
             "type": "array",
@@ -828,7 +829,7 @@
           "walletId",
           "providerConfigured",
           "freshness",
-          "isSyncing",
+          "hasPendingWork",
           "holdings"
         ],
         "additionalProperties": false
@@ -2036,8 +2037,9 @@
               "not_required"
             ]
           },
-          "isSyncing": {
-            "type": "boolean"
+          "hasPendingWork": {
+            "type": "boolean",
+            "description": "Durable unfinished demand for stale/missing holdings, including retries or lease recovery. Does not imply an active worker or available quota."
           },
           "holdings": {
             "type": "array",
@@ -2127,7 +2129,7 @@
           "walletId",
           "providerConfigured",
           "freshness",
-          "isSyncing",
+          "hasPendingWork",
           "holdings"
         ],
         "additionalProperties": false

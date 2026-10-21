@@ -5,6 +5,7 @@ import {
   holdingRefreshStatusSchema,
   priceRefreshRequestSchema,
   providerQuotaStatusSchema,
+  walletRefreshStatusSchema,
 } from './market-data.js';
 
 const price = {
@@ -81,5 +82,27 @@ describe('when validating public market data contracts', () => {
     expect(providerQuotaStatusSchema.parse(quota)).toEqual(quota);
     expect(providerQuotaStatusSchema.safeParse({ ...quota, used: 0.5 }).success).toBe(false);
     expect(providerQuotaStatusSchema.safeParse({ ...quota, remaining: -1 }).success).toBe(false);
+  });
+
+  it('should describe durable pending work without promising active synchronization', () => {
+    // Arrange
+    const status = {
+      walletId: 'e10c1c99-341d-4e4f-bb56-d5b646f748d9',
+      providerConfigured: false,
+      freshness: 'missing',
+      hasPendingWork: true,
+      holdings: [
+        {
+          symbol: 'AAPL',
+          freshness: 'missing',
+          status: 'pending',
+          nextAttemptAt: null,
+          lastFailureCode: null,
+        },
+      ],
+    };
+    // Assert
+    expect(walletRefreshStatusSchema.parse(status)).toEqual(status);
+    expect(walletRefreshStatusSchema.safeParse({ ...status, isSyncing: true }).success).toBe(false);
   });
 });

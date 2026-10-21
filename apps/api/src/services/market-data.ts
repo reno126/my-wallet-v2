@@ -12,6 +12,7 @@ import type { ApiFailure } from '../http/api-failure.ts';
 import type { MarketDataRepository } from '../repositories/market-data.ts';
 import type { createProviderQuotaRepository } from '../repositories/provider-quota.ts';
 import { failure, type Result, success } from '../result.ts';
+import { assessHoldingPrices, walletPriceFreshness } from './holding-prices.ts';
 import type { createLedgerService } from './ledger.ts';
 import type { createPriceRefreshScheduler } from './price-refresh-scheduler.ts';
 import { valueWalletHoldings } from './wallet-valuation.ts';
@@ -40,7 +41,7 @@ export function createMarketDataService(options: MarketDataOptions) {
   const now = options.now ?? (() => new Date());
   return { valuation, holdingValuation, refreshStatus, requestRefresh, quotaStatus };
 
-  async function read(userId: string, walletId: string) {
+  async function read(userId: string, walletId: string, mode: 'prices' | 'refresh-status') {
     const ledger = await options.ledger.holdings(userId, walletId);
     if (!ledger.ok) {
       return ledger;
@@ -48,16 +49,23 @@ export function createMarketDataService(options: MarketDataOptions) {
     const symbols = ledger.value.holdings
       .filter((holding) => holding.quantity !== '0')
       .map((holding) => holding.symbol);
-    const market = await options.market.readForSymbols(symbols);
+    const market =
+      mode === 'refresh-status'
+        ? await options.market.readForSymbols(symbols)
+        : { prices: await options.market.latestPricesForSymbols(symbols), work: [] };
     return success({
-      valuation: valueWalletHoldings(ledger.value, market.prices, now(), options.calendar),
-      work: market.work,
+      ledger: ledger.value,
+      ...market,
     });
   }
 
   async function valuation(userId: string, walletId: string) {
-    const result = await read(userId, walletId);
-    return result.ok ? success(result.value.valuation) : result;
+    const result = await read(userId, walletId, 'prices');
+    return result.ok
+      ? success(
+          valueWalletHoldings(result.value.ledger, result.value.prices, now(), options.calendar),
+        )
+      : result;
   }
 
   async function holdingValuation(userId: string, walletId: string, symbol: string) {
@@ -75,34 +83,41 @@ export function createMarketDataService(options: MarketDataOptions) {
     userId: string,
     walletId: string,
   ): Promise<Result<RefreshStatus, ApiFailure>> {
-    const result = await read(userId, walletId);
+    const result = await read(userId, walletId, 'refresh-status');
     if (!result.ok) {
       return result;
     }
-    const { valuation, work } = result.value;
+    const { ledger, prices, work } = result.value;
+    const instant = now();
+    const priceStates = assessHoldingPrices(ledger.holdings, prices, instant, options.calendar);
     const bySymbol = new Map(work.map((row) => [row.symbol, row]));
-    const holdings = valuation.holdings.map((holding): RefreshStatus['holdings'][number] => {
-      const row = bySymbol.get(holding.symbol);
-      const parsedCode = apiErrorSchema.shape.error.shape.code.safeParse(row?.lastFailureCode);
-      return {
-        symbol: holding.symbol,
-        freshness: holding.freshness,
-        status: row ? workStatuses[row.status] : 'idle',
-        nextAttemptAt: row?.nextAttemptAt?.toISOString() ?? null,
-        lastFailureCode: parsedCode.success ? parsedCode.data : null,
-      };
-    });
+    const holdings = priceStates.map(
+      ({ holding, freshness }): RefreshStatus['holdings'][number] => {
+        const row = bySymbol.get(holding.symbol);
+        const parsedCode = apiErrorSchema.shape.error.shape.code.safeParse(row?.lastFailureCode);
+        return {
+          symbol: holding.symbol,
+          freshness,
+          status:
+            row?.status === 'RUNNING' && (!row.leaseExpiresAt || row.leaseExpiresAt <= instant)
+              ? 'pending'
+              : row
+                ? workStatuses[row.status]
+                : 'idle',
+          nextAttemptAt: row?.nextAttemptAt?.toISOString() ?? null,
+          lastFailureCode: parsedCode.success ? parsedCode.data : null,
+        };
+      },
+    );
     return success({
       walletId,
       providerConfigured: options.configured,
-      freshness: valuation.freshness,
-      isSyncing:
-        options.configured &&
-        holdings.some(
-          (holding) =>
-            (holding.freshness === 'stale' || holding.freshness === 'missing') &&
-            (holding.status === 'pending' || holding.status === 'running'),
-        ),
+      freshness: walletPriceFreshness(priceStates),
+      hasPendingWork: holdings.some(
+        (holding) =>
+          (holding.freshness === 'stale' || holding.freshness === 'missing') &&
+          (holding.status === 'pending' || holding.status === 'running'),
+      ),
       holdings,
     });
   }
@@ -126,13 +141,16 @@ export function createMarketDataService(options: MarketDataOptions) {
     userId: string,
     walletId: string,
   ): Promise<Result<RefreshReceipt, ApiFailure>> {
-    const result = await valuation(userId, walletId);
+    const result = await read(userId, walletId, 'prices');
     if (!result.ok) {
       return result;
     }
-    const stale = result.value.holdings.filter(
-      (holding) => holding.freshness === 'stale' || holding.freshness === 'missing',
-    );
+    const stale = assessHoldingPrices(
+      result.value.ledger.holdings,
+      result.value.prices,
+      now(),
+      options.calendar,
+    ).filter((state) => state.freshness === 'stale' || state.freshness === 'missing');
     if (stale.length === 0) {
       return success({ walletId, requestedSymbols: [] });
     }
@@ -147,7 +165,7 @@ export function createMarketDataService(options: MarketDataOptions) {
       return failure({ code: 'PROVIDER_QUOTA_EXHAUSTED' });
     }
     const requestedSymbols: string[] = [];
-    for (const holding of stale) {
+    for (const { holding } of stale) {
       if (!(await options.scheduler.requestForWallet(userId, walletId, holding.symbol))) {
         return failure({ code: 'PROVIDER_UNAVAILABLE' });
       }

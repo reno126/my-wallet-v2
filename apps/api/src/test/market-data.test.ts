@@ -177,7 +177,7 @@ describe('when exposing cached valuations and shared price refreshes', () => {
     expect(responses.every((response) => response.statusCode === 202)).toBe(true);
     expect(fixture.fetchRequest).toHaveBeenCalledTimes(1);
     expect(status).toMatchObject({
-      isSyncing: true,
+      hasPendingWork: true,
       freshness: 'missing',
       holdings: [{ status: 'running' }],
     });
@@ -220,16 +220,55 @@ describe('when exposing cached valuations and shared price refreshes', () => {
     const status = walletRefreshStatusSchema.parse(
       (await fixture.get(`${fixture.base}/price-refresh`)).json(),
     );
-    await fixture.refresh();
+    const exhausted = await fixture.refresh();
+    const quotaStatus = providerQuotaStatusSchema.parse(
+      (await fixture.get('/api/market-data/quota')).json(),
+    );
     await fixture.server.priceRefresh.enqueue(fixture.symbol);
     // Assert
     expect(value).toMatchObject({ currentValue: '25', freshness: 'stale' });
     expect(status).toMatchObject({
-      isSyncing: false,
+      hasPendingWork: false,
       holdings: [{ status: 'failed', lastFailureCode: 'PROVIDER_QUOTA_EXHAUSTED' }],
     });
     expect(fixture.fetchRequest).toHaveBeenCalledTimes(1);
     expect((await fixture.quota.read()).used).toBe(1);
+    expect(exhausted.statusCode).toBe(503);
+    expect(apiErrorSchema.parse(exhausted.json()).error.code).toBe('PROVIDER_QUOTA_EXHAUSTED');
+    expect(quotaStatus).toMatchObject({ limit: 1, used: 1, remaining: 0, exhausted: true });
+  });
+
+  it('should retain pending demand without claiming activity or admitting new work when the shared budget is exhausted', async () => {
+    // Arrange
+    const fixture = await createMarketDataFixture({ limit: 1 });
+    await fixture.seedTransaction();
+    await fixture.server.prisma.refreshWork.create({
+      data: {
+        symbol: fixture.symbol,
+        requestedAt: new Date(),
+        updatedAt: new Date(),
+        subscriptions: { create: { walletId: fixture.wallet.id } },
+      },
+    });
+    await fixture.quota.reserveRequest();
+    // Act
+    const status = walletRefreshStatusSchema.parse(
+      (await fixture.get(`${fixture.base}/price-refresh`)).json(),
+    );
+    const quota = providerQuotaStatusSchema.parse(
+      (await fixture.get('/api/market-data/quota')).json(),
+    );
+    const response = await fixture.refresh();
+    // Assert
+    expect(status).toMatchObject({ hasPendingWork: true, holdings: [{ status: 'pending' }] });
+    expect(quota).toMatchObject({ limit: 1, used: 1, remaining: 0, exhausted: true });
+    expect(response.statusCode).toBe(503);
+    expect(fixture.fetchRequest).not.toHaveBeenCalled();
+    expect(
+      await fixture.server.prisma.refreshWork.findUniqueOrThrow({
+        where: { symbol: fixture.symbol },
+      }),
+    ).toMatchObject({ status: 'PENDING', attempts: 0 });
   });
 
   it('should retain stale prices and safe terminal failure status after a non-retryable provider error', async () => {
@@ -253,7 +292,7 @@ describe('when exposing cached valuations and shared price refreshes', () => {
     const status = walletRefreshStatusSchema.parse(response.json());
     // Assert
     expect(value).toMatchObject({ currentValue: '25', freshness: 'stale' });
-    expect(status).toMatchObject({ isSyncing: false, holdings: [{ status: 'failed' }] });
+    expect(status).toMatchObject({ hasPendingWork: false, holdings: [{ status: 'failed' }] });
     expect(response.payload).not.toContain('provider-body');
     expect(response.payload).not.toContain('leaseToken');
     expect((await fixture.quota.read()).used).toBe(1);
@@ -285,7 +324,7 @@ describe('when exposing cached valuations and shared price refreshes', () => {
           holding.status === 'failed' && holding.lastFailureCode === 'PROVIDER_QUOTA_EXHAUSTED',
       ),
     ).toBe(true);
-    expect(status.isSyncing).toBe(false);
+    expect(status.hasPendingWork).toBe(false);
   });
 
   it('should isolate wallet ownership, unknown symbols and mutation origins before any dispatch', async () => {

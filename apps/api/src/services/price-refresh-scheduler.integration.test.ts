@@ -119,7 +119,7 @@ describe('when scheduling refreshes with PostgreSQL coordination', () => {
     const fixture = await createFixture({ now: () => new Date() });
     const server = createTestServer(
       { FMP_API_KEY: 'test-only-key', FMP_REFRESH_CONCURRENCY: '1' },
-      { fmp: { reserveRequest: fixture.quota.reserveRequest, fetch: fixture.fetchRequest } },
+      { fmp: { budget: fixture.quota, fetch: fixture.fetchRequest } },
     );
     onTestFinished(async () => server.close());
     await server.ready();
