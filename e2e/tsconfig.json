@@ -5,7 +5,14 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["playwright.config.ts", "tests/**/*.ts"]
+  "include": [
+    "playwright.config.ts",
+    "deployment.config.ts",
+    "preview.config.ts",
+    "tests/**/*.ts",
+    "deployment/**/*.ts"
+  ]
 }

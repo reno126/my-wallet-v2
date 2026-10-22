@@ -1,3 +1,6 @@
+// eslint-disable-next-line simple-import-sort/imports -- CSP setup must run before router/schema imports.
+import './configureZod';
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router';

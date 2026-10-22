@@ -89,3 +89,7 @@ Regenerate the [OpenAPI document and browser types](api.md#contracts-and-swagger
 Market-data fixtures compose the shared authenticated API and ledger fixtures directly, using injected fetch responses without starting an unused HTTP provider. The base API fixture owns shutdown and cleanup of test-owned users, symbols and provider keys. HTTP adapter tests add their controlled network provider separately. Injected budgets supply both reservation and read methods so refresh admission and the public quota endpoint report the same counters that outbound requests consume. Plugin composition tests exercise this shared budget, including exhausted startup recovery, without a reachable database; PostgreSQL route tests separately verify durable counters and rejection of exhausted refresh requests.
 
 See [cross-feature acceptance](acceptance.md) for the acceptance matrix, visual review and release-boundary notes.
+
+## Production-build and preview checks
+
+`pnpm test:deployment` builds the SPA and runs the separate deployment Playwright configuration. Local checks exercise the built app under report-only and enforced CSP, deep-link reloads, missing assets and cache headers. The workspace CI pipeline includes these local checks. Hosted read-only checks use a separate configuration: run `pnpm test:preview` with `DEPLOYMENT_URL` set to an authorized HTTPS preview. See [deployment verification](deployment-preview.md) for environment selection, limitations and the remaining authenticated/OAuth/ingress walkthrough.

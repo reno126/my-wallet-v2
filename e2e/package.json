@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "test:deployment": "pnpm --filter @my-wallets/web build && playwright test --config deployment.config.ts",
+    "test:preview": "playwright test --config preview.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

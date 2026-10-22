@@ -2,7 +2,7 @@
 
 [Project overview](../README.md)
 
-These notes describe current API protections and configuration. The canonical deployment topology, environment/secrets protocol, and release verification requirements remain in [the implementation plan](../IMPLEMENTATION_PLAN.md#production-deployment-topology). Production-like deployment acceptance is tracked in Slice 8B.
+These notes describe current API protections and configuration. The canonical deployment topology, environment/secrets protocol, and release verification requirements remain in [the implementation plan](../IMPLEMENTATION_PLAN.md#production-deployment-topology). See [production-like deployment verification](deployment-preview.md) for the prepared hosting policy, local checks and outstanding hosted acceptance steps for slice 8B.
 
 ## Runtime configuration and credentials
 
