@@ -13,7 +13,7 @@
     "dev:local": "dotenv -e .env.local -- pnpm dev:workspace",
     "ci:workspace": "pnpm run contracts:check && pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm run test && pnpm run test:eslint-rules && pnpm run test:database-safety && pnpm run build && pnpm run audit",
     "ci:local": "dotenv -e .env.ci.local -- pnpm ci:workspace",
-    "test": "pnpm --recursive --if-present test",
+    "test": "pnpm --recursive --workspace-concurrency=1 --if-present test",
     "test:e2e": "pnpm --filter @my-wallets/e2e test",
     "build": "pnpm --recursive --if-present build",
     "audit": "pnpm audit --audit-level high",

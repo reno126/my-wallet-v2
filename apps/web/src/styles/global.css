@@ -45,7 +45,7 @@
   --accent-foreground: oklch(0.96 0.01 250);
   --destructive: oklch(0.68 0.18 25);
   --border: oklch(0.31 0.025 255);
-  --input: oklch(0.31 0.025 255);
+  --input: oklch(0.53 0.025 255);
   --ring: oklch(0.76 0.14 175);
   --radius: 0.75rem;
   --normal-bg: var(--popover);

@@ -4,7 +4,17 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { toast } from 'sonner';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest';
 
 import { emptyLedgerHandlers } from '@/test/ledger-api';
 import { unavailablePricingHandlers } from '@/test/market-data-api';
@@ -54,9 +64,13 @@ beforeEach(() => {
 
 async function openDeletion() {
   const router = createMemoryRouter(routeObjects, { initialEntries: [detailPath] });
+  onTestFinished(() => router.dispose());
   render(<RouterProvider router={router} />);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole('button', { name: text.delete.open }));
+  // The initial lazy route also imports the financial screens on a cold test worker.
+  await user.click(
+    await screen.findByRole('button', { name: text.delete.open }, { timeout: 5_000 }),
+  );
   return {
     router,
     user,

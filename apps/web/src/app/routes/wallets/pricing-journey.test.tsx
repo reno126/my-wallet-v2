@@ -90,10 +90,17 @@ function openPage(suffix = '') {
   const router = createMemoryRouter(routeObjects, { initialEntries: [path + suffix] });
   onTestFinished(() => router.dispose());
   render(<RouterProvider router={router} />);
+  const user = userEvent.setup();
+  const panel = () => screen.getByRole('region', { name: text.title });
   return {
     router,
-    user: userEvent.setup(),
-    panel: () => screen.getByRole('region', { name: text.title }),
+    user,
+    panel,
+    async retryPricing() {
+      const retry = within(panel()).getByRole('button', { name: text.retry });
+      await waitFor(() => expect(retry).toBeEnabled());
+      await user.click(retry);
+    },
   };
 }
 
@@ -303,10 +310,7 @@ describe('when showing cached valuations and refresh progress', () => {
     expect(within(page.panel()).getByText('USD 30.00')).toBeVisible();
     expect(requests).toBe(1);
     // Act
-    await waitFor(() =>
-      expect(within(page.panel()).getByRole('button', { name: text.retry })).toBeEnabled(),
-    );
-    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await page.retryPricing();
     // Assert
     expect(await within(page.panel()).findByText(text.failed)).toBeVisible();
     expect(requests).toBe(1);
@@ -529,7 +533,7 @@ describe('when showing cached valuations and refresh progress', () => {
     expect(within(page.panel()).queryByText(text.unavailable)).not.toBeInTheDocument();
     // Act
     server.use(http.get(`${endpoint}/price-refresh`, () => HttpResponse.json(status)));
-    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await page.retryPricing();
     // Assert
     await waitFor(() =>
       expect(within(page.panel()).queryByText(text.statusUnavailable)).not.toBeInTheDocument(),
@@ -557,7 +561,7 @@ describe('when showing cached valuations and refresh progress', () => {
     await within(await screen.findByRole('region', { name: text.title })).findByText('USD 30.00');
     await waitFor(() => expect(quotaReads).toBe(1));
     // Act
-    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await page.retryPricing();
     await waitFor(() =>
       expect(within(page.panel()).getByRole('button', { name: text.retry })).toBeEnabled(),
     );
@@ -720,7 +724,7 @@ describe('when showing cached valuations and refresh progress', () => {
     // Act
     valuation = priceValuation('fresh');
     status = refreshStatus('fresh');
-    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await page.retryPricing();
     // Assert
     expect(await within(page.panel()).findByText('2026-01-16')).toBeVisible();
     expect(within(page.panel()).getByText('USD 20.0000')).toBeVisible();
@@ -735,7 +739,7 @@ describe('when showing cached valuations and refresh progress', () => {
     await within(await screen.findByRole('region', { name: text.title })).findByText('USD 30.00');
     server.use(http.get(`${endpoint}/valuation`, () => HttpResponse.json({}, { status: 503 })));
     // Act
-    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await page.retryPricing();
     // Assert
     expect(await within(page.panel()).findByText(text.unavailable)).toBeVisible();
     expect(within(page.panel()).getByText('USD 30.00')).toBeVisible();
@@ -745,7 +749,7 @@ describe('when showing cached valuations and refresh progress', () => {
         HttpResponse.json({ ...valuation, currentValue: '31' }),
       ),
     );
-    await page.user.click(within(page.panel()).getByRole('button', { name: text.retry }));
+    await page.retryPricing();
     // Assert
     expect(await within(page.panel()).findByText('USD 31.00')).toBeVisible();
   });
