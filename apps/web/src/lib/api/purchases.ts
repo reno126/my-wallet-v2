@@ -24,11 +24,11 @@ export function createPurchasesApi({ client, request }: RequestClient) {
         200,
       );
     },
-    price(symbol: string, date: string) {
+    price(symbol: string, date: string, currency: Instrument['quoteCurrency']) {
       return request(
         () =>
           client.GET('/instruments/{symbol}/price', {
-            params: { path: { symbol }, query: { date } },
+            params: { path: { symbol }, query: { date, currency } },
           }),
         historicalPriceSchema,
         200,

@@ -3166,7 +3166,7 @@
         "tags": [
           "Instruments"
         ],
-        "description": "Preserves the requested date and returns the effective quote date and exact-decimal unit price. Profile and history requests each consume a reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly.",
+        "description": "Accepts the selected symbol, trade date and USD currency. Returns the effective quote date and exact-decimal unit price without a profile request. Returned symbols and any explicit provider currency must match. Each history request consumes one reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly. BUY submission separately verifies instrument eligibility.",
         "parameters": [
           {
             "schema": {
@@ -3174,6 +3174,14 @@
             },
             "in": "query",
             "name": "date",
+            "required": true
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/CurrencyCodeInput"
+            },
+            "in": "query",
+            "name": "currency",
             "required": true
           },
           {

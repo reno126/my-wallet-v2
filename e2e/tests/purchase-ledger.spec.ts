@@ -33,7 +33,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
   const email = `browser-${randomUUID()}@example.test`;
   const symbol = `E${randomUUID().replaceAll('-', '').toUpperCase()}`;
   const providerRequests: string[] = [];
-  const budget = createTestProviderBudget(6);
+  const budget = createTestProviderBudget(5);
   let releaseQuote = () => {};
   const quoteGate = new Promise<void>((resolve) => {
     releaseQuote = resolve;
@@ -141,10 +141,9 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     const pricing = page.getByRole('region', { name: pricingText.title });
     await expect(pricing.getByText(pricingText.freshness.missing, { exact: true })).toBeVisible();
     await expect(pricing.getByText(pricingText.running)).toBeVisible();
-    expect(budget.used()).toBe(6);
+    expect(budget.used()).toBe(5);
     expect(providerRequests).toEqual([
       '/stable/search-symbol',
-      '/stable/profile',
       '/stable/historical-price-eod/full',
       '/stable/profile',
       '/stable/profile',
@@ -152,7 +151,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     ]);
     releaseQuote();
     await expect(pricing.getByText(pricingText.freshness.fresh, { exact: true })).toBeVisible();
-    await expect(page.getByText(quotaRemaining(0, 6), { exact: true })).toBeVisible();
+    await expect(page.getByText(quotaRemaining(0, 5), { exact: true })).toBeVisible();
     const snapshot = await server.prisma.priceSnapshot.findFirstOrThrow({ where: { symbol } });
     expect(snapshot.unitPrice.toFixed()).toBe('250');
     await page.reload();
@@ -202,7 +201,7 @@ test('a browser buy, sell, delete and corrected re-entry persist exact FIFO resu
     expect(replacement.id).not.toBe(sale.id);
     expect(replacement.quantity.toFixed()).toBe('0.5');
     expect(replacement.unitPrice.toFixed()).toBe('240');
-    expect(budget.used()).toBe(6);
+    expect(budget.used()).toBe(5);
     await page.reload();
     await expect(page.getByText('Gain: USD 4.94', { exact: true }).first()).toBeVisible();
   } finally {

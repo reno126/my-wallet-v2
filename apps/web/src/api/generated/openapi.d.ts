@@ -152,7 +152,7 @@ export interface paths {
         };
         /**
          * Get the latest available USD closing price on or before a trade date
-         * @description Preserves the requested date and returns the effective quote date and exact-decimal unit price. Profile and history requests each consume a reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly.
+         * @description Accepts the selected symbol, trade date and USD currency. Returns the effective quote date and exact-decimal unit price without a profile request. Returned symbols and any explicit provider currency must match. Each history request consumes one reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly. BUY submission separately verifies instrument eligibility.
          */
         get: operations["getHistoricalPrice"];
         put?: never;
@@ -1284,6 +1284,7 @@ export interface operations {
         parameters: {
             query: {
                 date: components["schemas"]["DateOnlyInput"];
+                currency: components["schemas"]["CurrencyCodeInput"];
             };
             header?: never;
             path: {

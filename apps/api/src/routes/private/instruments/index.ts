@@ -53,7 +53,7 @@ const instrumentRoutes: FastifyPluginCallbackZod = (
         operationId: 'getHistoricalPrice',
         summary: 'Get the latest available USD closing price on or before a trade date',
         description:
-          'Preserves the requested date and returns the effective quote date and exact-decimal unit price. Profile and history requests each consume a reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly.',
+          'Accepts the selected symbol, trade date and USD currency. Returns the effective quote date and exact-decimal unit price without a profile request. Returned symbols and any explicit provider currency must match. Each history request consumes one reserved unit. Searches at most five consecutive five-year windows; incomplete coverage is reported explicitly. BUY submission separately verifies instrument eligibility.',
         tags: ['Instruments'],
         params: instrumentPriceParamsSchema,
         querystring: instrumentPriceQuerySchema,
@@ -72,7 +72,11 @@ const instrumentRoutes: FastifyPluginCallbackZod = (
       },
     },
     async (request, reply) => {
-      const result = await server.historicalPrices.quote(request.params.symbol, request.query.date);
+      const result = await server.historicalPrices.quote(
+        request.params.symbol,
+        request.query.date,
+        request.query.currency,
+      );
       return sendResult(reply, result, request.id);
     },
   );

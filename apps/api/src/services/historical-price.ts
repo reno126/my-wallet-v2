@@ -6,7 +6,6 @@ import {
   instrumentPriceQuerySchema,
 } from '@my-wallets/contracts';
 
-import { validateUsdCurrency } from '../domain/usd-currency.ts';
 import type { ApiFailure } from '../http/api-failure.js';
 import { failure, type Result, success } from '../result.ts';
 import type { HistoricalClose, HistoricalPriceProvider } from './historical-price-provider.js';
@@ -32,9 +31,10 @@ export function createHistoricalPriceService(
   async function quote(
     symbol: string,
     requestedDate: string,
+    currency: string,
   ): Promise<Result<HistoricalPrice, ApiFailure>> {
     const params = instrumentPriceParamsSchema.safeParse({ symbol });
-    const query = instrumentPriceQuerySchema.safeParse({ date: requestedDate });
+    const query = instrumentPriceQuerySchema.safeParse({ date: requestedDate, currency });
     if (!params.success || !query.success || query.data.date > currentMarketDate(now())) {
       return failure({ code: 'VALIDATION_FAILED' });
     }
@@ -47,20 +47,9 @@ export function createHistoricalPriceService(
       return success(cached);
     }
 
-    const profileResult = await provider.getProfile(normalizedSymbol);
-    if (!profileResult.ok) {
-      return profileResult;
-    }
-    const profile = profileResult.value;
-    const currency = validateUsdCurrency(profile.currency);
-    if (!currency.ok) {
-      return currency;
-    }
-
     const selected = await findHistoricalClose(provider, {
       symbol: normalizedSymbol,
       requestedDate: date,
-      earliestDate: profile.ipoDate || '0000-01-01',
     });
     if (!selected.ok) {
       return selected;
@@ -96,13 +85,11 @@ export function createHistoricalPriceService(
 
 async function findHistoricalClose(
   provider: HistoricalPriceProvider,
-  input: { symbol: string; requestedDate: string; earliestDate: string },
+  input: { symbol: string; requestedDate: string },
 ): Promise<Result<HistoricalClose, ApiFailure>> {
-  const { symbol, requestedDate, earliestDate } = input;
+  const { symbol, requestedDate } = input;
+  const earliestDate = '0000-01-01';
   let windowEndDate = requestedDate;
-  if (windowEndDate < earliestDate) {
-    return failure({ code: 'PRICE_NOT_AVAILABLE' });
-  }
 
   for (let windowIndex = 0; windowIndex < maximumHistoryWindows; windowIndex += 1) {
     const windowStartDate = historicalWindowStart(windowEndDate, earliestDate);

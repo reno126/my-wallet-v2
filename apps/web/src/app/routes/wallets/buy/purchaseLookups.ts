@@ -30,13 +30,16 @@ export async function instrumentSearchLoader({ request }: LoaderFunctionArgs) {
 export async function purchasePriceLoader({ request }: LoaderFunctionArgs) {
   const query = new URL(request.url).searchParams;
   const symbol = instrumentPriceParamsSchema.safeParse({ symbol: query.get('symbol') });
-  const date = instrumentPriceQuerySchema.safeParse({ date: query.get('date') });
+  const date = instrumentPriceQuerySchema.safeParse({
+    date: query.get('date'),
+    currency: query.get('currency'),
+  });
   if (!symbol.success || !date.success || date.data.date > marketToday()) {
     return { status: 'error' as const, message: text.invalidDate };
   }
   const client = createRequestClient(request.signal);
   const purchases = createPurchasesApi(client);
-  const result = await purchases.price(symbol.data.symbol, date.data.date);
+  const result = await purchases.price(symbol.data.symbol, date.data.date, date.data.currency);
   if (!result.ok) {
     return {
       status: 'error' as const,

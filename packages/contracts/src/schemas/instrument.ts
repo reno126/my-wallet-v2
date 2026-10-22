@@ -14,7 +14,10 @@ export const instrumentSymbolSchema = zod
   .regex(/^[A-Za-z0-9.^=-]+$/);
 
 export const instrumentPriceParamsSchema = zod.strictObject({ symbol: instrumentSymbolSchema });
-export const instrumentPriceQuerySchema = zod.strictObject({ date: dateOnlySchema });
+export const instrumentPriceQuerySchema = zod.strictObject({
+  date: dateOnlySchema,
+  currency: currencyCodeSchema,
+});
 export const historicalPriceSchema = zod.object({
   symbol: instrumentSymbolSchema,
   requestedDate: dateOnlySchema,

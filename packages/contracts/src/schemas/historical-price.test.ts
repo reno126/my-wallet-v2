@@ -47,10 +47,13 @@ describe('when validating historical quote contracts', () => {
 
   it.each([
     {},
-    { date: '2026-02-30' },
-    { date: '2026-10-18T00:00:00Z' },
-    { date: ['2026-10-18'] },
-    { date: '2026-10-18', currency: 'USD' },
+    { date: '2026-02-30', currency: 'USD' },
+    { date: '2026-10-18T00:00:00Z', currency: 'USD' },
+    { date: ['2026-10-18'], currency: 'USD' },
+    { date: '2026-10-18' },
+    { date: '2026-10-18', currency: 'EUR' },
+    { date: '2026-10-18', currency: '' },
+    { date: '2026-10-18', currency: ['USD'] },
   ])('should reject invalid price queries: %j', (input) => {
     // Arrange
     // Act
@@ -58,6 +61,15 @@ describe('when validating historical quote contracts', () => {
 
     // Assert
     expect(result.success).toBe(false);
+  });
+
+  it('should accept a trade date with explicit USD currency', () => {
+    // Arrange
+    const query = { date: '2026-10-18', currency: 'USD' };
+    // Act
+    const result = instrumentPriceQuerySchema.safeParse(query);
+    // Assert
+    expect(result.success).toBe(true);
   });
 
   it.each(['AAPL', 'BRK-B', 'BRK.B'])('should accept an instrument symbol %s', (symbol) => {

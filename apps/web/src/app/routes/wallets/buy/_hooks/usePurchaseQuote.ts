@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useFetcher } from 'react-router';
 import { toast } from 'sonner';
 
-import type { HistoricalPrice } from '@/lib/api/purchases';
+import type { HistoricalPrice, Instrument } from '@/lib/api/purchases';
 
 import { purchaseFormSchema } from '../_utils/purchaseForm';
 import type { purchasePriceLoader } from '../purchaseLookups';
@@ -15,21 +15,28 @@ export type PurchaseQuoteState =
 
 interface PurchaseQuoteRequest {
   symbol: string;
+  currency: Instrument['quoteCurrency'];
   transactionDate: string;
 }
 
 interface UsePurchaseQuoteOptions {
   walletId: string;
   symbol: string | undefined;
+  currency: Instrument['quoteCurrency'] | undefined;
   transactionDate: string;
 }
 
-export function usePurchaseQuote({ walletId, symbol, transactionDate }: UsePurchaseQuoteOptions) {
+export function usePurchaseQuote({
+  walletId,
+  symbol,
+  currency,
+  transactionDate,
+}: UsePurchaseQuoteOptions) {
   const fetcher = useFetcher<typeof purchasePriceLoader>();
   const isValidDate = purchaseFormSchema.shape.transactionDate.safeParse(transactionDate).success;
   let state: PurchaseQuoteState = { status: 'idle' };
 
-  if (symbol && isValidDate) {
+  if (symbol && currency && isValidDate) {
     if (fetcher.state !== 'idle') {
       state = { status: 'loading' };
     } else if (
@@ -61,14 +68,15 @@ export function usePurchaseQuote({ walletId, symbol, transactionDate }: UsePurch
     void fetcher.load(
       `/wallets/${walletId}/buy/price?${new URLSearchParams({
         symbol: request.symbol,
+        currency: request.currency,
         date: request.transactionDate,
       })}`,
     );
   }
 
   function retryQuote() {
-    if (symbol) {
-      requestQuote({ symbol, transactionDate });
+    if (symbol && currency) {
+      requestQuote({ symbol, currency, transactionDate });
     }
   }
 

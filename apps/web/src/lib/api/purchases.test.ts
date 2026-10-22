@@ -19,6 +19,28 @@ afterEach(() => {
 afterAll(() => mockApiServer.close());
 
 describe('when crossing the purchase API boundary', () => {
+  it('should send the selected symbol, date and currency for price lookup', async () => {
+    // Arrange
+    let requestedUrl: URL | undefined;
+    mockApiServer.use(
+      http.get(`${endpoint}/instruments/:symbol/price`, ({ request }) => {
+        requestedUrl = new URL(request.url);
+        return HttpResponse.json(historicalPrice);
+      }),
+    );
+    // Act
+    const result = await purchases.price(
+      stock.symbol,
+      historicalPrice.requestedDate,
+      stock.quoteCurrency,
+    );
+    // Assert
+    expect(result.ok).toBe(true);
+    expect(requestedUrl?.pathname).toBe(`/api/instruments/${stock.symbol}/price`);
+    expect(requestedUrl?.searchParams.get('date')).toBe(historicalPrice.requestedDate);
+    expect(requestedUrl?.searchParams.get('currency')).toBe(stock.quoteCurrency);
+  });
+
   it('should encode company queries and include session credentials', async () => {
     // Arrange
     let search: URL | undefined;
@@ -48,7 +70,11 @@ describe('when crossing the purchase API boundary', () => {
       http.get(`${endpoint}/instruments/:symbol/price`, () => HttpResponse.json(body)),
     );
     // Act
-    const result = await purchases.price(stock.symbol, historicalPrice.requestedDate);
+    const result = await purchases.price(
+      stock.symbol,
+      historicalPrice.requestedDate,
+      stock.quoteCurrency,
+    );
     // Assert
     expect(result).toStrictEqual({ ok: false, error: { kind: 'invalid-response' } });
   });

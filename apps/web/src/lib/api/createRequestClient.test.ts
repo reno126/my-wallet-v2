@@ -52,7 +52,11 @@ const operations = [
   {
     name: 'historical price',
     run: (client: RequestClient) =>
-      createPurchasesApi(client).price(stock.symbol, historicalPrice.requestedDate),
+      createPurchasesApi(client).price(
+        stock.symbol,
+        historicalPrice.requestedDate,
+        stock.quoteCurrency,
+      ),
   },
   {
     name: 'purchase',

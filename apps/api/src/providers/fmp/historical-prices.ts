@@ -3,16 +3,6 @@ import { z as zod } from 'zod';
 import { dateOnlySchema, instrumentSymbolSchema } from '@my-wallets/contracts';
 
 import { exactPriceSchema, parseExactPriceJson } from './exact-price.ts';
-import { fmpProfileResponseSchema } from './instruments.ts';
-
-export const fmpHistoricalProfileSchema = zod
-  .array(
-    fmpProfileResponseSchema.element.extend({
-      ipoDate: zod.union([dateOnlySchema, zod.literal('')]).nullish(),
-    }),
-  )
-  .max(1);
-
 export const fmpHistoricalPricesSchema = zod
   .array(
     zod.object({

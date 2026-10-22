@@ -33,7 +33,12 @@ export function PurchaseForm({ walletId }: PurchaseFormProps) {
     defaultValues: { transactionDate: marketToday(), quantity: '', description: '' },
   });
   const transactionDate = useWatch({ control: form.control, name: 'transactionDate' });
-  const quote = usePurchaseQuote({ walletId, symbol: selectedInstrument?.symbol, transactionDate });
+  const quote = usePurchaseQuote({
+    walletId,
+    symbol: selectedInstrument?.symbol,
+    currency: selectedInstrument?.quoteCurrency,
+    transactionDate,
+  });
   const { errors, isSubmitting } = form.formState;
   const isPending = isSubmitting || navigation.state !== 'idle';
   const isSaveUnconfirmed = actionData?.unconfirmed ?? false;
@@ -51,6 +56,7 @@ export function PurchaseForm({ walletId }: PurchaseFormProps) {
     form.clearErrors('root');
     quote.requestQuote({
       symbol: instrument.symbol,
+      currency: instrument.quoteCurrency,
       transactionDate: form.getValues('transactionDate'),
     });
   }
@@ -63,6 +69,7 @@ export function PurchaseForm({ walletId }: PurchaseFormProps) {
     if (selectedInstrument) {
       quote.requestQuote({
         symbol: selectedInstrument.symbol,
+        currency: selectedInstrument.quoteCurrency,
         transactionDate: form.getValues('transactionDate'),
       });
     }
