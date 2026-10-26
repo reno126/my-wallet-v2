@@ -18,6 +18,7 @@ export function useWalletPricing(walletId: string) {
   const refresh = useFetcher<typeof priceRefreshAction>();
   const { data: quotaResult, refresh: refreshQuota } = useProviderQuota();
   const { submit, reset } = refresh;
+  const lastRefreshResult = useRef(refresh.data);
   const [cachedValuation, setCachedValuation] = useState<WalletValuation>();
   const [paused, setPaused] = useState(false);
   const automaticRequestSent = useRef(false);
@@ -54,6 +55,13 @@ export function useWalletPricing(walletId: string) {
   }, [readPrices]);
 
   useEffect(() => {
+    if (refresh.state === 'idle' && refresh.data && refresh.data !== lastRefreshResult.current) {
+      lastRefreshResult.current = refresh.data;
+      readPrices();
+    }
+  }, [refresh.state, refresh.data, readPrices]);
+
+  useEffect(() => {
     if (
       state === 'idle' &&
       needsPrice &&
@@ -62,7 +70,7 @@ export function useWalletPricing(walletId: string) {
       !automaticRequestSent.current
     ) {
       automaticRequestSent.current = true;
-      void submit({}, { method: 'post', action: resource });
+      void submit({}, { method: 'post', action: resource, defaultShouldRevalidate: false });
     }
   }, [state, needsPrice, pricesBehindStatus, canRefresh, submit, resource, walletId]);
 
@@ -119,7 +127,7 @@ export function useWalletPricing(walletId: string) {
     exhaustedPendingChecked.current = false;
     setPaused(false);
     automaticRequestSent.current = true;
-    void submit({}, { method: 'post', action: resource });
+    void submit({}, { method: 'post', action: resource, defaultShouldRevalidate: false });
   }, [submit, resource]);
 
   return useMemo(
