@@ -16,11 +16,9 @@ import { createRequestClient } from '@/lib/api/createRequestClient';
 import { createLedgerApi } from '@/lib/api/ledger';
 
 import { requirePageData } from '../../_utils/requirePageData';
-import { HoldingList } from '../_components/HoldingList';
 import { LedgerSummary } from '../_components/LedgerSummary';
-import { PriceRefreshPanel } from '../_components/PriceRefreshPanel';
 import { TransactionHistory } from '../_components/TransactionHistory';
-import { useWalletPricing } from '../_hooks/useWalletPricing';
+import { WalletPricing } from '../_components/WalletPricing';
 import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
 import { loadWallet } from '../_utils/loadWallet';
 import { walletDictionary as walletMsg } from '../walletDictionary';
@@ -49,7 +47,6 @@ interface WalletDetailContentProps {
 export function WalletDetailContent({ data }: WalletDetailContentProps) {
   const { wallet, summary, history } = data;
   const navigation = useNavigation();
-  const pricing = useWalletPricing(wallet.id);
   return (
     <section
       className="flex flex-col gap-6"
@@ -89,8 +86,7 @@ export function WalletDetailContent({ data }: WalletDetailContentProps) {
         </CardFooter>
       </Card>
       <LedgerSummary summary={summary} />
-      <PriceRefreshPanel pricing={pricing} />
-      <HoldingList holdings={summary.holdings} valuations={pricing.valuation?.holdings} />
+      <WalletPricing walletId={wallet.id} holdings={summary.holdings} />
       <TransactionHistory history={history} />
     </section>
   );

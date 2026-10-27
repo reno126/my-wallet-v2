@@ -33,8 +33,20 @@ export function useProviderQuotaController() {
 }
 
 export const ProviderQuotaContext = createContext<
-  ReturnType<typeof useProviderQuotaController> | undefined
+  Pick<ReturnType<typeof useProviderQuotaController>, 'data' | 'refresh'> | undefined
 >(undefined);
+
+export const ProviderQuotaStateContext = createContext<
+  ReturnType<typeof useProviderQuotaController>['state'] | undefined
+>(undefined);
+
+export function useProviderQuotaState() {
+  const state = useContext(ProviderQuotaStateContext);
+  if (state === undefined) {
+    throw new Error('Provider quota must be used inside the authenticated layout.');
+  }
+  return state;
+}
 
 export function useProviderQuota() {
   const quota = useContext(ProviderQuotaContext);

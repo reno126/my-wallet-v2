@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFetcher } from 'react-router';
 
-import type { WalletValuation } from '@/lib/api/marketData';
-
 import {
   canRequestPriceRefresh,
   needsPriceRefresh,
@@ -13,6 +11,7 @@ import {
 } from '../_utils/pricePolling';
 import type { priceRefreshAction, pricingLoader } from '../pricingResource';
 import { useProviderQuota } from './useProviderQuota';
+import { useWalletValuation } from './useWalletValuation';
 
 export function useWalletPricing(walletId: string) {
   const { data, state, load } = useFetcher<typeof pricingLoader>();
@@ -29,21 +28,12 @@ export function useWalletPricing(walletId: string) {
   const lastProgressRead = useRef(progressData);
   const lastFullRead = useRef(data);
   const fullReadInFlight = useRef(false);
-  const [cachedValuation, setCachedValuation] = useState<WalletValuation>();
+  const valuation = useWalletValuation(walletId, data?.valuation);
   const [paused, setPaused] = useState(false);
   const automaticRequestSent = useRef(false);
   const exhaustedPendingChecked = useRef(false);
   const polls = useRef(0);
   const resource = `/wallets/${walletId}/pricing`;
-  const currentValuation =
-    data?.valuation?.ok && data.valuation.value.walletId === walletId
-      ? data.valuation.value
-      : undefined;
-  if (currentValuation && currentValuation !== cachedValuation) {
-    setCachedValuation(currentValuation);
-  }
-  const valuation =
-    currentValuation ?? (cachedValuation?.walletId === walletId ? cachedValuation : undefined);
   const statusResult = progressData?.status ?? data?.status;
   const status =
     statusResult?.ok && statusResult.value.walletId === walletId ? statusResult.value : undefined;

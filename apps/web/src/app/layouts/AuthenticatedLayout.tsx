@@ -6,17 +6,13 @@ import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
 
 import { appDictionary } from '../appDictionary';
+import { ProviderQuotaProvider } from '../routes/wallets/_components/ProviderQuotaProvider';
 import { ProviderQuotaStatus } from '../routes/wallets/_components/ProviderQuotaStatus';
-import {
-  ProviderQuotaContext,
-  useProviderQuotaController,
-} from '../routes/wallets/_hooks/useProviderQuota';
 
 export function AuthenticatedLayout() {
   const navigate = useNavigate();
   const navigation = useNavigation();
   const [isSigningOut, startSignOutTransition] = useTransition();
-  const quota = useProviderQuotaController();
 
   function signOut() {
     startSignOutTransition(async () => {
@@ -73,10 +69,10 @@ export function AuthenticatedLayout() {
             {appDictionary.navigation.loading}
           </p>
         ) : null}
-        <ProviderQuotaContext value={quota}>
+        <ProviderQuotaProvider>
           <ProviderQuotaStatus />
           <Outlet />
-        </ProviderQuotaContext>
+        </ProviderQuotaProvider>
       </main>
     </div>
   );

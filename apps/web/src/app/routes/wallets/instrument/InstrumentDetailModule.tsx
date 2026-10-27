@@ -9,10 +9,9 @@ import { createLedgerApi } from '@/lib/api/ledger';
 import { pageFailureResponse } from '../../_utils/pageFailure';
 import { requirePageData } from '../../_utils/requirePageData';
 import { LedgerSummary } from '../_components/LedgerSummary';
-import { PriceRefreshPanel } from '../_components/PriceRefreshPanel';
 import { SellDialog } from '../_components/SellDialog';
 import { TransactionHistory } from '../_components/TransactionHistory';
-import { useWalletPricing } from '../_hooks/useWalletPricing';
+import { InstrumentPricing } from '../_components/WalletPricing';
 import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
 import { loadWallet } from '../_utils/loadWallet';
 import { ledgerDictionary as text } from '../ledgerDictionary';
@@ -45,7 +44,6 @@ interface InstrumentDetailContentProps {
 export function InstrumentDetailContent({ data }: InstrumentDetailContentProps) {
   const { wallet, holding, history } = data;
   const navigation = useNavigation();
-  const pricing = useWalletPricing(wallet.id);
   return (
     <section
       className="flex min-w-0 flex-col gap-6"
@@ -72,7 +70,7 @@ export function InstrumentDetailContent({ data }: InstrumentDetailContentProps) 
         </div>
       </header>
       <LedgerSummary summary={holding} />
-      <PriceRefreshPanel pricing={pricing} symbol={holding.symbol} />
+      <InstrumentPricing walletId={wallet.id} symbol={holding.symbol} />
       <TransactionHistory history={history} instrumentView />
     </section>
   );

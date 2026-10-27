@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +9,8 @@ import { Spinner } from '@/components/ui/spinner';
 import type { useWalletPricing } from '../_hooks/useWalletPricing';
 import { pricingDictionary as text } from '../pricingDictionary';
 import { ValuationMetrics } from './ValuationMetrics';
+
+const PriceMetrics = memo(ValuationMetrics);
 
 interface PriceRefreshPanelProps {
   pricing: ReturnType<typeof useWalletPricing>;
@@ -26,7 +30,7 @@ export function PriceRefreshPanel({ pricing, symbol }: PriceRefreshPanelProps) {
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">
         {valuation ? (
-          <ValuationMetrics valuation={valuation} />
+          <PriceMetrics valuation={valuation} />
         ) : !pricing.valuationFailed ? (
           <div role="status" aria-label={text.loading}>
             <span className="sr-only">{text.loading}</span>

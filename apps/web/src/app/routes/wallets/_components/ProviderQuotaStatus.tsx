@@ -4,11 +4,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 
-import { useProviderQuota } from '../_hooks/useProviderQuota';
+import { useProviderQuota, useProviderQuotaState } from '../_hooks/useProviderQuota';
 import { pricingDictionary as text, quotaRemaining } from '../pricingDictionary';
 
 export function ProviderQuotaStatus() {
-  const { data, refresh, state } = useProviderQuota();
+  const { data, refresh } = useProviderQuota();
+  const state = useProviderQuotaState();
   const quota = data?.ok ? data.value : undefined;
   return (
     <aside aria-label={text.quota.title} className="mb-6 min-w-0">
