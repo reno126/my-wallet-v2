@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { WalletRefreshStatus } from '@/lib/api/marketData';
 import { priceValuation, providerQuota, refreshStatus } from '@/test/market-data-api';
 
-import { pricePollingDecision, pricePollLimit } from './pricePolling';
+import { pricePollingDecision, pricePollLimit, shouldReloadValuation } from './pricePolling';
 
 const pending: WalletRefreshStatus = {
   ...refreshStatus(),
@@ -30,6 +30,70 @@ function decide(overrides: Partial<Parameters<typeof pricePollingDecision>[0]> =
 }
 
 describe('when deciding whether to check background prices', () => {
+  it('should reread valuation for partial price changes and terminal work, but not unchanged progress', () => {
+    // Arrange
+    const succeeded: WalletRefreshStatus = {
+      ...pending,
+      holdings: pending.holdings.map((holding) => ({ ...holding, status: 'succeeded' })),
+    };
+    const partiallyUpdated: WalletRefreshStatus = {
+      ...pending,
+      holdings: [
+        ...refreshStatus('fresh').holdings,
+        {
+          ...pending.holdings[0],
+          symbol: 'MSFT',
+          freshness: 'stale',
+          status: 'pending',
+          nextAttemptAt: null,
+          lastFailureCode: null,
+        },
+      ],
+    };
+    // Assert
+    expect(shouldReloadValuation(pending, running)).toBe(false);
+    expect(shouldReloadValuation(running, structuredClone(running))).toBe(false);
+    expect(shouldReloadValuation(pending, succeeded)).toBe(true);
+    expect(
+      shouldReloadValuation(partiallyUpdated, {
+        ...partiallyUpdated,
+        holdings: partiallyUpdated.holdings.map((holding) => ({ ...holding, freshness: 'fresh' })),
+      }),
+    ).toBe(true);
+  });
+
+  it('should ignore holding order but reload for removed or replaced instruments', () => {
+    // Arrange
+    const previous: WalletRefreshStatus = {
+      ...pending,
+      holdings: [
+        ...pending.holdings,
+        ...pending.holdings.map((holding) => ({ ...holding, symbol: 'MSFT' })),
+      ],
+    };
+    // Assert
+    expect(
+      shouldReloadValuation(previous, {
+        ...previous,
+        holdings: [...previous.holdings].reverse(),
+      }),
+    ).toBe(false);
+    expect(
+      shouldReloadValuation(previous, {
+        ...previous,
+        holdings: previous.holdings.slice(1),
+      }),
+    ).toBe(true);
+    expect(
+      shouldReloadValuation(previous, {
+        ...previous,
+        holdings: previous.holdings.map((holding) => ({
+          ...holding,
+          symbol: holding.symbol === 'MSFT' ? 'NVDA' : holding.symbol,
+        })),
+      }),
+    ).toBe(true);
+  });
   it('should keep checking pending work while admission is available', () => {
     expect(decide()).toBe('poll');
   });

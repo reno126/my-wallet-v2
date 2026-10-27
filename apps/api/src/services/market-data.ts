@@ -41,7 +41,7 @@ export function createMarketDataService(options: MarketDataOptions) {
   const now = options.now ?? (() => new Date());
   return { valuation, holdingValuation, refreshStatus, requestRefresh, quotaStatus };
 
-  async function read(userId: string, walletId: string, mode: 'prices' | 'refresh-status') {
+  async function read(userId: string, walletId: string) {
     const ledger = await options.ledger.holdings(userId, walletId);
     if (!ledger.ok) {
       return ledger;
@@ -49,18 +49,15 @@ export function createMarketDataService(options: MarketDataOptions) {
     const symbols = ledger.value.holdings
       .filter((holding) => holding.quantity !== '0')
       .map((holding) => holding.symbol);
-    const market =
-      mode === 'refresh-status'
-        ? await options.market.readForSymbols(symbols)
-        : { prices: await options.market.latestPricesForSymbols(symbols), work: [] };
+    const prices = await options.market.latestPricesForSymbols(symbols);
     return success({
       ledger: ledger.value,
-      ...market,
+      prices,
     });
   }
 
   async function valuation(userId: string, walletId: string) {
-    const result = await read(userId, walletId, 'prices');
+    const result = await read(userId, walletId);
     return result.ok
       ? success(
           valueWalletHoldings(result.value.ledger, result.value.prices, now(), options.calendar),
@@ -83,13 +80,16 @@ export function createMarketDataService(options: MarketDataOptions) {
     userId: string,
     walletId: string,
   ): Promise<Result<RefreshStatus, ApiFailure>> {
-    const result = await read(userId, walletId, 'refresh-status');
-    if (!result.ok) {
-      return result;
+    const positions = await options.market.readWalletPositions(userId, walletId);
+    if (!positions) {
+      return failure({ code: 'NOT_FOUND' });
     }
-    const { ledger, prices, work } = result.value;
+    const symbols = positions.holdings
+      .filter((holding) => holding.quantity !== '0')
+      .map((holding) => holding.symbol);
+    const { prices, work } = await options.market.readForSymbols(symbols);
     const instant = now();
-    const priceStates = assessHoldingPrices(ledger.holdings, prices, instant, options.calendar);
+    const priceStates = assessHoldingPrices(positions.holdings, prices, instant, options.calendar);
     const bySymbol = new Map(work.map((row) => [row.symbol, row]));
     const holdings = priceStates.map(
       ({ holding, freshness }): RefreshStatus['holdings'][number] => {
@@ -141,7 +141,7 @@ export function createMarketDataService(options: MarketDataOptions) {
     userId: string,
     walletId: string,
   ): Promise<Result<RefreshReceipt, ApiFailure>> {
-    const result = await read(userId, walletId, 'prices');
+    const result = await read(userId, walletId);
     if (!result.ok) {
       return result;
     }

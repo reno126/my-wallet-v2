@@ -3,6 +3,26 @@ import type { ProviderQuota, WalletRefreshStatus, WalletValuation } from '@/lib/
 export const pricePollIntervalMs = 3_000;
 export const pricePollLimit = 20;
 
+export function shouldReloadValuation(
+  previous: WalletRefreshStatus | undefined,
+  next: WalletRefreshStatus,
+) {
+  if (!previous || previous.holdings.length !== next.holdings.length) {
+    return true;
+  }
+  const previousBySymbol = new Map(previous.holdings.map((holding) => [holding.symbol, holding]));
+  return next.holdings.some((holding) => {
+    const before = previousBySymbol.get(holding.symbol);
+    if (!before) {
+      return true;
+    }
+    const freshnessChanged = before.freshness !== holding.freshness;
+    const refreshFinished = holding.status === 'succeeded' || holding.status === 'failed';
+    const enteredTerminalState = refreshFinished && before.status !== holding.status;
+    return freshnessChanged || enteredTerminalState;
+  });
+}
+
 interface PricePollingInput {
   valuation: WalletValuation | undefined;
   status: WalletRefreshStatus | undefined;

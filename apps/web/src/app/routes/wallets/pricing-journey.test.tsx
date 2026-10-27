@@ -47,6 +47,7 @@ let status = refreshStatus();
 let quota = { ...providerQuota };
 let requests = 0;
 let reads = 0;
+let statusReads = 0;
 beforeAll(() => server.listen());
 afterAll(() => server.close());
 afterEach(() => {
@@ -59,6 +60,7 @@ beforeEach(() => {
   quota = { ...providerQuota };
   requests = 0;
   reads = 0;
+  statusReads = 0;
   session.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   server.use(
     http.get(endpoint, () => HttpResponse.json(walletSummary)),
@@ -69,7 +71,10 @@ beforeEach(() => {
       reads += 1;
       return HttpResponse.json(valuation);
     }),
-    http.get(`${endpoint}/price-refresh`, () => HttpResponse.json(status)),
+    http.get(`${endpoint}/price-refresh`, () => {
+      statusReads += 1;
+      return HttpResponse.json(status);
+    }),
     http.get(`${base}/market-data/quota`, () => HttpResponse.json(quota)),
     http.post(`${endpoint}/price-refresh`, () => {
       requests += 1;
@@ -134,6 +139,76 @@ function mockOtherWallet() {
 }
 
 describe('when showing cached valuations and refresh progress', () => {
+  it('should redirect an expired session reported by a status-only poll', async () => {
+    // Arrange
+    acceleratePricePolling();
+    server.use(
+      http.get(`${endpoint}/price-refresh`, () => {
+        statusReads += 1;
+        if (statusReads >= 3) {
+          session.mockResolvedValue({ data: null, error: null });
+          return HttpResponse.json({}, { status: 401 });
+        }
+        return HttpResponse.json(status);
+      }),
+    );
+    // Act
+    const page = openPage();
+    // Assert
+    await waitFor(() => expect(page.router.state.location.pathname).toBe('/login'), {
+      timeout: 5_000,
+    });
+  });
+
+  it.each(['', '/instruments/AAPL'])(
+    'should poll progress without rereading valuation or quota until prices change on %s',
+    async (suffix) => {
+      // Arrange
+      acceleratePricePolling();
+      let complete = false;
+      let quotaReads = 0;
+      server.use(
+        http.get(`${base}/market-data/quota`, () => {
+          quotaReads += 1;
+          return HttpResponse.json(quota);
+        }),
+        http.get(`${endpoint}/price-refresh`, () => {
+          statusReads += 1;
+          return HttpResponse.json({
+            ...refreshStatus(complete ? 'fresh' : 'stale'),
+            hasPendingWork: !complete,
+            holdings: refreshStatus().holdings.map((holding) => ({
+              ...holding,
+              freshness: complete ? 'fresh' : 'stale',
+              status: complete ? 'succeeded' : statusReads < 4 ? 'pending' : 'running',
+            })),
+          });
+        }),
+      );
+      const page = openPage(suffix);
+      await within(
+        await screen.findByRole('region', { name: text.title }, { timeout: 10_000 }),
+      ).findByText(text.running);
+      // Assert
+      expect(reads).toBe(2);
+      const initialQuotaReads = quotaReads;
+      const initialStatusReads = statusReads;
+      // Act
+      await waitFor(() => expect(statusReads).toBeGreaterThanOrEqual(initialStatusReads + 3));
+      // Assert
+      expect(reads).toBe(2);
+      expect(quotaReads).toBe(initialQuotaReads);
+      // Act
+      valuation = priceValuation('fresh');
+      complete = true;
+      // Assert
+      await within(page.panel()).findByText(text.freshness.fresh);
+      await waitFor(() => expect(quotaReads).toBe(initialQuotaReads + 1));
+      expect(reads).toBe(3);
+      expect(requests).toBe(1);
+    },
+  );
+
   it('should expose quota loading accessibly and keep exhaustion visible while toggling budget details with the keyboard', async () => {
     // Arrange
     quota = { ...quota, remaining: 0, used: 250, exhausted: true };
@@ -477,7 +552,7 @@ describe('when showing cached valuations and refresh progress', () => {
       {},
       { timeout: 10_000 },
     );
-    const previousReads = reads;
+    const previousReads = statusReads;
     // Act
     await act(async () => {
       await page.router.navigate(other.path);
@@ -489,7 +564,7 @@ describe('when showing cached valuations and refresh progress', () => {
     // Assert
     expect(await within(page.panel()).findByText(text.pending)).toBeVisible();
     await waitFor(() => expect(requests).toBe(2));
-    await waitFor(() => expect(reads).toBeGreaterThan(previousReads + 2));
+    await waitFor(() => expect(statusReads).toBeGreaterThan(previousReads + 2));
     expect(within(page.panel()).queryByText(text.paused)).not.toBeInTheDocument();
   });
 

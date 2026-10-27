@@ -8,6 +8,7 @@ import {
   needsPriceRefresh,
   pricePollingDecision,
   pricePollIntervalMs,
+  shouldReloadValuation,
   valuationBehindStatus,
 } from '../_utils/pricePolling';
 import type { priceRefreshAction, pricingLoader } from '../pricingResource';
@@ -15,10 +16,19 @@ import { useProviderQuota } from './useProviderQuota';
 
 export function useWalletPricing(walletId: string) {
   const { data, state, load } = useFetcher<typeof pricingLoader>();
+  const {
+    data: progressData,
+    state: progressState,
+    load: loadProgress,
+    reset: resetProgress,
+  } = useFetcher<typeof pricingLoader>();
   const refresh = useFetcher<typeof priceRefreshAction>();
   const { data: quotaResult, refresh: refreshQuota } = useProviderQuota();
   const { submit, reset } = refresh;
   const lastRefreshResult = useRef(refresh.data);
+  const lastProgressRead = useRef(progressData);
+  const lastFullRead = useRef(data);
+  const fullReadInFlight = useRef(false);
   const [cachedValuation, setCachedValuation] = useState<WalletValuation>();
   const [paused, setPaused] = useState(false);
   const automaticRequestSent = useRef(false);
@@ -26,7 +36,7 @@ export function useWalletPricing(walletId: string) {
   const polls = useRef(0);
   const resource = `/wallets/${walletId}/pricing`;
   const currentValuation =
-    data?.valuation.ok && data.valuation.value.walletId === walletId
+    data?.valuation?.ok && data.valuation.value.walletId === walletId
       ? data.valuation.value
       : undefined;
   if (currentValuation && currentValuation !== cachedValuation) {
@@ -34,25 +44,61 @@ export function useWalletPricing(walletId: string) {
   }
   const valuation =
     currentValuation ?? (cachedValuation?.walletId === walletId ? cachedValuation : undefined);
+  const statusResult = progressData?.status ?? data?.status;
   const status =
-    data?.status.ok && data.status.value.walletId === walletId ? data.status.value : undefined;
+    statusResult?.ok && statusResult.value.walletId === walletId ? statusResult.value : undefined;
   const quota = quotaResult?.ok ? quotaResult.value : undefined;
   const canRefresh = canRequestPriceRefresh(status, quota);
   const needsPrice = needsPriceRefresh(valuation);
   const pricesBehindStatus = valuationBehindStatus(valuation, status);
-  const valuationFailed = data?.valuation.ok === false;
-  const statusFailed = data?.status.ok === false;
+  const valuationFailed = data?.valuation?.ok === false;
+  const statusFailed = statusResult?.ok === false;
   const quotaFailed = quotaResult?.ok === false;
   const readPrices = useCallback(() => {
+    fullReadInFlight.current = true;
+    resetProgress();
     void load(resource);
     void refreshQuota();
-  }, [load, resource, refreshQuota]);
+  }, [load, resource, refreshQuota, resetProgress]);
 
   useEffect(() => {
     polls.current = 0;
     exhaustedPendingChecked.current = false;
     readPrices();
   }, [readPrices]);
+
+  useEffect(() => {
+    if (state !== 'idle' || !data || data === lastFullRead.current) {
+      return;
+    }
+    lastFullRead.current = data;
+    lastProgressRead.current = progressData;
+    fullReadInFlight.current = false;
+    resetProgress();
+  }, [data, state, progressData, resetProgress]);
+
+  useEffect(() => {
+    if (
+      state !== 'idle' ||
+      progressState !== 'idle' ||
+      !progressData ||
+      progressData === lastProgressRead.current ||
+      fullReadInFlight.current
+    ) {
+      return;
+    }
+    lastProgressRead.current = progressData;
+    if (
+      progressData.status.ok &&
+      (shouldReloadValuation(
+        data?.status.ok ? data.status.value : undefined,
+        progressData.status.value,
+      ) ||
+        pricesBehindStatus)
+    ) {
+      readPrices();
+    }
+  }, [data, progressData, progressState, state, pricesBehindStatus, readPrices]);
 
   useEffect(() => {
     if (refresh.state === 'idle' && refresh.data && refresh.data !== lastRefreshResult.current) {
@@ -75,7 +121,12 @@ export function useWalletPricing(walletId: string) {
   }, [state, needsPrice, pricesBehindStatus, canRefresh, submit, resource, walletId]);
 
   useEffect(() => {
-    if (state !== 'idle' || refresh.state !== 'idle') {
+    if (
+      state !== 'idle' ||
+      progressState !== 'idle' ||
+      refresh.state !== 'idle' ||
+      fullReadInFlight.current
+    ) {
       return;
     }
     const pollDecision = pricePollingDecision({
@@ -98,7 +149,7 @@ export function useWalletPricing(walletId: string) {
           exhaustedPendingChecked.current = true;
         }
         polls.current += 1;
-        readPrices();
+        void loadProgress(`${resource}?statusOnly=true`);
       }
     }, pricePollIntervalMs);
     return () => globalThis.clearTimeout(timer);
@@ -111,7 +162,9 @@ export function useWalletPricing(walletId: string) {
     paused,
     refresh.state,
     state,
-    readPrices,
+    progressState,
+    loadProgress,
+    resource,
   ]);
 
   const checkAgain = useCallback(() => {
@@ -138,7 +191,7 @@ export function useWalletPricing(walletId: string) {
       paused,
       canRefresh,
       needsPrice,
-      busy: state !== 'idle' || refresh.state !== 'idle',
+      busy: state !== 'idle' || progressState !== 'idle' || refresh.state !== 'idle',
       requesting: refresh.state === 'submitting',
       valuationFailed,
       statusFailed,
@@ -155,6 +208,7 @@ export function useWalletPricing(walletId: string) {
       canRefresh,
       needsPrice,
       state,
+      progressState,
       refresh.state,
       refresh.data,
       valuationFailed,

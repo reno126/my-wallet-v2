@@ -36,6 +36,9 @@ function createFixture(configured = true) {
       .mockResolvedValue(success({ ...wallet, holdings: [...wallet.holdings] })),
   };
   const market = {
+    readWalletPositions: vi
+      .fn<MarketDataRepository['readWalletPositions']>()
+      .mockResolvedValue({ walletId: wallet.walletId, holdings: [...wallet.holdings] }),
     latestPricesForSymbols: vi
       .fn<MarketDataRepository['latestPricesForSymbols']>()
       .mockResolvedValue([]),
@@ -72,10 +75,24 @@ function createFixture(configured = true) {
 }
 
 describe('when serving cached wallet prices and refresh intent', () => {
+  it('should serve repeated pending/running status checks without invoking accounting', async () => {
+    // Arrange
+    const fixture = createFixture();
+    // Act
+    await Promise.all(
+      Array.from({ length: 20 }, () => fixture.service.refreshStatus('user', 'wallet')),
+    );
+    // Assert
+    expect(fixture.ledger.holdings).not.toHaveBeenCalled();
+    expect(fixture.market.readWalletPositions).toHaveBeenCalledTimes(20);
+    expect(fixture.quota.read).not.toHaveBeenCalled();
+    expect(fixture.scheduler.requestForWallet).not.toHaveBeenCalled();
+  });
   it('should check ownership before accessing shared data, quota or scheduling', async () => {
     // Arrange
     const fixture = createFixture();
     fixture.ledger.holdings.mockResolvedValue(failure({ code: 'NOT_FOUND' }));
+    fixture.market.readWalletPositions.mockResolvedValue(null);
     // Act
     const results = await Promise.all([
       fixture.service.valuation('other', 'wallet'),
@@ -99,6 +116,7 @@ describe('when serving cached wallet prices and refresh intent', () => {
     // Assert
     expect(fixture.market.readForSymbols).toHaveBeenCalledWith(['AAPL']);
     expect(fixture.market.latestPricesForSymbols).toHaveBeenCalledExactlyOnceWith(['AAPL']);
+    expect(fixture.ledger.holdings).toHaveBeenCalledTimes(1);
     expect(fixture.quota.read).not.toHaveBeenCalled();
     expect(fixture.scheduler.requestForWallet).not.toHaveBeenCalled();
   });

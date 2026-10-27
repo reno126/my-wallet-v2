@@ -7,6 +7,29 @@ import type { PriceSnapshot } from '../domain/price-snapshot.ts';
 
 export function createMarketDataRepository(prisma: PrismaClient) {
   return {
+    async readWalletPositions(userId: string, walletId: string) {
+      const rows = await prisma.$queryRaw<
+        { symbol: string | null; quantity: Prisma.Decimal | null }[]
+      >`
+        SELECT entry.symbol,
+          SUM(CASE WHEN entry.side = 'BUY' THEN entry.quantity ELSE -entry.quantity END) AS quantity
+        FROM wallet
+        LEFT JOIN ledger_transaction entry ON entry."walletId" = wallet.id
+        WHERE wallet.id = ${walletId}::uuid AND wallet."userId" = ${userId}
+        GROUP BY entry.symbol
+        ORDER BY entry.symbol
+      `;
+      if (rows.length === 0) {
+        return null;
+      }
+      const holdings = rows.flatMap(({ symbol, quantity }) => {
+        if (symbol === null) {
+          return [];
+        }
+        return [{ symbol, quantity: quantity?.toFixed() ?? '0' }];
+      });
+      return { walletId, holdings };
+    },
     latestPricesForSymbols: (symbols: readonly string[]) => readLatestPrices(prisma, symbols),
     async readForSymbols(symbols: readonly string[]) {
       if (symbols.length === 0) {

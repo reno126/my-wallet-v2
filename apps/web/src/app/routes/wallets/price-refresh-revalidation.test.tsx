@@ -22,6 +22,7 @@ import { purchaseResult } from '@/test/purchase-api';
 import { walletSummary } from '@/test/wallet-api';
 
 import { routeObjects } from '../../router';
+import { pricePollIntervalMs } from './_utils/pricePolling';
 import { ledgerDictionary } from './ledgerDictionary';
 import { pricingDictionary as text, quotaRemaining } from './pricingDictionary';
 
@@ -44,6 +45,7 @@ const path = `/wallets/${walletSummary.id}`;
 const server = setupServer();
 let pageReads = { wallet: 0, holdings: 0, history: 0 };
 let priceReads = 0;
+let progressReads = 0;
 let refreshRequests = 0;
 let refreshOutcome: 'pending' | 'fresh' | 'limited' = 'pending';
 let valuation = priceValuation();
@@ -60,6 +62,7 @@ afterEach(() => {
 beforeEach(() => {
   pageReads = { wallet: 0, holdings: 0, history: 0 };
   priceReads = 0;
+  progressReads = 0;
   refreshRequests = 0;
   refreshOutcome = 'pending';
   valuation = priceValuation();
@@ -84,7 +87,10 @@ beforeEach(() => {
       pageReads.history += 1;
       return HttpResponse.json(history);
     }),
-    http.get(`${endpoint}/price-refresh`, () => HttpResponse.json(status)),
+    http.get(`${endpoint}/price-refresh`, () => {
+      progressReads += 1;
+      return HttpResponse.json(status);
+    }),
     http.get(`${base}/market-data/quota`, () =>
       HttpResponse.json({
         ...providerQuota,
@@ -119,6 +125,15 @@ beforeEach(() => {
     }),
     http.post(`${endpoint}/transactions`, () => {
       holding = { ...holding, quantity: '1', remainingCostBasis: '10' };
+      valuation = {
+        ...valuation,
+        currentValue: '20',
+        holdings: valuation.holdings.map((item) => ({
+          ...item,
+          quantity: '1',
+          currentValue: '20',
+        })),
+      };
       const transaction = {
         ...purchaseResult().transaction,
         side: 'SELL',
@@ -207,6 +222,23 @@ async function openPage(suffix: string) {
 }
 
 describe('when scheduling price refreshes without reloading the ledger', () => {
+  it('should reload valuation after a sale even when the last background read checked only progress', async () => {
+    // Arrange
+    const schedule = globalThis.setTimeout;
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(
+      (handler, timeout, ...arguments_: unknown[]) =>
+        schedule(handler, timeout === pricePollIntervalMs ? 50 : timeout, ...arguments_),
+    );
+    const page = await openPage('');
+    await within(page.panel).findByText(text.pending);
+    await waitFor(() => expect(progressReads).toBeGreaterThanOrEqual(3));
+    // Act
+    await page.sell();
+    // Assert
+    await within(page.panel).findByText('USD 20.00', {}, { timeout: 5_000 });
+    expect(pageReads).toEqual({ wallet: 2, holdings: 2, history: 2 });
+  });
+
   it('should redirect an expired session reported by the refresh action', async () => {
     // Arrange
     server.use(

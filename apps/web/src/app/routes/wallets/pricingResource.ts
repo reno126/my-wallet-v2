@@ -21,6 +21,9 @@ export async function quotaLoader({ request }: LoaderFunctionArgs) {
 export async function pricingLoader({ request, params }: LoaderFunctionArgs) {
   const walletId = requireWalletId(params);
   const api = createMarketDataApi(createRequestClient(request.signal));
+  if (new URL(request.url).searchParams.get('statusOnly') === 'true') {
+    return { valuation: undefined, status: checkSession(await api.status(walletId)) };
+  }
   const [valuation, status] = await Promise.all([api.valuation(walletId), api.status(walletId)]);
   return {
     valuation: checkSession(valuation),
