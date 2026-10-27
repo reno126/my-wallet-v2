@@ -10,6 +10,7 @@ import { pageFailureResponse } from '../../_utils/pageFailure';
 import { requirePageData } from '../../_utils/requirePageData';
 import { LedgerSummary } from '../_components/LedgerSummary';
 import { SellDialog } from '../_components/SellDialog';
+import { SellDialogProvider } from '../_components/SellDialogProvider';
 import { TransactionHistory } from '../_components/TransactionHistory';
 import { InstrumentPricing } from '../_components/WalletPricing';
 import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
@@ -63,7 +64,9 @@ export function InstrumentDetailContent({ data }: InstrumentDetailContentProps) 
           {wallet.name} · {holding.exchange} · {holding.quoteCurrency}
         </p>
         <div className="flex flex-wrap gap-3">
-          <SellDialog key={`${holding.walletId}:${holding.symbol}`} holding={holding} />
+          <SellDialogProvider key={`${holding.walletId}:${holding.symbol}`}>
+            <SellDialog holding={holding} />
+          </SellDialogProvider>
           <Button asChild variant="outline">
             <Link to={`/wallets/${wallet.id}/buy`}>{text.buy}</Link>
           </Button>
