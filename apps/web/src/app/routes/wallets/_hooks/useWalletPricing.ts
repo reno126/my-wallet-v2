@@ -10,7 +10,8 @@ import {
   valuationBehindStatus,
 } from '../_utils/pricePolling';
 import type { priceRefreshAction, pricingLoader } from '../pricingResource';
-import { useProviderQuota } from './useProviderQuota';
+import { usePricingRevalidation } from './usePricingRevalidation';
+import { useProviderQuota, useProviderQuotaState } from './useProviderQuota';
 import { useWalletValuation } from './useWalletValuation';
 
 export function useWalletPricing(walletId: string) {
@@ -23,6 +24,7 @@ export function useWalletPricing(walletId: string) {
   } = useFetcher<typeof pricingLoader>();
   const refresh = useFetcher<typeof priceRefreshAction>();
   const { data: quotaResult, refresh: refreshQuota } = useProviderQuota();
+  const quotaState = useProviderQuotaState();
   const { submit, reset } = refresh;
   const lastRefreshResult = useRef(refresh.data);
   const lastProgressRead = useRef(progressData);
@@ -30,7 +32,7 @@ export function useWalletPricing(walletId: string) {
   const fullReadInFlight = useRef(false);
   const valuation = useWalletValuation(walletId, data?.valuation);
   const [paused, setPaused] = useState(false);
-  const automaticRequestSent = useRef(false);
+  const automaticRequestDay = useRef<string | undefined>(undefined);
   const exhaustedPendingChecked = useRef(false);
   const polls = useRef(0);
   const resource = `/wallets/${walletId}/pricing`;
@@ -97,18 +99,52 @@ export function useWalletPricing(walletId: string) {
     }
   }, [refresh.state, refresh.data, readPrices]);
 
+  const checkAgain = useCallback(() => {
+    polls.current = 0;
+    exhaustedPendingChecked.current = false;
+    setPaused(false);
+    reset();
+    readPrices();
+  }, [readPrices, reset]);
+
+  usePricingRevalidation({
+    quotaDate: quota?.quotaDate,
+    busy: state !== 'idle' || progressState !== 'idle' || refresh.state !== 'idle',
+    revalidate: checkAgain,
+  });
+
   useEffect(() => {
     if (
       state === 'idle' &&
+      progressState === 'idle' &&
+      refresh.state === 'idle' &&
+      quotaState === 'idle' &&
+      !fullReadInFlight.current &&
+      !valuationFailed &&
+      !statusFailed &&
       needsPrice &&
       !pricesBehindStatus &&
       canRefresh &&
-      !automaticRequestSent.current
+      quota &&
+      automaticRequestDay.current !== quota.quotaDate
     ) {
-      automaticRequestSent.current = true;
+      automaticRequestDay.current = quota.quotaDate;
       void submit({}, { method: 'post', action: resource, defaultShouldRevalidate: false });
     }
-  }, [state, needsPrice, pricesBehindStatus, canRefresh, submit, resource, walletId]);
+  }, [
+    state,
+    progressState,
+    refresh.state,
+    quotaState,
+    valuationFailed,
+    statusFailed,
+    needsPrice,
+    pricesBehindStatus,
+    canRefresh,
+    quota,
+    submit,
+    resource,
+  ]);
 
   useEffect(() => {
     if (
@@ -157,21 +193,13 @@ export function useWalletPricing(walletId: string) {
     resource,
   ]);
 
-  const checkAgain = useCallback(() => {
-    polls.current = 0;
-    exhaustedPendingChecked.current = false;
-    setPaused(false);
-    reset();
-    readPrices();
-  }, [readPrices, reset]);
-
   const requestRefresh = useCallback(() => {
     polls.current = 0;
     exhaustedPendingChecked.current = false;
     setPaused(false);
-    automaticRequestSent.current = true;
+    automaticRequestDay.current = quota?.quotaDate;
     void submit({}, { method: 'post', action: resource, defaultShouldRevalidate: false });
-  }, [submit, resource]);
+  }, [submit, resource, quota?.quotaDate]);
 
   return useMemo(
     () => ({
