@@ -21,16 +21,18 @@ import { TransactionHistory } from '../_components/TransactionHistory';
 import { WalletPricing } from '../_components/WalletPricing';
 import { ledgerPageOptions, loadHistory } from '../_utils/loadLedger';
 import { loadWallet } from '../_utils/loadWallet';
+import { requireWalletId } from '../_utils/requireWalletId';
 import { walletDictionary as walletMsg } from '../walletDictionary';
 import { DeleteWalletDialog } from './_components/DeleteWalletDialog';
 
 export async function walletDetailLoader(args: LoaderFunctionArgs) {
+  const walletId = requireWalletId(args.params);
   const client = createRequestClient(args.request.signal);
-  const wallet = await loadWallet(args, client);
   const api = createLedgerApi(client);
-  const [summary, history] = await Promise.all([
-    api.holdings(wallet.id),
-    loadHistory(api, args.request, wallet.id),
+  const [wallet, summary, history] = await Promise.all([
+    loadWallet(args, client),
+    api.holdings(walletId),
+    loadHistory(api, args.request, walletId),
   ]);
   return { wallet, summary: requirePageData(summary, ledgerPageOptions), history };
 }

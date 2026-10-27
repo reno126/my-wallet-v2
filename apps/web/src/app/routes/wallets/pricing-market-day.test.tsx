@@ -193,6 +193,7 @@ describe('when a mounted pricing view crosses a market day', () => {
     advanceMarketDay();
     // Assert
     await waitFor(() => expect(requests).toBe(1));
+    await within(page.panel).findByText(text.freshness.fresh);
     await page.settled();
     await waitFor(() => expect(quotaReads).toBeGreaterThan(initialQuotaReads + 3));
     expect(reads).toBe(3);
